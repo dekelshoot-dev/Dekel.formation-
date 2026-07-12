@@ -1,0 +1,6 @@
+{
+  "name": "Systeme.io Formation",
+  "description": "Plateforme complète de formation en ligne pour formateurs et étudiants inspirée de Systeme.io, avec gestion des modules, chapitres, progression des élèves et catalogue de cours.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

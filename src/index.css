@@ -5,32 +5,171 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Theme 1: Aura Cosmique (Option 1 - Thème Sombre Premium) */
+.theme-cosmic {
+  --bg-app: #0f172a;
+  --text-app: #f1f5f9;
+  --mesh-bg-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                     radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                     radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-light-bg: rgba(255, 255, 255, 0.08);
+  --glass-light-border: rgba(255, 255, 255, 0.15);
+  --brand-text: #ffffff;
+  --brand-logo-text: #818cf8;
+  --header-text: #cbd5e1;
+  --header-text-hover: #ffffff;
+
+  --color-indigo-50: #f5f3ff;
+  --color-indigo-100: #ede9fe;
+  --color-indigo-200: #ddd6fe;
+  --color-indigo-300: #c4b5fd;
+  --color-indigo-400: #a78bfa;
+  --color-indigo-500: #8b5cf6;
+  --color-indigo-600: #7c3aed;
+  --color-indigo-700: #6d28d9;
+  --color-indigo-800: #5b21b6;
+  --color-indigo-900: #4c1d95;
+  --color-indigo-950: #2e1065;
+}
+
+/* Theme 2: Ardoise Minimaliste (Option 2 - Thème Clair Moderne) */
+:root, .theme-slate {
+  --bg-app: #f8fafc;
+  --text-app: #0f172a;
+  --mesh-bg-image: radial-gradient(at 0% 0%, #f1f5f9 0, transparent 70%), 
+                     radial-gradient(at 50% 0%, #e2e8f0 0, transparent 70%), 
+                     radial-gradient(at 100% 0%, #cbd5e1 0, transparent 70%);
+  --glass-bg: #ffffff;
+  --glass-border: rgba(148, 163, 184, 0.25);
+  --glass-light-bg: #ffffff;
+  --glass-light-border: rgba(148, 163, 184, 0.2);
+  --brand-text: #0f172a;
+  --brand-logo-text: #475569;
+  --header-text: #334155;
+  --header-text-hover: #0f172a;
+
+  --color-indigo-50: #ffffff;
+  --color-indigo-100: #ffffff;
+  --color-indigo-200: #e2e8f0;
+  --color-indigo-300: #cbd5e1;
+  --color-indigo-400: #94a3b8;
+  --color-indigo-500: #64748b;
+  --color-indigo-600: #475569;
+  --color-indigo-700: #334155;
+  --color-indigo-800: #1e293b;
+  --color-indigo-900: #0f172a;
+  --color-indigo-950: #020617;
+}
+
+/* Theme 3: Sauge Chaleureuse (Option 3 - Thème Naturel & Organique) */
+.theme-sage {
+  --bg-app: #f5f4ef;
+  --text-app: #1c281f;
+  --mesh-bg-image: radial-gradient(at 0% 0%, #ebede5 0, transparent 70%), 
+                     radial-gradient(at 50% 0%, #f1efe9 0, transparent 70%), 
+                     radial-gradient(at 100% 0%, #e8e6df 0, transparent 70%);
+  --glass-bg: rgba(253, 252, 249, 0.9);
+  --glass-border: rgba(40, 60, 45, 0.12);
+  --glass-light-bg: rgba(253, 252, 249, 0.95);
+  --glass-light-border: rgba(40, 60, 45, 0.15);
+  --brand-text: #1c281f;
+  --brand-logo-text: #2d4a34;
+  --header-text: #425745;
+  --header-text-hover: #1c281f;
+
+  --color-indigo-50: #f4f7f5;
+  --color-indigo-100: #e3ebe6;
+  --color-indigo-200: #cad8cf;
+  --color-indigo-300: #a3bdae;
+  --color-indigo-400: #749c85;
+  --color-indigo-500: #517e65;
+  --color-indigo-600: #3e634f;
+  --color-indigo-700: #335040;
+  --color-indigo-800: #2a4034;
+  --color-indigo-900: #23352b;
+  --color-indigo-950: #111c16;
+}
+
+/* Theme 4: Nature (Style Spotify – Thème Clair) */
+.theme-nature {
+  --bg-app: #FFFFFF;
+  --text-app: #121212;
+  --mesh-bg-image: none; /* No mesh background since it's a solid/minimalist clear theme */
+  --glass-bg: #FFFFFF;
+  --glass-border: #E5E7EB;
+  --glass-light-bg: rgba(255, 255, 255, 0.9);
+  --glass-light-border: #E5E7EB;
+  --brand-text: #1DB954;
+  --brand-logo-text: #169C46;
+  --header-text: #374151;
+  --header-text-hover: #1DB954;
+
+  --color-indigo-50: #E8F8EE;
+  --color-indigo-100: #C2F0D0;
+  --color-indigo-200: #8CE2A8;
+  --color-indigo-300: #52D67A;
+  --color-indigo-400: #2CBF60;
+  --color-indigo-500: #1DB954; /* Main Green */
+  --color-indigo-600: #169C46; /* Darker Green */
+  --color-indigo-700: #117B36;
+  --color-indigo-800: #0D5D29;
+  --color-indigo-900: #09411D;
+  --color-indigo-950: #052611;
+}
+
+/* Theme 5: Nature Dark (Style Spotify – Thème Sombre Premium) */
+.theme-nature-dark {
+  --bg-app: #0F1115;
+  --text-app: #E5E7EB;
+  --mesh-bg-image: none; /* Spotify style is solid/minimal dark */
+  --glass-bg: #1B2028;
+  --glass-border: #2D3748;
+  --glass-light-bg: rgba(15, 17, 21, 0.9);
+  --glass-light-border: #2D3748;
+  --brand-text: #FFFFFF;
+  --brand-logo-text: #1DB954;
+  --header-text: #9CA3AF;
+  --header-text-hover: #FFFFFF;
+
+  --color-indigo-50: rgba(29, 185, 84, 0.18);
+  --color-indigo-100: #1B2028;
+  --color-indigo-200: #20262F;
+  --color-indigo-300: #252C36;
+  --color-indigo-400: #1ED760;
+  --color-indigo-500: #1DB954; /* Main Green */
+  --color-indigo-600: #169C46; /* Darker Green */
+  --color-indigo-700: #117B36;
+  --color-indigo-800: #0D5D29;
+  --color-indigo-900: #09411D;
+  --color-indigo-950: #052611;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
 }
 
 .mesh-bg {
-  background-color: #0f172a;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+  background-color: var(--bg-app);
+  background-image: var(--mesh-bg-image);
   background-attachment: fixed;
+  color: var(--text-app);
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
 }
 
 .glass-light {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-light-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--glass-light-border);
 }
 
 .accent-gradient {
@@ -39,6 +178,34 @@ body {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Custom Minimalist Scrollbars (Un petit trait qui monte et descend) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+/* Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
 }
 
 /* Markdown Rendering Styling */
@@ -143,4 +310,1098 @@ body {
   padding: 0.5rem 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* --- Theme 2: Ardoise Minimaliste (Clair Moderne) Navigation Overrides --- */
+.theme-slate {
+  color-scheme: light;
+}
+
+.theme-slate .glass-light nav button,
+.theme-slate .glass-light .relative > button,
+.theme-slate .glass-light .theme-header-text {
+  color: var(--header-text) !important;
+}
+
+.theme-slate .glass-light nav button:hover,
+.theme-slate .glass-light .relative > button:hover {
+  background: rgba(148, 163, 184, 0.1) !important;
+  color: var(--header-text-hover) !important;
+}
+
+/* Adjust active button in Slate Theme */
+.theme-slate .glass-light nav button.bg-white\/10 {
+  background: rgba(148, 163, 184, 0.15) !important;
+  color: #020617 !important;
+}
+
+/* Ensure body/root text elements have high legibility */
+.theme-slate .theme-brand-text {
+  color: var(--brand-text) !important;
+}
+
+.theme-slate .theme-brand-logo {
+  color: var(--brand-logo-text) !important;
+}
+
+/* Safe dynamic light contrast for text elements */
+.theme-slate .text-slate-400 {
+  color: #57606a !important; /* accessible dark gray */
+}
+
+.theme-slate .text-slate-300 {
+  color: #444d56 !important;
+}
+
+.theme-slate .text-slate-200 {
+  color: #24292e !important;
+}
+
+.theme-slate .text-slate-100 {
+  color: #1b1f23 !important;
+}
+
+/* Specific cards & sections within the Student & Admin dashboards */
+.theme-slate .bg-slate-900,
+.theme-slate .bg-slate-950,
+.theme-slate .bg-slate-900\/95 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+.theme-slate .border-white\/10 {
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+.theme-slate .text-white {
+  /* Only target headings or icons that should be dark in light mode */
+  color: #0f172a !important;
+}
+
+/* Prevent solid primary buttons with .text-white from having dark text */
+.theme-slate button.bg-indigo-600 .text-white,
+.theme-slate button.bg-indigo-600,
+.theme-slate button.accent-gradient,
+.theme-slate .bg-indigo-600,
+.theme-slate .bg-indigo-600 .text-white,
+.theme-slate .bg-red-600,
+.theme-slate .bg-red-600 .text-white,
+.theme-slate .accent-gradient,
+.theme-slate .bg-emerald-600,
+.theme-slate .bg-emerald-600 .text-white,
+.theme-slate .bg-indigo-500,
+.theme-slate .bg-indigo-500 .text-white {
+  color: #ffffff !important;
+}
+
+.theme-slate .markdown-body p,
+.theme-slate .markdown-body li {
+  color: #24292e !important;
+}
+
+.theme-slate .markdown-body h1,
+.theme-slate .markdown-body h2,
+.theme-slate .markdown-body h3 {
+  color: #0f172a !important;
+}
+
+/* --- Theme 3: Sauge Chaleureuse (Thème Naturel & Organique) Navigation Overrides --- */
+.theme-sage {
+  color-scheme: light;
+}
+
+.theme-sage .glass-light nav button,
+.theme-sage .glass-light .relative > button,
+.theme-sage .glass-light .theme-header-text {
+  color: var(--header-text) !important;
+}
+
+.theme-sage .glass-light nav button:hover,
+.theme-sage .glass-light .relative > button:hover {
+  background: rgba(81, 126, 101, 0.1) !important;
+  color: var(--header-text-hover) !important;
+}
+
+/* Adjust active button in Sage Theme */
+.theme-sage .glass-light nav button.bg-white\/10 {
+  background: rgba(81, 126, 101, 0.15) !important;
+  color: #1c281f !important;
+}
+
+/* Ensure body/root text elements have high legibility */
+.theme-sage .theme-brand-text {
+  color: var(--brand-text) !important;
+}
+
+.theme-sage .theme-brand-logo {
+  color: var(--brand-logo-text) !important;
+}
+
+/* Safe dynamic light contrast for organic text elements */
+.theme-sage .text-slate-400 {
+  color: #5c6e5e !important; /* accessible dark sage-gray */
+}
+
+.theme-sage .text-slate-300 {
+  color: #435245 !important;
+}
+
+.theme-sage .text-slate-200 {
+  color: #232e25 !important;
+}
+
+.theme-sage .text-slate-100 {
+  color: #161e18 !important;
+}
+
+/* Specific cards & sections within dashboards for Sage */
+.theme-sage .bg-slate-900,
+.theme-sage .bg-slate-950,
+.theme-sage .bg-slate-900\/95 {
+  background-color: #fdfdfb !important;
+  color: #1c281f !important;
+  border-color: rgba(81, 126, 101, 0.15) !important;
+}
+
+.theme-sage .border-white\/10 {
+  border-color: rgba(81, 126, 101, 0.15) !important;
+}
+
+.theme-sage .text-white {
+  /* Only target headings or icons that should be dark in light mode */
+  color: #1c281f !important;
+}
+
+/* Prevent solid primary buttons with .text-white from having dark text */
+.theme-sage button.bg-indigo-600 .text-white,
+.theme-sage button.bg-indigo-600,
+.theme-sage button.accent-gradient,
+.theme-sage .bg-indigo-600,
+.theme-sage .bg-indigo-600 .text-white,
+.theme-sage .bg-red-600,
+.theme-sage .bg-red-600 .text-white,
+.theme-sage .accent-gradient,
+.theme-sage .bg-emerald-600,
+.theme-sage .bg-emerald-600 .text-white,
+.theme-sage .bg-indigo-500,
+.theme-sage .bg-indigo-500 .text-white {
+  color: #ffffff !important;
+}
+
+.theme-sage .markdown-body p,
+.theme-sage .markdown-body li {
+  color: #232e25 !important;
+}
+
+.theme-sage .markdown-body h1,
+.theme-sage .markdown-body h2,
+.theme-sage .markdown-body h3 {
+  color: #1c281f !important;
+}
+
+/* --- Ardoise Moderne (Slate Theme) Overrides for Solid White Backgrounds & Perfect Contrast --- */
+.theme-slate {
+  --bg-app: #f8fafc;
+  --text-app: #090d16;
+}
+
+/* Override utility grey/slate backgrounds inside cards, panels, fields, forms, and headers with pure white */
+.theme-slate .bg-slate-50,
+.theme-slate .bg-slate-100,
+.theme-slate .bg-slate-150,
+.theme-slate .bg-slate-200/50,
+.theme-slate .bg-slate-50/50,
+.theme-slate .bg-slate-100/50,
+.theme-slate .bg-gray-50,
+.theme-slate .bg-gray-100,
+.theme-slate .bg-white/5,
+.theme-slate .bg-white/10,
+.theme-slate .bg-white\/5,
+.theme-slate .bg-white\/10,
+.theme-slate .bg-slate-50\/50,
+.theme-slate .bg-slate-100\/50 {
+  background-color: #ffffff !important;
+}
+
+/* Forms, inputs, selectors, and textareas */
+.theme-slate input[type="text"],
+.theme-slate input[type="email"],
+.theme-slate input[type="tel"],
+.theme-slate input[type="password"],
+.theme-slate input[type="url"],
+.theme-slate input[type="search"],
+.theme-slate select,
+.theme-slate textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.theme-slate input::placeholder,
+.theme-slate textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* High contrast text overrides */
+.theme-slate .text-slate-400,
+.theme-slate .text-slate-500 {
+  color: #475569 !important;
+}
+.theme-slate .text-slate-300 {
+  color: #334155 !important;
+}
+.theme-slate .text-slate-200 {
+  color: #1e293b !important;
+}
+.theme-slate .text-white {
+  color: #0f172a !important;
+}
+
+/* Force solid colors on primary filled buttons and icons inside them */
+.theme-slate button.bg-indigo-600,
+.theme-slate button.bg-indigo-600 *,
+.theme-slate button.bg-emerald-600,
+.theme-slate button.bg-emerald-600 *,
+.theme-slate button.bg-rose-600,
+.theme-slate button.bg-rose-600 *,
+.theme-slate button.bg-red-600,
+.theme-slate button.bg-red-600 *,
+.theme-slate .accent-gradient,
+.theme-slate .accent-gradient * {
+  color: #ffffff !important;
+}
+
+/* Correct Markdown Rendering in Slate Theme (Option 2) */
+.theme-slate .markdown-body p,
+.theme-slate .markdown-body ul,
+.theme-slate .markdown-body ol,
+.theme-slate .markdown-body li {
+  color: #334155 !important;
+}
+.theme-slate .markdown-body h1 {
+  color: #0f172a !important;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1) !important;
+}
+.theme-slate .markdown-body h2 {
+  color: #1e293b !important;
+}
+.theme-slate .markdown-body h3 {
+  color: #334155 !important;
+}
+.theme-slate .markdown-body code {
+  color: #0f172a !important;
+  background-color: rgba(15, 23, 42, 0.05) !important;
+}
+.theme-slate .markdown-body blockquote {
+  color: #64748b !important;
+  border-left-color: #64748b !important;
+}
+.theme-slate .markdown-body a {
+  color: #2563eb !important;
+}
+
+/* --- Theme 4: Nature (Style Spotify – Thème Clair) Navigation & Visual Overrides --- */
+.theme-nature {
+  color-scheme: light;
+}
+
+.theme-nature .glass-light nav button,
+.theme-nature .glass-light .relative > button,
+.theme-nature .glass-light .theme-header-text {
+  color: var(--header-text) !important;
+}
+
+.theme-nature .glass-light nav button:hover,
+.theme-nature .glass-light .relative > button:hover {
+  background: #F3F4F6 !important;
+  color: var(--header-text-hover) !important;
+}
+
+/* Adjust active button in Nature Theme */
+.theme-nature .glass-light nav button.bg-white\/10 {
+  background: #E8F8EE !important;
+  color: #1DB954 !important;
+}
+
+/* Ensure body/root text elements have high legibility */
+.theme-nature .theme-brand-text {
+  color: var(--brand-text) !important;
+}
+
+.theme-nature .theme-brand-logo {
+  color: var(--brand-logo-text) !important;
+}
+
+/* Safe dynamic light contrast for nature text elements */
+.theme-nature .text-slate-400 {
+  color: #6B7280 !important; /* accessible dark gray */
+}
+
+.theme-nature .text-slate-300 {
+  color: #4B5563 !important;
+}
+
+.theme-nature .text-slate-200 {
+  color: #1F2937 !important;
+}
+
+.theme-nature .text-slate-100 {
+  color: #111827 !important;
+}
+
+/* Specific cards & sections within dashboards */
+.theme-nature .bg-slate-900,
+.theme-nature .bg-slate-950,
+.theme-nature .bg-slate-900\/95 {
+  background-color: #FFFFFF !important;
+  color: #111827 !important;
+  border-color: #E5E7EB !important;
+}
+
+.theme-nature .border-white\/10 {
+  border-color: #E5E7EB !important;
+}
+
+.theme-nature .text-white {
+  color: #111827 !important;
+}
+
+/* Overriding other dark backgrounds with white/off-white */
+.theme-nature .bg-slate-50,
+.theme-nature .bg-slate-100,
+.theme-nature .bg-slate-150,
+.theme-nature .bg-slate-200/50,
+.theme-nature .bg-slate-50/50,
+.theme-nature .bg-slate-100/50,
+.theme-nature .bg-gray-50,
+.theme-nature .bg-gray-100,
+.theme-nature .bg-white/5,
+.theme-nature .bg-white/10,
+.theme-nature .bg-white\/5,
+.theme-nature .bg-white\/10,
+.theme-nature .bg-slate-50\/50,
+.theme-nature .bg-slate-100\/50 {
+  background-color: #FFFFFF !important;
+}
+
+.theme-nature .bg-slate-900\/40 {
+  background-color: #F8F9FA !important;
+}
+
+/* Prevent solid primary buttons with .text-white from having dark text */
+.theme-nature button.bg-indigo-600 .text-white,
+.theme-nature button.bg-indigo-600,
+.theme-nature button.accent-gradient,
+.theme-nature .bg-indigo-600,
+.theme-nature .bg-indigo-600 .text-white,
+.theme-nature .bg-red-600,
+.theme-nature .bg-red-600 .text-white,
+.theme-nature .accent-gradient,
+.theme-nature .bg-emerald-600,
+.theme-nature .bg-emerald-600 .text-white,
+.theme-nature .bg-indigo-500,
+.theme-nature .bg-indigo-500 .text-white {
+  color: #ffffff !important;
+}
+
+.theme-nature .markdown-body p,
+.theme-nature .markdown-body li {
+  color: #1F2937 !important;
+}
+
+.theme-nature .markdown-body h1,
+.theme-nature .markdown-body h2,
+.theme-nature .markdown-body h3 {
+  color: #111827 !important;
+}
+
+/* Premium styling for cards as per specification */
+.theme-nature .card-premium {
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.05) !important;
+  transition: all 250ms ease-in-out !important;
+}
+.theme-nature .card-premium:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  background-color: #F3F4F6 !important;
+}
+
+/* Sidebar Custom Styling */
+.theme-nature .sidebar-container {
+  width: 280px !important;
+  background-color: #FFFFFF !important;
+  border-right: 1px solid #ECECEC !important;
+}
+
+.theme-nature .sidebar-menu-active {
+  background-color: #E8F8EE !important;
+  color: #1DB954 !important;
+}
+
+.theme-nature .sidebar-menu-hover:hover {
+  background-color: #F7F7F7 !important;
+}
+
+/* Inputs styling */
+.theme-nature input[type="text"],
+.theme-nature input[type="email"],
+.theme-nature input[type="tel"],
+.theme-nature input[type="password"],
+.theme-nature input[type="url"],
+.theme-nature input[type="search"],
+.theme-nature select,
+.theme-nature textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #DADADA !important;
+  border-radius: 12px !important;
+  transition: all 250ms ease-in-out !important;
+}
+
+.theme-nature input[type="text"]:focus,
+.theme-nature input[type="email"]:focus,
+.theme-nature input[type="tel"]:focus,
+.theme-nature input[type="password"]:focus,
+.theme-nature input[type="url"]:focus,
+.theme-nature input[type="search"]:focus,
+.theme-nature select:focus,
+.theme-nature textarea:focus {
+  border: 2px solid #1DB954 !important;
+  outline: none !important;
+}
+
+.theme-nature input::placeholder,
+.theme-nature textarea::placeholder {
+  color: #9CA3AF !important;
+}
+
+/* Course active chapter highlighting */
+.theme-nature .course-chapter-active {
+  background-color: #E8F8EE !important;
+}
+
+/* Course active chapter text styling to avoid default colors */
+.theme-nature .course-chapter-active span,
+.theme-nature .course-chapter-active p,
+.theme-nature .course-chapter-active div {
+  color: #1DB954 !important;
+}
+
+/* Correct Markdown Rendering in Nature Theme */
+.theme-nature .markdown-body p,
+.theme-nature .markdown-body ul,
+.theme-nature .markdown-body ol,
+.theme-nature .markdown-body li {
+  color: #374151 !important;
+}
+.theme-nature .markdown-body h1 {
+  color: #111827 !important;
+  border-bottom: 1px solid #E5E7EB !important;
+}
+.theme-nature .markdown-body h2 {
+  color: #1F2937 !important;
+}
+.theme-nature .markdown-body h3 {
+  color: #374151 !important;
+}
+.theme-nature .markdown-body code {
+  color: #111827 !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+.theme-nature .markdown-body blockquote {
+  color: #4B5563 !important;
+  border-left-color: #1DB954 !important;
+}
+.theme-nature .markdown-body a {
+  color: #1DB954 !important;
+}
+
+/* --- Theme 5: Nature Dark (Style Spotify – Thème Sombre Premium) Navigation & Overrides --- */
+.theme-nature-dark {
+  color-scheme: dark;
+  background-color: #0F1115 !important;
+  color: #E5E7EB !important;
+}
+
+/* Force body background and mesh override */
+.theme-nature-dark,
+body.theme-nature-dark,
+.theme-nature-dark .mesh-bg {
+  background-color: #0F1115 !important;
+  background-image: none !important;
+}
+
+/* Base text contrast */
+.theme-nature-dark .text-slate-900,
+.theme-nature-dark .text-slate-800,
+.theme-nature-dark h1,
+.theme-nature-dark h2,
+.theme-nature-dark h3,
+.theme-nature-dark h4 {
+  color: #FFFFFF !important;
+}
+
+.theme-nature-dark .text-slate-700,
+.theme-nature-dark .text-slate-600,
+.theme-nature-dark p,
+.theme-nature-dark span:not(.text-emerald-500):not(.text-emerald-400):not(.text-red-500):not(.text-amber-500) {
+  color: #E5E7EB !important;
+}
+
+.theme-nature-dark .text-slate-500 {
+  color: #9CA3AF !important;
+}
+
+.theme-nature-dark .text-slate-400 {
+  color: #6B7280 !important; /* Accessible light gray */
+}
+
+.theme-nature-dark .text-slate-300 {
+  color: #D1D5DB !important;
+}
+
+.theme-nature-dark .text-slate-200 {
+  color: #E5E7EB !important;
+}
+
+.theme-nature-dark .text-slate-100 {
+  color: #F3F4F6 !important;
+}
+
+.theme-nature-dark .text-white {
+  color: #FFFFFF !important;
+}
+
+/* Header & Glassmorphism Navigation bar */
+.theme-nature-dark header.glass-light,
+.theme-nature-dark .glass-light {
+  background-color: rgba(15, 17, 21, 0.9) !important;
+  border-color: #2D3748 !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+}
+
+.theme-nature-dark .glass-light nav button,
+.theme-nature-dark .glass-light .relative > button,
+.theme-nature-dark .glass-light .theme-header-text {
+  color: #9CA3AF !important;
+}
+
+.theme-nature-dark .glass-light nav button:hover,
+.theme-nature-dark .glass-light .relative > button:hover {
+  background: #252C36 !important;
+  color: #FFFFFF !important;
+}
+
+/* Active navigation state */
+.theme-nature-dark .glass-light nav button.bg-white\/10 {
+  background: rgba(29, 185, 84, 0.18) !important;
+  color: #1DB954 !important;
+}
+
+.theme-nature-dark .theme-brand-text {
+  color: #FFFFFF !important;
+}
+
+.theme-nature-dark .theme-brand-logo {
+  color: #1DB954 !important;
+}
+
+/* Dashboard & Cards Background Overrides (Standard bg-white converted to premium dark card) */
+.theme-nature-dark .bg-white,
+.theme-nature-dark .bg-slate-900,
+.theme-nature-dark .bg-slate-900\/95,
+.theme-nature-dark .bg-slate-850,
+.theme-nature-dark .bg-slate-800 {
+  background-color: #1B2028 !important;
+  color: #E5E7EB !important;
+  border-color: #2D3748 !important;
+}
+
+/* Outer layout panel backgrounds */
+.theme-nature-dark .bg-slate-950 {
+  background-color: #0F1115 !important;
+  color: #E5E7EB !important;
+  border-color: #2D3748 !important;
+}
+
+/* Right-side main content pane override (and any other full-width main content pane) */
+.theme-nature-dark .flex-1.bg-white,
+.theme-nature-dark div.flex-1.bg-white,
+.theme-nature-dark main div.flex-1.bg-white {
+  background-color: #161A20 !important;
+  color: #E5E7EB !important;
+  border-color: #2D3748 !important;
+}
+
+/* Secondary off-black layout backgrounds and general non-elevated states */
+.theme-nature-dark .bg-slate-50,
+.theme-nature-dark .bg-slate-100,
+.theme-nature-dark .bg-slate-150,
+.theme-nature-dark .bg-slate-200/50,
+.theme-nature-dark .bg-slate-50/50,
+.theme-nature-dark .bg-slate-100/50,
+.theme-nature-dark .bg-slate-900\/40,
+.theme-nature-dark .bg-gray-50,
+.theme-nature-dark .bg-gray-100,
+.theme-nature-dark .bg-white/5,
+.theme-nature-dark .bg-white/10,
+.theme-nature-dark .bg-white\/5,
+.theme-nature-dark .bg-white\/10,
+.theme-nature-dark .bg-slate-50\/50,
+.theme-nature-dark .bg-slate-100\/50 {
+  background-color: #1B2028 !important; /* Elegant card background */
+  color: #E5E7EB !important;
+  border-color: #2D3748 !important;
+}
+
+/* Elevating elements inside the right-side content pane to #1B2028 or #20262F */
+.theme-nature-dark .flex-1.bg-white .bg-slate-50,
+.theme-nature-dark .flex-1.bg-white .bg-slate-100,
+.theme-nature-dark .flex-1.bg-white .bg-slate-50\/50,
+.theme-nature-dark .flex-1.bg-white .bg-slate-100\/50,
+.theme-nature-dark .flex-1.bg-white .bg-white,
+.theme-nature-dark .flex-1.bg-white .bg-white.rounded-xl,
+.theme-nature-dark .flex-1.bg-white .bg-white.rounded-2xl {
+  background-color: #1B2028 !important; /* Stands out perfectly against #161A20 background! */
+  color: #E5E7EB !important;
+  border: 1px solid #2D3748 !important;
+}
+
+/* Specific inner cards that should be even lighter to stand out, like stats mini cards or code elements */
+.theme-nature-dark .flex-1.bg-white .bg-white.p-3,
+.theme-nature-dark .flex-1.bg-white .bg-slate-50.p-3,
+.theme-nature-dark .flex-1.bg-white .border.bg-white,
+.theme-nature-dark .flex-1.bg-white .border-slate-150.rounded-xl {
+  background-color: #20262F !important; /* Lighter Panel color */
+  color: #FFFFFF !important;
+  border-color: #374151 !important;
+}
+
+/* Specific Panel/Modal background override */
+.theme-nature-dark .course-editor-module-header {
+  background-color: #010101 !important;
+}
+
+.theme-nature-dark .course-editor-chapter-list-container {
+  background-color: #000000 !important;
+}
+
+.theme-nature-dark .bg-slate-200 {
+  background-color: #20262F !important;
+}
+
+/* Border controls */
+.theme-nature-dark .border-slate-200,
+.theme-nature-dark .border-slate-250,
+.theme-nature-dark .border-slate-150,
+.theme-nature-dark .border-slate-100,
+.theme-nature-dark .border-slate-300,
+.theme-nature-dark .border-red-100,
+.theme-nature-dark .border-indigo-100,
+.theme-nature-dark .border-white\/10,
+.theme-nature-dark .border-slate-800 {
+  border-color: #2D3748 !important;
+}
+
+/* Cards & Elevated Containers as per specification */
+.theme-nature-dark .card-premium,
+.theme-nature-dark .bg-white.rounded-2xl,
+.theme-nature-dark .bg-white.rounded-3xl,
+.theme-nature-dark .bg-white.rounded-xl {
+  background-color: #1B2028 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35) !important;
+  border: 1px solid #2D3748 !important;
+  transition: all 250ms ease-in-out !important;
+}
+
+.theme-nature-dark .card-premium:hover,
+.theme-nature-dark .bg-white.rounded-2xl:hover,
+.theme-nature-dark .bg-white.rounded-3xl:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  background-color: #252C36 !important;
+}
+
+/* Table row hovering */
+.theme-nature-dark tbody tr:hover,
+.theme-nature-dark tr.hover\:bg-slate-50\/50:hover,
+.theme-nature-dark .hover\:bg-slate-50\/50:hover {
+  background-color: #252C36 !important;
+}
+
+/* Table head styling */
+.theme-nature-dark thead tr,
+.theme-nature-dark .bg-slate-50 {
+  background-color: #161A20 !important;
+}
+
+/* Sidebar Custom Styling as per specification */
+.theme-nature-dark .sidebar-container,
+.theme-nature-dark .md\:w-60.bg-white {
+  width: 280px !important;
+  background-color: #181D24 !important; /* Menus background */
+  border-right: 1px solid #2D3748 !important;
+}
+
+/* Active and Hover Sidebar elements */
+.theme-nature-dark .sidebar-menu-active,
+.theme-nature-dark .bg-red-50.text-red-900,
+.theme-nature-dark .bg-indigo-50.text-indigo-600 {
+  background-color: rgba(29, 185, 84, 0.18) !important;
+  color: #1DB954 !important;
+  border-color: rgba(29, 185, 84, 0.3) !important;
+  font-weight: 700 !important;
+}
+
+.theme-nature-dark .sidebar-menu-active svg,
+.theme-nature-dark .bg-red-50.text-red-900 svg,
+.theme-nature-dark .bg-indigo-50.text-indigo-600 svg {
+  color: #1DB954 !important;
+}
+
+.theme-nature-dark .sidebar-menu-hover:hover,
+.theme-nature-dark .hover\:bg-slate-50:hover,
+.theme-nature-dark .hover\:bg-slate-100:hover {
+  background-color: #252C36 !important;
+}
+
+/* Icons accent colors and stats layout card decorations */
+.theme-nature-dark .bg-indigo-50,
+.theme-nature-dark .bg-red-50,
+.theme-nature-dark .bg-emerald-50,
+.theme-nature-dark .bg-sky-50,
+.theme-nature-dark .bg-purple-50 {
+  background-color: rgba(29, 185, 84, 0.15) !important;
+}
+
+.theme-nature-dark .text-indigo-600,
+.theme-nature-dark .text-red-600,
+.theme-nature-dark .text-emerald-600,
+.theme-nature-dark .text-sky-600,
+.theme-nature-dark .text-purple-600,
+.theme-nature-dark .text-red-500,
+.theme-nature-dark .text-indigo-500 {
+  color: #1DB954 !important;
+}
+
+/* Primary buttons mapping as per specification (Height 48px, Radius 14px, Main Green, White Text) */
+.theme-nature-dark button.bg-indigo-600,
+.theme-nature-dark button.bg-red-600,
+.theme-nature-dark button.bg-emerald-600,
+.theme-nature-dark button.accent-gradient,
+.theme-nature-dark .accent-gradient {
+  background: #1DB954 !important;
+  color: #FFFFFF !important;
+  border-radius: 14px !important;
+  border: none !important;
+  font-weight: 600 !important;
+  transition: all 250ms ease-in-out !important;
+}
+
+.theme-nature-dark button.bg-indigo-600:hover,
+.theme-nature-dark button.bg-red-600:hover,
+.theme-nature-dark button.bg-emerald-600:hover,
+.theme-nature-dark button.accent-gradient:hover,
+.theme-nature-dark .accent-gradient:hover {
+  background: #1ED760 !important;
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3) !important;
+}
+
+/* Secondary buttons (Transparent, border #374151, White Text, Hover #252C36) */
+.theme-nature-dark button.bg-white:not(.accent-gradient),
+.theme-nature-dark button.border-slate-200,
+.theme-nature-dark button.border-slate-300 {
+  background-color: transparent !important;
+  color: #FFFFFF !important;
+  border: 1px solid #374151 !important;
+  border-radius: 14px !important;
+  transition: all 250ms ease-in-out !important;
+}
+
+.theme-nature-dark button.bg-white:not(.accent-gradient):hover,
+.theme-nature-dark button.border-slate-200:hover,
+.theme-nature-dark button.border-slate-300:hover {
+  background-color: #252C36 !important;
+  border-color: #1DB954 !important;
+}
+
+/* Horizontal top tabs in Trainer Dashboard */
+.theme-nature-dark .border-b-2.border-indigo-600,
+.theme-nature-dark .border-b-2.border-indigo-600 span {
+  border-color: #1DB954 !important;
+  color: #1DB954 !important;
+}
+
+.theme-nature-dark .border-b-2.border-transparent:hover {
+  color: #FFFFFF !important;
+}
+
+/* Inputs styling (Background #20262F, Border #374151, Text #FFFFFF, Focus 2px solid #1DB954) */
+.theme-nature-dark input[type="text"],
+.theme-nature-dark input[type="email"],
+.theme-nature-dark input[type="tel"],
+.theme-nature-dark input[type="password"],
+.theme-nature-dark input[type="url"],
+.theme-nature-dark input[type="search"],
+.theme-nature-dark select,
+.theme-nature-dark textarea {
+  background-color: #20262F !important;
+  color: #FFFFFF !important;
+  border: 1px solid #374151 !important;
+  border-radius: 12px !important;
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+  transition: all 250ms ease-in-out !important;
+}
+
+.theme-nature-dark input[type="text"]:focus,
+.theme-nature-dark input[type="email"]:focus,
+.theme-nature-dark input[type="tel"]:focus,
+.theme-nature-dark input[type="password"]:focus,
+.theme-nature-dark input[type="url"]:focus,
+.theme-nature-dark input[type="search"]:focus,
+.theme-nature-dark select:focus,
+.theme-nature-dark textarea:focus {
+  border: 2px solid #1DB954 !important;
+  outline: none !important;
+}
+
+.theme-nature-dark input::placeholder,
+.theme-nature-dark textarea::placeholder {
+  color: #9CA3AF !important;
+}
+
+/* Modals & Dialog overlays as per specification */
+.theme-nature-dark .fixed.inset-0.z-50 .bg-slate-950\/60,
+.theme-nature-dark .bg-slate-950\/60 {
+  background-color: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.theme-nature-dark .fixed.inset-0.z-50 .bg-white {
+  background-color: #1B2028 !important;
+  border-radius: 20px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid #2D3748 !important;
+}
+
+/* Badges / Toast / Custom tags */
+.theme-nature-dark .bg-emerald-50,
+.theme-nature-dark .bg-emerald-50\/50,
+.theme-nature-dark .bg-emerald-100 {
+  background-color: rgba(34, 197, 94, 0.18) !important;
+  color: #22C55E !important;
+  border-color: rgba(34, 197, 94, 0.3) !important;
+}
+.theme-nature-dark .text-emerald-700,
+.theme-nature-dark .text-emerald-800 {
+  color: #22C55E !important;
+}
+
+.theme-nature-dark .bg-amber-50,
+.theme-nature-dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+  color: #F59E0B !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+.theme-nature-dark .text-amber-700,
+.theme-nature-dark .text-amber-800 {
+  color: #F59E0B !important;
+}
+
+.theme-nature-dark .bg-rose-50,
+.theme-nature-dark .bg-rose-100,
+.theme-nature-dark .bg-red-50,
+.theme-nature-dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+  color: #EF4444 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+.theme-nature-dark .text-rose-700,
+.theme-nature-dark .text-rose-800,
+.theme-nature-dark .text-red-700,
+.theme-nature-dark .text-red-800 {
+  color: #EF4444 !important;
+}
+
+/* Chapter & Navigation highlighting */
+.theme-nature-dark .course-chapter-active,
+.theme-nature-dark .course-chapter-active div {
+  background-color: rgba(29, 185, 84, 0.18) !important;
+  color: #1DB954 !important;
+}
+
+.theme-nature-dark .course-chapter-active span,
+.theme-nature-dark .course-chapter-active p {
+  color: #1DB954 !important;
+}
+
+/* Webhook logging list cards */
+.theme-nature-dark .border-l-4.border-emerald-500 {
+  border-left-color: #1DB954 !important;
+  background-color: #20262F !important;
+}
+
+.theme-nature-dark .border-l-4.border-rose-500 {
+  border-left-color: #EF4444 !important;
+  background-color: #20262F !important;
+}
+
+/* Markdown render safety */
+.theme-nature-dark .markdown-body p,
+.theme-nature-dark .markdown-body ul,
+.theme-nature-dark .markdown-body ol,
+.theme-nature-dark .markdown-body li {
+  color: #E5E7EB !important;
+}
+.theme-nature-dark .markdown-body h1 {
+  color: #FFFFFF !important;
+  border-bottom: 1px solid #2D3748 !important;
+}
+.theme-nature-dark .markdown-body h2 {
+  color: #F3F4F6 !important;
+}
+.theme-nature-dark .markdown-body h3 {
+  color: #E5E7EB !important;
+}
+.theme-nature-dark .markdown-body code {
+  color: #FFFFFF !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+.theme-nature-dark .markdown-body blockquote {
+  color: #9CA3AF !important;
+  border-left-color: #1DB954 !important;
+}
+.theme-nature-dark .markdown-body a {
+  color: #1DB954 !important;
+}
+
+/* User Focus Mode CSS Overrides */
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(2) {
+  background-color: #1a1e24 !important;
+}
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) {
+  background-color: #1a1e24 !important;
+}
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(2) {
+  background-color: #15181e !important;
+}
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(4) {
+  background-color: #1a1e24 !important;
+}
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #121218 !important;
+}
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) {
+  background-color: #1a1e24 !important;
+}
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(3) > form:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > div:nth-of-type(5) > p:nth-of-type(1) {
+  color: #ffffff !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2) {
+  background-color: #f3f5ff !important;
+}
+
+/* Responsive adjustment for mobile: reduce icon/button text and icon sizes */
+@media (max-width: 640px) {
+  /* Decrease standard button text sizes and paddings */
+  button, 
+  .btn,
+  [role="button"] {
+    font-size: 11px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+
+  /* Decrease text adjacent/inside buttons, navigation, headers, and tabs */
+  button span,
+  button p,
+  button div,
+  [role="button"] span,
+  [role="button"] p,
+  [role="button"] div,
+  nav span,
+  nav p,
+  .sidebar-container span,
+  .sidebar-container p,
+  .course-editor-module-header span,
+  .course-editor-module-header p,
+  .course-chapter-active span,
+  .course-chapter-active p {
+    font-size: 10px !important;
+  }
+
+  /* Decrease size of SVG icons within buttons, navigation, sidebar etc */
+  button svg,
+  [role="button"] svg,
+  nav svg,
+  .sidebar-container svg,
+  .course-editor-module-header svg,
+  .course-chapter-active svg {
+    width: 13px !important;
+    height: 13px !important;
+    min-width: 13px !important;
+    min-height: 13px !important;
+  }
+
+  /* Truncate and downsize text for the selected focused element */
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) {
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
+
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) span,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) p,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) a,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) h1,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) h2,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) h3,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) h4,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) h5,
+  div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(3) > div:nth-of-type(1) h6 {
+    font-size: 10px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+    display: inline-block !important;
+  }
+}
+
+/* Make the selected button fixed on screen (non-scrolling) */
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1) {
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  color: #ffffff !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1):hover {
+  transform: scale(1.05) !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+}
+
+
+
+
+
 

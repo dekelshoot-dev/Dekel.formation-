@@ -1,10 +1,18 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
-import { Course, Module, Chapter, StudentProgress } from '../types';
+import { Course, Module, Chapter, StudentProgress, User } from '../types';
 import { 
   Play, CheckCircle2, ChevronRight, ChevronDown, Download, ExternalLink, 
-  ArrowLeft, FileText, Globe, Sparkles, BookOpen, Menu, X, Check, Lock, Unlock
+  ArrowLeft, FileText, Globe, Sparkles, BookOpen, Menu, X, Check, Lock, Unlock,
+  GraduationCap, Search
 } from 'lucide-react';
+import { 
+  ChapterBookmarks, 
+  ChapterQuizComponent, 
+  ChapterExerciseComponent, 
+  ChapterCommentsComponent, 
+  CourseCertificateComponent 
+} from './InteractiveCourseElements';
 
 interface CoursePlayerProps {
   course: Course;
@@ -14,6 +22,7 @@ interface CoursePlayerProps {
   onToggleChapterComplete: (chapterId: string) => void;
   onBack: () => void;
   isEnrolled?: boolean;
+  currentUser?: User | null;
 }
 
 export default function CoursePlayer({
@@ -23,32 +32,75 @@ export default function CoursePlayer({
   progress,
   onToggleChapterComplete,
   onBack,
-  isEnrolled = false
+  isEnrolled = false,
+  currentUser = null
 }: CoursePlayerProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar is hidden by default
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter active modules and chapters for the student view
+  const activeModules = modules.filter(m => m.active !== false);
+  const activeChapters = chapters.filter(ch => {
+    const parentMod = activeModules.find(m => m.id === ch.moduleId);
+    const matchesSearch = searchQuery ? ch.title.toLowerCase().includes(searchQuery.toLowerCase()) : true;
+    return parentMod && ch.active !== false && matchesSearch;
+  });
+
   const [activeChapterId, setActiveChapterId] = useState<string | null>(() => {
-    // Default to first chapter of first module
-    const sortedMods = [...modules].sort((a, b) => a.order - b.order);
+    // Default to first active chapter of first active module
+    const sortedMods = [...activeModules].sort((a, b) => a.order - b.order);
     if (sortedMods.length > 0) {
-      const firstModChaps = chapters
+      const firstModChaps = activeChapters
         .filter(ch => ch.moduleId === sortedMods[0].id)
         .sort((a, b) => a.order - b.order);
       if (firstModChaps.length > 0) {
         return firstModChaps[0].id;
       }
     }
-    return chapters[0]?.id || null;
+    return activeChapters[0]?.id || null;
   });
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Track which modules are currently expanded (dropdown / accordion style)
+  const [expandedModuleIds, setExpandedModuleIds] = useState<Record<string, boolean>>(() => {
+    // Expand the active chapter's parent module by default
+    const initial: Record<string, boolean> = {};
+    const sortedMods = [...activeModules].sort((a, b) => a.order - b.order);
+    let defaultActiveId: string | null = null;
+    if (sortedMods.length > 0) {
+      const firstModChaps = activeChapters
+        .filter(ch => ch.moduleId === sortedMods[0].id)
+        .sort((a, b) => a.order - b.order);
+      if (firstModChaps.length > 0) {
+        defaultActiveId = firstModChaps[0].id;
+      }
+    }
+    const initialActiveChapterId = activeChapters[0]?.id || null;
+    const resolvedActiveId = defaultActiveId || initialActiveChapterId;
+    if (resolvedActiveId) {
+      const activeCh = activeChapters.find(ch => ch.id === resolvedActiveId);
+      if (activeCh) {
+        initial[activeCh.moduleId] = true;
+      }
+    }
+    return initial;
+  });
 
-  const activeChapter = chapters.find(ch => ch.id === activeChapterId);
-  const activeModule = activeChapter ? modules.find(m => m.id === activeChapter.moduleId) : null;
+  const toggleModuleExpanded = (moduleId: string) => {
+    setExpandedModuleIds(prev => ({
+      ...prev,
+      [moduleId]: !prev[moduleId]
+    }));
+  };
 
-  // Sorted list of all chapters for "Previous / Next" logic
-  const sortedModules = [...modules].sort((a, b) => a.order - b.order);
+  const activeChapter = activeChapters.find(ch => ch.id === activeChapterId);
+  const activeModule = activeChapter ? activeModules.find(m => m.id === activeChapter.moduleId) : null;
+
+  // Sorted list of all chapters for sequential navigation
+  const sortedModules = [...activeModules].sort((a, b) => a.order - b.order);
   const allSortedChapters: Chapter[] = [];
   sortedModules.forEach(mod => {
-    const modChaps = chapters
+    const modChaps = activeChapters
       .filter(ch => ch.moduleId === mod.id)
       .sort((a, b) => a.order - b.order);
     allSortedChapters.push(...modChaps);
@@ -60,13 +112,12 @@ export default function CoursePlayer({
 
   const completedChapterIds = progress?.completedChapterIds || [];
   const completedCount = completedChapterIds.length;
-  const totalChapters = chapters.length;
+  const totalChapters = activeChapters.length;
   const progressPercent = totalChapters > 0 ? Math.round((completedCount / totalChapters) * 100) : 0;
 
   // Custom Video URL parser to embed correctly
   const getEmbedUrl = (url: string, source: 'youtube' | 'vimeo' | 'direct' | 'iframe') => {
     if (source === 'iframe') {
-      // Extract src if full iframe tag was input
       const match = url.match(/src="([^"]+)"/);
       return match ? match[1] : url;
     }
@@ -150,20 +201,33 @@ export default function CoursePlayer({
 
   const activeTheme = themeColors[course.themeColor] || themeColors.indigo;
 
+  // Single button flow: marks current chapter complete and automatically redirects to the next.
   const handleMarkComplete = () => {
     if (!activeChapterId) return;
-    onToggleChapterComplete(activeChapterId);
+    
+    // Mark as completed
+    const isAlreadyCompleted = completedChapterIds.includes(activeChapterId);
+    if (!isAlreadyCompleted) {
+      onToggleChapterComplete(activeChapterId);
+    }
 
-    // If next chapter exists, automatically transition to it
     if (nextChapter) {
       setTimeout(() => {
+        // Automatically expand the parent module of the next chapter
+        setExpandedModuleIds(prev => ({
+          ...prev,
+          [nextChapter.moduleId]: true
+        }));
         setActiveChapterId(nextChapter.id);
       }, 300);
+    } else {
+      // End of course! Show congratulations modal
+      setShowCongrats(true);
     }
   };
 
   return (
-    <div className="min-h-[85vh] glass flex flex-col rounded-3xl overflow-hidden border border-white/10 shadow-2xl relative text-white">
+    <div className="lg:h-[calc(100vh-140px)] lg:overflow-hidden glass flex flex-col rounded-3xl border border-white/10 shadow-2xl relative text-white">
       
       {/* Top Navbar */}
       <div className="glass-light border-b border-white/10 py-3.5 px-6 flex items-center justify-between gap-4 z-10 shrink-0 text-white">
@@ -177,7 +241,7 @@ export default function CoursePlayer({
           
           <div className="truncate">
             <h1 className="text-xs font-black text-white truncate">{course.title}</h1>
-            <p className="text-[10px] text-slate-400 font-semibold truncate">Formateur : {course.trainerName}</p>
+            <p className="text-[10px] text-slate-400 font-semibold truncate font-sans">Formateur : {course.trainerName}</p>
           </div>
         </div>
 
@@ -186,9 +250,10 @@ export default function CoursePlayer({
           <div className="flex-1 bg-white/15 h-2 rounded-full overflow-hidden">
             <div className="h-full rounded-full transition-all duration-500 accent-gradient" style={{ width: `${progressPercent}%` }}></div>
           </div>
-          <span className="text-[10px] font-bold text-slate-300 shrink-0">{progressPercent}% Terminé ({completedCount}/{totalChapters})</span>
+          <span className="text-[10px] font-bold text-slate-300 shrink-0 font-sans">{progressPercent}% Terminé ({completedCount}/{totalChapters})</span>
         </div>
 
+        {/* Small screen drawer trigger */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="lg:hidden p-2 bg-white/10 hover:bg-white/15 rounded-xl text-white"
@@ -200,84 +265,128 @@ export default function CoursePlayer({
       {/* Primary Layout */}
       <div className="flex flex-1 overflow-hidden relative">
         
-        {/* Mobile Backdrop Overlay (Requirement 3) */}
+        {/* Mobile Backdrop Overlay */}
         {sidebarOpen && (
           <div 
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-20"
+            className="lg:hidden fixed inset-0 bg-slate-950/75 backdrop-blur-md z-40"
           ></div>
         )}
 
-        {/* Sidebar course outline navigation (Collapsible & Sticky) (Requirement 3) */}
-        <div className={`absolute lg:relative top-0 left-0 h-full w-72 glass border-r border-white/10 flex flex-col justify-between shrink-0 z-30 transition-all duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:hidden'
+        {/* Left Sidebar (Fixed on Desktop, Drawer on Mobile) */}
+        <div className={`absolute lg:relative top-0 left-0 h-full w-80 lg:w-72 bg-[#090d16] lg:bg-transparent border-r border-white/10 flex flex-col justify-between shrink-0 z-50 lg:z-30 transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="flex items-center gap-1.5 border-b border-white/10 pb-2 mb-2 text-white">
-              <BookOpen className="w-4 h-4 text-indigo-400" />
-              <span className="text-xs font-bold text-white">Programme du cours</span>
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 text-white">
+              <div className="flex items-center gap-1.5">
+                <GraduationCap className="w-4 h-4 text-indigo-400 animate-pulse" />
+                <span className="text-xs font-bold text-white font-sans uppercase tracking-wide">Programme</span>
+              </div>
+              
+              {/* Close Button on Mobile Sidebar */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden p-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {sortedModules.map(mod => {
-              const modChaps = chapters
-                .filter(ch => ch.moduleId === mod.id)
-                .sort((a, b) => a.order - b.order);
+            {/* In-Course Chapter Search */}
+            <div className="relative mb-3">
+              <input
+                type="text"
+                placeholder="Rechercher un chapitre..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-1.5 pl-8 pr-3 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans"
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2 top-2.5" />
+            </div>
 
-              return (
-                <div key={mod.id} className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    {mod.title}
-                  </p>
-                  
-                  <div className="space-y-1">
-                    {modChaps.map(ch => {
-                      const isActive = ch.id === activeChapterId;
-                      const isCompleted = completedChapterIds.includes(ch.id);
-                      const isLocked = !isEnrolled && !ch.isFree;
+            <div className="space-y-3">
+              {sortedModules.map(mod => {
+                const modChaps = activeChapters
+                  .filter(ch => ch.moduleId === mod.id)
+                  .sort((a, b) => a.order - b.order);
 
-                      return (
-                        <button
-                          key={ch.id}
-                          onClick={() => {
-                            setActiveChapterId(ch.id);
-                            if (window.innerWidth < 1024) setSidebarOpen(false); // Auto close mobile menu
-                          }}
-                          className={`w-full text-left p-2 rounded-xl border flex items-center justify-between gap-2 text-xs transition-all ${
-                            isActive
-                              ? `bg-white/15 border-white/10 text-white font-bold shadow-md`
-                              : 'bg-transparent hover:bg-white/5 border-transparent text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="shrink-0">
-                              {isCompleted ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-500/10" />
-                              ) : isLocked ? (
-                                <Lock className="w-3 h-3 text-slate-400" />
-                              ) : ch.isFree ? (
-                                <Unlock className="w-3 h-3 text-emerald-400" />
-                              ) : (
-                                <Play className="w-3 h-3 text-slate-400" />
-                              )}
-                            </span>
-                            <span className="truncate">{ch.title}</span>
-                          </div>
-                          {ch.isFree && (
-                            <span className="bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wide shrink-0 border border-emerald-500/25">
-                              Aperçu
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
+                const isExpanded = !!expandedModuleIds[mod.id];
+
+                return (
+                  <div key={mod.id} className="space-y-1 bg-white/5 p-2 rounded-2xl border border-white/5">
+                    {/* Collapsible Module Title Button */}
+                    <button
+                      type="button"
+                      onClick={() => toggleModuleExpanded(mod.id)}
+                      className="w-full flex items-center justify-between text-left py-1.5 px-2 text-[10px] font-black text-slate-300 hover:text-white uppercase tracking-wider transition-colors"
+                    >
+                      <span className="truncate pr-2 font-sans">{mod.title}</span>
+                      {isExpanded ? (
+                        <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                      )}
+                    </button>
+                    
+                    {/* Expandable list of Chapters inside this Module */}
+                    {isExpanded && (
+                      <div className="space-y-1 pt-1 border-t border-white/5 mt-1.5 transition-all">
+                        {modChaps.length === 0 ? (
+                          <p className="text-[10px] text-slate-500 italic p-2 font-sans">Aucun chapitre visible.</p>
+                        ) : (
+                          modChaps.map(ch => {
+                            const isActive = ch.id === activeChapterId;
+                            const isCompleted = completedChapterIds.includes(ch.id);
+                            const isLocked = !isEnrolled && !ch.isFree;
+
+                            return (
+                              <button
+                                key={ch.id}
+                                onClick={() => {
+                                  setActiveChapterId(ch.id);
+                                  if (window.innerWidth < 1024) setSidebarOpen(false); // Auto close mobile menu
+                                }}
+                                className={`w-full text-left p-2 rounded-xl border flex items-center justify-between gap-2 text-xs transition-all ${
+                                  isActive
+                                    ? `bg-white/15 border-white/10 text-white font-bold shadow-md`
+                                    : 'bg-transparent hover:bg-white/5 border-transparent text-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="shrink-0">
+                                    {isCompleted ? (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-500/10" />
+                                    ) : isLocked ? (
+                                      <Lock className="w-3.5 h-3.5 text-slate-400" />
+                                    ) : ch.isFree ? (
+                                      <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+                                    ) : (
+                                      <Play className="w-3.5 h-3.5 text-slate-400" />
+                                    )}
+                                  </span>
+                                  <span className="truncate font-sans">{ch.title}</span>
+                                </div>
+                                {ch.isFree && (
+                                  <span className="bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wide shrink-0 border border-emerald-500/25">
+                                    Aperçu
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <div className="p-4 bg-white/5 border-t border-white/10 text-[10px] text-slate-400 flex justify-between items-center">
-            <span>Soutien technique : <strong className="text-slate-300">{course.language}</strong></span>
+          <div className="p-4 bg-white/5 border-t border-white/10 text-[10px] text-slate-400 flex justify-between items-center shrink-0">
+            <span className="font-sans">Soutien : <strong className="text-slate-300">{course.language}</strong></span>
             {isEnrolled && (
               <span className="bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded text-[8px] font-extrabold border border-indigo-500/30">INSCRIT</span>
             )}
@@ -298,22 +407,22 @@ export default function CoursePlayer({
                       Contenu réservé aux inscrits
                     </span>
                     <h2 className="text-lg font-black text-white leading-tight mt-2">{activeChapter.title}</h2>
-                    <p className="text-xs text-slate-300 leading-relaxed">
+                    <p className="text-xs text-slate-300 leading-relaxed font-sans">
                       Ce chapitre est verrouillé. Pour débloquer la formation et y accéder immédiatement, suivez les options de paiement ci-dessous ou contactez le formateur.
                     </p>
                   </div>
 
                   <div className="border-t border-white/10 pt-4 text-left space-y-4">
                     <div>
-                      <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Instructions de paiement :</h4>
-                      <div className="text-xs text-slate-300 whitespace-pre-line leading-relaxed bg-white/5 border border-white/10 p-4 rounded-xl">
+                      <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2 font-sans">Instructions de paiement :</h4>
+                      <div className="text-xs text-slate-300 whitespace-pre-line leading-relaxed bg-white/5 border border-white/10 p-4 rounded-xl font-sans">
                         {course.paymentInstructions || "Veuillez contacter le formateur pour valider votre inscription."}
                       </div>
                     </div>
 
                     {course.customPaymentButtons && course.customPaymentButtons.filter(b => b.active).length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">💳 Liens de Paiement (Validation Webhook automatique) :</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">💳 Liens de Paiement (Validation Webhook automatique) :</p>
                         <div className="flex flex-col sm:flex-row gap-2">
                           {course.customPaymentButtons.filter(b => b.active).map(btn => {
                             const colors = {
@@ -333,7 +442,7 @@ export default function CoursePlayer({
                                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 ${colorClass}`}
                               >
                                 <Sparkles className="w-3.5 h-3.5" />
-                                <span>{btn.text}</span>
+                                <span className="font-sans">{btn.text}</span>
                               </a>
                             );
                           })}
@@ -343,7 +452,7 @@ export default function CoursePlayer({
 
                     {course.contactInfo && (
                       <div className="space-y-1">
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">📞 Contact Direct Formateur :</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">📞 Contact Direct Formateur :</p>
                         <div className="text-xs text-slate-300 font-mono whitespace-pre-line bg-white/5 border border-white/5 p-3 rounded-xl">
                           {course.contactInfo}
                         </div>
@@ -355,7 +464,7 @@ export default function CoursePlayer({
             ) : (
               <div className="max-w-3xl mx-auto space-y-6">
                 
-                {/* Responsive Video Container (Section 9) */}
+                {/* Responsive Video Container */}
                 {activeChapter.videoUrl ? (
                   <div className="aspect-video bg-black rounded-3xl overflow-hidden shadow-xl border border-white/10 relative group">
                     {activeChapter.videoSource === 'youtube' || activeChapter.videoSource === 'vimeo' || activeChapter.videoSource === 'iframe' ? (
@@ -378,62 +487,45 @@ export default function CoursePlayer({
                   <div className="aspect-video bg-slate-950 rounded-3xl flex items-center justify-center border border-white/10 p-6 text-center">
                     <div className="space-y-2">
                       <BookOpen className="w-12 h-12 text-slate-400 mx-auto stroke-1" />
-                      <p className="text-xs text-slate-300 font-medium">Ce chapitre ne contient pas de vidéo.</p>
-                      <p className="text-[10px] text-slate-500">Poursuivez la lecture ci-dessous.</p>
+                      <p className="text-xs text-slate-300 font-medium font-sans">Ce chapitre ne contient pas de vidéo.</p>
+                      <p className="text-[10px] text-slate-500 font-sans">Poursuivez la lecture ci-dessous.</p>
                     </div>
                   </div>
                 )}
 
-                {/* Title Header with Mark completed button */}
+                {/* Title Header with single "Marquer comme terminé" button */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-4 gap-4">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 font-sans">
                       {activeModule ? activeModule.title : 'Cours'}
                     </span>
                     <h2 className="text-lg font-black text-white leading-tight mt-1">{activeChapter.title}</h2>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onToggleChapterComplete(activeChapter.id)}
-                      className={`py-2 px-4 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                        completedChapterIds.includes(activeChapter.id)
-                          ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300 font-bold'
-                          : 'border-white/10 text-slate-300 hover:bg-white/5'
-                      }`}
-                    >
-                      {completedChapterIds.includes(activeChapter.id) ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-400" />
-                          <span>Terminé</span>
-                        </>
-                      ) : (
-                        <span>Marquer Terminé</span>
-                      )}
-                    </button>
-
+                    {/* SINGLE BUTTON labeled "Marquer comme terminé" replaces all navigation buttons */}
                     <button
                       onClick={handleMarkComplete}
-                      className="py-2 px-4 rounded-xl text-white text-xs font-bold transition-all shadow-lg flex items-center gap-1.5 accent-gradient hover:opacity-95"
+                      className="py-2.5 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-lg flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-95"
                     >
-                      <span>{nextChapter ? 'Suivant' : 'Terminer le cours'}</span>
-                      <ChevronRight className="w-4 h-4" />
+                      <Check className="w-4 h-4" />
+                      <span>Marquer comme terminé</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Rich text / markdown container (Section 10) */}
-                <div className="max-w-none text-slate-300 text-xs md:text-sm leading-relaxed space-y-4">
+                {/* Rich text / markdown container */}
+                <div className="max-w-none text-slate-300 text-xs md:text-sm leading-relaxed space-y-4 font-sans">
                   {activeChapter.richText ? (
                     <div className="markdown-body">
                       <Markdown>{activeChapter.richText}</Markdown>
                     </div>
                   ) : (
-                    <p className="text-slate-500 italic">Aucune description textuelle disponible pour cette leçon.</p>
+                    <p className="text-slate-500 italic font-sans">Aucune description textuelle disponible pour cette leçon.</p>
                   )}
                 </div>
 
-                {/* Call to action Button (CTA) (Section 8) */}
+                {/* Call to action Button (CTA) */}
                 {activeChapter.linkButton?.label && (
                   <div className="py-4 border-t border-b border-white/10 flex justify-center">
                     <a
@@ -443,18 +535,18 @@ export default function CoursePlayer({
                       className="px-6 py-3 rounded-xl text-white text-xs font-bold transition-all shadow-lg flex items-center gap-2 accent-gradient hover:opacity-95"
                     >
                       <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                      <span>{activeChapter.linkButton.label}</span>
+                      <span className="font-sans">{activeChapter.linkButton.label}</span>
                     </a>
                   </div>
                 )}
 
-                {/* Download links & External resources (Section 8) */}
+                {/* Download links & External resources */}
                 {(activeChapter.downloadableFiles?.length || 0) + (activeChapter.externalLinks?.length || 0) > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                     {/* Download files */}
                     {(activeChapter.downloadableFiles?.length || 0) > 0 && (
                       <div className="border border-white/10 rounded-2xl p-4 bg-white/5 space-y-2">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 font-sans">
                           <Download className="w-3.5 h-3.5 text-indigo-400" />
                           <span>Ressources à télécharger</span>
                         </p>
@@ -467,8 +559,8 @@ export default function CoursePlayer({
                               rel="noreferrer"
                               className="w-full text-left bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 flex items-center justify-between text-xs transition-all"
                             >
-                              <span className="font-bold text-white truncate max-w-[180px]">{f.name}</span>
-                              <span className="text-[10px] text-indigo-300 font-semibold shrink-0 flex items-center gap-1">
+                              <span className="font-bold text-white truncate max-w-[180px] font-sans">{f.name}</span>
+                              <span className="text-[10px] text-indigo-300 font-semibold shrink-0 flex items-center gap-1 font-sans">
                                 {f.size || 'Télécharger'}
                                 <ExternalLink className="w-3 h-3" />
                               </span>
@@ -481,7 +573,7 @@ export default function CoursePlayer({
                     {/* Complementary links */}
                     {(activeChapter.externalLinks?.length || 0) > 0 && (
                       <div className="border border-white/10 rounded-2xl p-4 bg-white/5 space-y-2">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1 font-sans">
                           <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
                           <span>Liens complémentaires</span>
                         </p>
@@ -492,9 +584,9 @@ export default function CoursePlayer({
                               href={l.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="w-full text-left bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 flex items-center justify-between text-xs transition-all"
+                              className="w-full text-left bg-white/5 hover:bg-white/10 p-2.5 rounded-xl border border-white/10 flex items-center justify-between text-xs transition-all animate-fade-in"
                             >
-                              <span className="font-bold text-white truncate">{l.title}</span>
+                              <span className="font-bold text-white truncate font-sans">{l.title}</span>
                               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                             </a>
                           ))}
@@ -504,28 +596,93 @@ export default function CoursePlayer({
                   </div>
                 )}
 
+                {/* MODULAR INTERACTIVE FEATURES (Student view: bookmarks, quizzes, assignments, certificate & Q&A) */}
+                {currentUser && isEnrolled && (
+                  <div className="border-t border-white/10 pt-6 space-y-6">
+                    {/* Bookmarks */}
+                    <ChapterBookmarks 
+                      currentUser={currentUser} 
+                      courseId={course.id} 
+                      chapterId={activeChapter.id} 
+                      chapterTitle={activeChapter.title} 
+                    />
+
+                    {/* Quiz */}
+                    <ChapterQuizComponent 
+                      currentUser={currentUser} 
+                      chapterId={activeChapter.id} 
+                    />
+
+                    {/* Exercise Submission */}
+                    <ChapterExerciseComponent 
+                      currentUser={currentUser} 
+                      courseId={course.id} 
+                      chapterId={activeChapter.id} 
+                    />
+
+                    {/* Certificate of completion */}
+                    <CourseCertificateComponent 
+                      currentUser={currentUser} 
+                      course={course} 
+                      progressPercent={progressPercent} 
+                    />
+
+                    {/* Live Q&A and Chat Forum */}
+                    <ChapterCommentsComponent 
+                      currentUser={currentUser} 
+                      chapterId={activeChapter.id} 
+                    />
+                  </div>
+                )}
+
               </div>
             )
           ) : (
             <div className="text-center py-20 text-slate-400">
               <BookOpen className="w-12 h-12 mx-auto stroke-1 text-slate-500 mb-2" />
-              <p>Sélectionnez un chapitre dans le menu de gauche pour démarrer.</p>
+              <p className="font-sans">Sélectionnez un chapitre dans le menu de gauche pour démarrer.</p>
             </div>
           )}
         </div>
 
       </div>
 
-      {/* Floating Button for Mobile Navigation Drawer (Requirement 3) */}
+      {/* Floating Graduation Cap button at bottom of mobile screen */}
       {!sidebarOpen && (
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="lg:hidden fixed bottom-6 right-6 w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-2xl z-40 border border-indigo-400/25 transition-all duration-200 active:scale-95 hover:scale-105"
-          title="Ouvrir le programme"
+          className="lg:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-2xl z-40 border border-indigo-400/25 transition-all duration-200 active:scale-95 hover:scale-105"
+          title="Ouvrir le programme de formation"
         >
-          <BookOpen className="w-5 h-5 text-white" />
+          <GraduationCap className="w-6 h-6 text-white" />
         </button>
+      )}
+
+      {/* Congratulations Modal when Course is Completed */}
+      {showCongrats && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-fade-in text-white">
+            <div className="w-20 h-20 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-lg">
+              <Sparkles className="w-10 h-10 text-amber-400 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-white">Félicitations ! 🎉</h3>
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                Vous avez terminé le dernier chapitre de cette formation. Quel incroyable accomplissement ! Votre persévérance est la clé de votre succès.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setShowCongrats(false);
+                onBack();
+              }}
+              className="w-full py-3 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-lg bg-indigo-600 hover:bg-indigo-700 font-sans"
+            >
+              Retourner à mon espace
+            </button>
+          </div>
+        </div>
       )}
 
     </div>

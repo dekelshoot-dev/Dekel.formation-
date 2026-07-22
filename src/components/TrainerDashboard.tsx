@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, DownloadableFile, ExternalLink, CustomPaymentButton } from '../types';
 import { 
   BarChart3, BookOpen, Users, Settings, User as UserIcon, Plus, Trash2, Copy, 
   Share2, Edit3, Save, ArrowUp, ArrowDown, Check, CheckCircle2, AlertCircle, 
-  HelpCircle, Eye, Play, FileText, ExternalLink as LinkIcon, Globe, Image, Video
+  HelpCircle, Eye, EyeOff, Play, FileText, ExternalLink as LinkIcon, Globe, Image, Video,
+  Mail, Phone, X, ChevronDown, ChevronRight, Folder, Menu
 } from 'lucide-react';
+import { showToast } from './Toast';
+import UserProfile from './UserProfile';
 
 interface TrainerDashboardProps {
   currentUser: User;
@@ -32,6 +35,8 @@ interface TrainerDashboardProps {
   onAddPreRegistered: (preReg: PreRegisteredStudent) => void;
   onSendEmail: (email: SimulatedEmail) => void;
   onUpdateUser: (user: User) => void;
+  onPreviewCourse?: (course: Course) => void;
+  onAddUser?: (user: User) => void;
 }
 
 export default function TrainerDashboard({
@@ -57,10 +62,13 @@ export default function TrainerDashboard({
   onDeleteEnrollment,
   onAddPreRegistered,
   onSendEmail,
-  onUpdateUser
+  onUpdateUser,
+  onPreviewCourse,
+  onAddUser,
 }: TrainerDashboardProps) {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants'>('dashboard');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   
   // Selection states
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
@@ -84,12 +92,92 @@ export default function TrainerDashboard({
   
   // Edit Profile Form
   const [profileName, setProfileName] = useState(currentUser.name);
+  const [profileFirstName, setProfileFirstName] = useState(currentUser.firstName || '');
+  const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
+  const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
   const [profileBio, setProfileBio] = useState(currentUser.bio || '');
   const [profileAvatar, setProfileAvatar] = useState(currentUser.avatarUrl || '');
+  const [profileTheme, setProfileTheme] = useState(currentUser.theme || 'theme-nature-dark');
+  const [viewingUserProfile, setViewingUserProfile] = useState<User | null>(null);
 
-  // 1. Filter Courses belonging to THIS trainer
-  const trainerCourses = allCourses.filter(c => c.trainerId === currentUser.id);
-  const selectedCourse = allCourses.find(c => c.id === selectedCourseId && c.trainerId === currentUser.id);
+  // Assistant management states (Requirement Fine-Grained Permissions)
+  const [assistantFirstName, setAssistantFirstName] = useState('');
+  const [assistantLastName, setAssistantLastName] = useState('');
+  const [assistantEmail, setAssistantEmail] = useState('');
+  const [assistantPassword, setAssistantPassword] = useState('');
+  const [assistantPermEditChapters, setAssistantPermEditChapters] = useState(true);
+  const [assistantPermManageComments, setAssistantPermManageComments] = useState(true);
+  const [showAddAssistantForm, setShowAddAssistantForm] = useState(false);
+
+  // States for unified "Structure de la formation" course editor
+  const [expandedTrainerModuleIds, setExpandedTrainerModuleIds] = useState<Record<string, boolean>>({});
+  const [activeModMenuId, setActiveModMenuId] = useState<string | null>(null);
+  const [activeChMenuId, setActiveChMenuId] = useState<string | null>(null);
+  const [modToRenameId, setModToRenameId] = useState<string | null>(null);
+  const [modRenameTitle, setModRenameTitle] = useState('');
+
+  const toggleTrainerModule = (moduleId: string) => {
+    setExpandedTrainerModuleIds(prev => ({
+      ...prev,
+      [moduleId]: !prev[moduleId]
+    }));
+  };
+
+  // Automatically expand the first module of the course by default when selectedCourseId changes
+  useEffect(() => {
+    if (selectedCourseId) {
+      const courseMods = allModules
+        .filter(m => m.courseId === selectedCourseId)
+        .sort((a, b) => a.order - b.order);
+      if (courseMods.length > 0) {
+        setExpandedTrainerModuleIds({ [courseMods[0].id]: true });
+      } else {
+        setExpandedTrainerModuleIds({});
+      }
+    } else {
+      setExpandedTrainerModuleIds({});
+    }
+    setActiveModMenuId(null);
+    setActiveChMenuId(null);
+    setModToRenameId(null);
+    setModRenameTitle('');
+  }, [selectedCourseId, allModules]);
+
+  useEffect(() => {
+    setProfileName(currentUser.name);
+    setProfileFirstName(currentUser.firstName || '');
+    setProfilePhone(currentUser.phone || '');
+    setProfileEmail(currentUser.email || '');
+    setProfileBio(currentUser.bio || '');
+    setProfileAvatar(currentUser.avatarUrl || '');
+    setProfileTheme(currentUser.theme || 'theme-nature-dark');
+  }, [currentUser]);
+
+  // Helper for fine-grained permissions check (Requirement Fine-Grained Permissions)
+  const hasPermission = (permission: 'edit_chapters' | 'manage_comments' | 'delete_course'): boolean => {
+    if (currentUser.role === 'admin' || currentUser.role === 'trainer') return true;
+    if (currentUser.role === 'assistant') {
+      return currentUser.permissions?.includes(permission) ?? false;
+    }
+    return false;
+  };
+
+  // 1. Filter Courses belonging to THIS trainer or the trainer who invited this assistant (Requirement Fine-Grained Permissions)
+  const trainerCourses = allCourses.filter(c => {
+    if (currentUser.role === 'assistant') {
+      const trainer = allUsers.find(u => u.email.toLowerCase() === currentUser.invitedBy?.toLowerCase());
+      return trainer ? c.trainerId === trainer.id : false;
+    }
+    return c.trainerId === currentUser.id;
+  });
+
+  const selectedCourse = allCourses.find(c => {
+    if (currentUser.role === 'assistant') {
+      const trainer = allUsers.find(u => u.email.toLowerCase() === currentUser.invitedBy?.toLowerCase());
+      return c.id === selectedCourseId && (trainer ? c.trainerId === trainer.id : false);
+    }
+    return c.id === selectedCourseId && c.trainerId === currentUser.id;
+  });
 
   // 2. Filter Modules & Chapters belonging to selected course
   const courseModules = allModules
@@ -109,7 +197,22 @@ export default function TrainerDashboard({
   const studentEmails = Array.from(new Set(activeEnrollments.map(e => e.studentEmail.toLowerCase())));
   const trainerStudents = allUsers.filter(u => u.role === 'student' && studentEmails.includes(u.email.toLowerCase()));
 
-  const triggerToast = (msg: string) => {
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
+
+  const handleAsyncAction = async (actionKey: string, actionFn: () => Promise<void> | void) => {
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
+    try {
+      await actionFn();
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || "Une erreur est survenue", "error");
+    } finally {
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
+    }
+  };
+
+  const triggerToast = (msg: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
+    showToast(msg, type);
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);
   };
@@ -117,13 +220,19 @@ export default function TrainerDashboard({
   // Profile Save
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    onUpdateUser({
-      ...currentUser,
-      name: profileName,
-      bio: profileBio,
-      avatarUrl: profileAvatar
+    handleAsyncAction('saveProfile', async () => {
+      await onUpdateUser({
+        ...currentUser,
+        name: profileName,
+        firstName: profileFirstName,
+        phone: profilePhone,
+        email: profileEmail,
+        bio: profileBio,
+        avatarUrl: profileAvatar,
+        theme: profileTheme
+      });
+      triggerToast('Vos informations ont été mises à jour !');
     });
-    triggerToast('Vos informations ont été mises à jour !');
   };
 
   // Add Course
@@ -131,99 +240,259 @@ export default function TrainerDashboard({
     e.preventDefault();
     if (!newCourseTitle) return;
 
-    const newCourse: Course = {
-      id: `c-${Date.now()}`,
-      title: newCourseTitle,
-      trainerId: currentUser.id,
-      trainerName: currentUser.name,
-      language: 'Français',
-      description: 'Entrez une description captivante pour cette nouvelle formation.',
-      themeColor: 'indigo',
-      trainerPhoto: currentUser.avatarUrl,
-      logoUrl: 'https://images.unsplash.com/photo-1547082299-de196ea013d6?w=100',
-      coverImage: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800',
-      status: 'draft',
+    handleAsyncAction('createCourse', async () => {
+      const newCourse: Course = {
+        id: `c-${Date.now()}`,
+        title: newCourseTitle,
+        trainerId: currentUser.id,
+        trainerName: currentUser.name,
+        language: 'Français',
+        description: 'Entrez une description captivante pour cette nouvelle formation.',
+        themeColor: 'indigo',
+        trainerPhoto: currentUser.avatarUrl,
+        logoUrl: 'https://images.unsplash.com/photo-1547082299-de196ea013d6?w=100',
+        coverImage: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800',
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        type: newCourseType,
+        price: 125000,
+        level: 'Tous niveaux',
+        duration: '10 heures'
+      };
+
+      await onAddCourse(newCourse);
+      setNewCourseTitle('');
+      setShowAddCourseForm(false);
+      triggerToast('Formation créée avec succès en mode Brouillon !');
+      
+      // Auto-select and open editor
+      setSelectedCourseId(newCourse.id);
+      setActiveTab('course-editor');
+    });
+  };
+
+  // Invite an Assistant (Requirement Fine-Grained Permissions)
+  const handleInviteAssistant = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assistantEmail || !assistantLastName || !assistantFirstName || !assistantPassword) {
+      triggerToast('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
+
+    const emailTrimmed = assistantEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      triggerToast('Veuillez saisir un e-mail valide.');
+      return;
+    }
+
+    // Check if user already exists
+    const userExists = allUsers.some(u => u.email.toLowerCase() === emailTrimmed);
+    if (userExists) {
+      triggerToast('Cet utilisateur existe déjà.');
+      return;
+    }
+
+    const permissions: string[] = [];
+    if (assistantPermEditChapters) permissions.push('edit_chapters');
+    if (assistantPermManageComments) permissions.push('manage_comments');
+
+    const newAssistant: User = {
+      id: `u-${Date.now()}`,
+      email: emailTrimmed,
+      name: assistantLastName.trim(),
+      firstName: assistantFirstName.trim(),
+      role: 'assistant',
       createdAt: new Date().toISOString(),
-      type: newCourseType,
-      price: 125000,
-      level: 'Tous niveaux',
-      duration: '10 heures'
+      permissions: permissions,
+      invitedBy: currentUser.email,
+      status: 'active'
     };
 
-    onAddCourse(newCourse);
-    setNewCourseTitle('');
-    setShowAddCourseForm(false);
-    triggerToast('Formation créée avec succès en mode Brouillon !');
-    
-    // Auto-select and open editor
-    setSelectedCourseId(newCourse.id);
-    setActiveTab('course-editor');
+    if (onAddUser) {
+      onAddUser(newAssistant);
+      
+      // Send simulated email
+      onSendEmail({
+        id: `m-${Date.now()}`,
+        to: emailTrimmed,
+        subject: `Invitation Collaborateur : Assistant sur Dekel.Formation par ${currentUser.name}`,
+        body: `Bonjour ${assistantFirstName.trim()},\n\nVous avez été invité à collaborer en tant qu'Assistant par le formateur ${currentUser.name} (${currentUser.email}) sur Dekel.Formation.\n\nVoici vos accès de connexion :\n- Identifiant/E-mail : ${emailTrimmed}\n- Mot de passe : ${assistantPassword}\n\nVos permissions accordées :\n${permissions.includes('edit_chapters') ? '✓ Modifier les chapitres de cours\n' : ''}${permissions.includes('manage_comments') ? '✓ Répondre et gérer les commentaires\n' : ''}\nNote de sécurité : En tant qu'Assistant, vous n'êtes pas autorisé à supprimer de formations de la plateforme.\n\nConnectez-vous dès maintenant pour commencer votre collaboration !\n\nCordialement,\nL'équipe administrative Dekel.Formation`,
+        sentAt: new Date().toISOString()
+      });
+
+      triggerToast(`Assistant ${assistantFirstName} invité avec succès ! Un e-mail de connexion lui a été envoyé.`);
+      
+      // Reset form
+      setAssistantFirstName('');
+      setAssistantLastName('');
+      setAssistantEmail('');
+      setAssistantPassword('');
+      setAssistantPermEditChapters(true);
+      setAssistantPermManageComments(true);
+      setShowAddAssistantForm(false);
+    } else {
+      triggerToast('Erreur : le système ne peut pas ajouter d\'utilisateur pour le moment.');
+    }
+  };
+
+  const handleToggleAssistantPermission = (assistant: User, permission: 'edit_chapters' | 'manage_comments') => {
+    const currentPerms = assistant.permissions || [];
+    let updatedPerms: string[] = [];
+    if (currentPerms.includes(permission)) {
+      updatedPerms = currentPerms.filter(p => p !== permission);
+    } else {
+      updatedPerms = [...currentPerms, permission];
+    }
+    onUpdateUser({
+      ...assistant,
+      permissions: updatedPerms
+    });
+    triggerToast('Permissions de l\'assistant mises à jour !');
+  };
+
+  const handleToggleAssistantStatus = (assistant: User) => {
+    const newStatus = assistant.status === 'active' ? 'deactivated' : 'active';
+    onUpdateUser({
+      ...assistant,
+      status: newStatus as any
+    });
+    triggerToast(`Statut de l'assistant mis à jour (${newStatus === 'active' ? 'Activé' : 'Désactivé'}).`);
   };
 
   // Duplicate Course
   const handleDuplicateCourse = (course: Course) => {
-    const newCourse: Course = {
-      ...course,
-      id: `c-${Date.now()}`,
-      title: `${course.title} (Copie)`,
-      status: 'draft',
-      createdAt: new Date().toISOString()
-    };
-    onAddCourse(newCourse);
-
-    // Also duplicate its modules and chapters!
-    const origModules = allModules.filter(m => m.courseId === course.id);
-    origModules.forEach(oldMod => {
-      const newModId = `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-      const newMod: Module = {
-        id: newModId,
-        courseId: newCourse.id,
-        title: oldMod.title,
-        order: oldMod.order
+    handleAsyncAction(`duplicate-${course.id}`, async () => {
+      const newCourse: Course = {
+        ...course,
+        id: `c-${Date.now()}`,
+        title: `${course.title} (Copie)`,
+        status: 'draft',
+        createdAt: new Date().toISOString()
       };
-      onAddModule(newMod);
+      await onAddCourse(newCourse);
 
-      const oldChapters = allChapters.filter(ch => ch.moduleId === oldMod.id);
-      oldChapters.forEach(oldCh => {
-        const newCh: Chapter = {
-          ...oldCh,
-          id: `ch-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          moduleId: newModId
+      // Also duplicate its modules and chapters!
+      const origModules = allModules.filter(m => m.courseId === course.id);
+      for (const oldMod of origModules) {
+        const newModId = `m-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        const newMod: Module = {
+          id: newModId,
+          courseId: newCourse.id,
+          title: oldMod.title,
+          order: oldMod.order
         };
-        onAddChapter(newCh);
-      });
-    });
+        await onAddModule(newMod);
 
-    triggerToast('Formation dupliquée avec succès !');
+        const oldChapters = allChapters.filter(ch => ch.moduleId === oldMod.id);
+        const newChapsList: Chapter[] = [];
+        for (const oldCh of oldChapters) {
+          const newCh: Chapter = {
+            ...oldCh,
+            id: `ch-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            moduleId: newModId
+          };
+          newChapsList.push(newCh);
+          await onAddChapter(newCh);
+        }
+      }
+
+      triggerToast('Formation dupliquée avec succès !');
+    });
   };
 
   // Course settings edit save
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editLang, setEditLang] = useState('Français');
+  const [editType, setEditType] = useState('Développement');
   const [editColor, setEditColor] = useState<'indigo'|'slate'|'emerald'|'amber'|'rose'|'sky'>('indigo');
   const [editPrice, setEditPrice] = useState(125000);
   const [editLevel, setEditLevel] = useState<'Débutant' | 'Intermédiaire' | 'Avancé' | 'Tous niveaux'>('Tous niveaux');
   const [editDuration, setEditDuration] = useState('10 heures');
   const [editCover, setEditCover] = useState('');
-  const [editStatus, setEditStatus] = useState<'published' | 'draft'>('draft');
+  const [editStatus, setEditStatus] = useState<'published' | 'draft' | 'archived'>('draft');
+  
+  // SEO optimization fields (Requirement 26)
+  const [editSeoTitle, setEditSeoTitle] = useState('');
+  const [editSeoDescription, setEditSeoDescription] = useState('');
+  const [editSeoSlug, setEditSeoSlug] = useState('');
+  const [editSeoShareImage, setEditSeoShareImage] = useState('');
+
+  // Helper to generate a URL-friendly slug
+  const handleAutoGenerateSlug = () => {
+    const slug = editTitle
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+    setEditSeoSlug(slug);
+  };
   
   // Custom Payment settings (Requirement 5)
   const [editPaymentInstructions, setEditPaymentInstructions] = useState('');
   const [editContactInfo, setEditContactInfo] = useState('');
   const [editPaymentButtons, setEditPaymentButtons] = useState<CustomPaymentButton[]>([]);
+  const [editShowPaymentInstructions, setEditShowPaymentInstructions] = useState(true);
+  const [editPromoPrice, setEditPromoPrice] = useState<number | ''>('');
 
   // Webhook settings & tester states (Requirement 2)
   const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
   const [testEmail, setTestEmail] = useState('');
   const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const [webhookCopied, setWebhookCopied] = useState(false);
+  const [editWebhookEmailKey, setEditWebhookEmailKey] = useState('email');
+  const [editWebhookNameKey, setEditWebhookNameKey] = useState('name');
+
+  // Global webhook journal states
+  const [globalWebhookLogs, setGlobalWebhookLogs] = useState<any[]>([]);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [globalWebhookSearch, setGlobalWebhookSearch] = useState('');
+  const [globalWebhookFilterCourseId, setGlobalWebhookFilterCourseId] = useState('');
+  const [globalWebhookFilterStatus, setGlobalWebhookFilterStatus] = useState('');
+  const [testName, setTestName] = useState('');
+  const [webhookTestResult, setWebhookTestResult] = useState<{
+    sentPayload: any;
+    response: any;
+    success: boolean;
+  } | null>(null);
+
+  const fetchGlobalLogs = async () => {
+    try {
+      const res = await fetch('/api/webhooks/logs');
+      const data = await res.json();
+      if (data && Array.isArray(data.logs)) {
+        setGlobalWebhookLogs(data.logs);
+      }
+    } catch (err) {}
+  };
+
+  const handleClearAllWebhookLogs = async () => {
+    if (!confirm("Voulez-vous vraiment effacer TOUS les journaux de Webhooks de l'application ? Cette action est irréversible.")) return;
+    try {
+      const res = await fetch('/api/webhooks/logs', { method: 'DELETE' });
+      if (res.ok) {
+        setGlobalWebhookLogs([]);
+        triggerToast("Tous les journaux ont été effacés.");
+      }
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    if (activeTab === 'webhooks') {
+      fetchGlobalLogs();
+    }
+  }, [activeTab]);
 
   const openCourseSettings = (c: Course) => {
     setSelectedCourseId(c.id);
     setEditTitle(c.title);
     setEditDesc(c.description);
     setEditLang(c.language);
+    setEditType(c.type || 'Développement');
     setEditColor(c.themeColor);
     setEditPrice(c.price);
     setEditLevel(c.level);
@@ -236,9 +505,21 @@ export default function TrainerDashboard({
       { id: 'btn-1', active: true, text: 'Payer par Wave', color: 'blue', url: 'https://wave.com' },
       { id: 'btn-2', active: true, text: 'Payer par Orange Money', color: 'yellow', url: 'https://orangemoney.com' }
     ]);
+    setEditShowPaymentInstructions(c.showPaymentInstructions !== false);
+    setEditPromoPrice(c.promoPrice !== undefined ? c.promoPrice : '');
+    setEditWebhookEmailKey(c.webhookEmailKey || 'email');
+    setEditWebhookNameKey(c.webhookNameKey || 'name');
+    
+    // SEO fields
+    setEditSeoTitle(c.seoTitle || '');
+    setEditSeoDescription(c.seoDescription || '');
+    setEditSeoSlug(c.seoSlug || '');
+    setEditSeoShareImage(c.seoShareImage || '');
     
     // Reset test fields
     setTestEmail('');
+    setTestName('');
+    setWebhookTestResult(null);
     setIsTestingWebhook(false);
     setWebhookCopied(false);
 
@@ -259,24 +540,35 @@ export default function TrainerDashboard({
     e.preventDefault();
     if (!selectedCourse) return;
 
-    onUpdateCourse({
-      ...selectedCourse,
-      title: editTitle,
-      description: editDesc,
-      language: editLang,
-      themeColor: editColor,
-      price: Number(editPrice),
-      level: editLevel,
-      duration: editDuration,
-      coverImage: editCover,
-      status: editStatus,
-      paymentInstructions: editPaymentInstructions,
-      contactInfo: editContactInfo,
-      customPaymentButtons: editPaymentButtons
-    });
+    handleAsyncAction('saveCourseSettings', async () => {
+      await onUpdateCourse({
+        ...selectedCourse,
+        title: editTitle,
+        description: editDesc,
+        language: editLang,
+        type: editType,
+        themeColor: editColor,
+        price: Number(editPrice),
+        level: editLevel,
+        duration: editDuration,
+        coverImage: editCover,
+        status: editStatus,
+        paymentInstructions: editPaymentInstructions,
+        contactInfo: editContactInfo,
+        customPaymentButtons: editPaymentButtons,
+        showPaymentInstructions: editShowPaymentInstructions,
+        promoPrice: editPromoPrice !== '' ? Number(editPromoPrice) : undefined,
+        webhookEmailKey: editWebhookEmailKey || 'email',
+        webhookNameKey: editWebhookNameKey || 'name',
+        seoTitle: editSeoTitle,
+        seoDescription: editSeoDescription,
+        seoSlug: editSeoSlug,
+        seoShareImage: editSeoShareImage
+      });
 
-    setIsEditingCourseSettings(false);
-    triggerToast('Paramètres de la formation enregistrés !');
+      setIsEditingCourseSettings(false);
+      triggerToast('Paramètres de la formation enregistrés !');
+    });
   };
 
   // Webhook integration helper functions (Requirement 2)
@@ -290,22 +582,55 @@ export default function TrainerDashboard({
     e.preventDefault();
     if (!testEmail || !selectedCourse) return;
     setIsTestingWebhook(true);
+    setWebhookTestResult(null);
 
     try {
+      // Build simulated body dynamically supporting nested JSON key mappings (e.g. data.object.email)
+      const mockBody: any = {
+        event: 'payment.success',
+        amount: selectedCourse.price
+      };
+
+      const assignNestedValue = (obj: any, path: string, val: any) => {
+        const parts = path.split('.');
+        let current = obj;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          if (!current[part]) {
+            current[part] = {};
+          }
+          current = current[part];
+        }
+        current[parts[parts.length - 1]] = val;
+      };
+
+      const emailPath = editWebhookEmailKey || 'email';
+      const namePath = editWebhookNameKey || 'name';
+
+      assignNestedValue(mockBody, emailPath, testEmail.trim());
+      
+      const studentNameVal = testName.trim() || ("Simulé " + testEmail.split('@')[0]);
+      assignNestedValue(mockBody, namePath, studentNameVal);
+
       const res = await fetch(`/api/webhooks/payment/${selectedCourse.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email: testEmail, event: 'payment.success', amount: selectedCourse.price })
+        body: JSON.stringify(mockBody)
       });
       const data = await res.json();
       
+      setWebhookTestResult({
+        sentPayload: mockBody,
+        response: data,
+        success: res.ok
+      });
+
       if (res.ok) {
-        triggerToast(`Webhook reçu avec succès ! L'étudiant "${testEmail}" a été inscrit en arrière-plan.`);
-        setTestEmail('');
+        triggerToast(`Webhook reçu avec succès ! L'étudiant "${testEmail}" a été inscrit.`);
       } else {
-        triggerToast(`Erreur webhook : ${data.message}`);
+        triggerToast(`Erreur webhook : ${data.message || 'Erreur inconnue'}`);
       }
 
       // Re-fetch live webhook logs
@@ -337,17 +662,19 @@ export default function TrainerDashboard({
     e.preventDefault();
     if (!selectedCourseId || !newModuleTitle) return;
 
-    const newOrder = courseModules.length + 1;
-    const newMod: Module = {
-      id: `m-${Date.now()}`,
-      courseId: selectedCourseId,
-      title: newModuleTitle,
-      order: newOrder
-    };
+    handleAsyncAction('addModule', async () => {
+      const newOrder = courseModules.length + 1;
+      const newMod: Module = {
+        id: `m-${Date.now()}`,
+        courseId: selectedCourseId,
+        title: newModuleTitle,
+        order: newOrder
+      };
 
-    onAddModule(newMod);
-    setNewModuleTitle('');
-    triggerToast('Module ajouté !');
+      await onAddModule(newMod);
+      setNewModuleTitle('');
+      triggerToast('Module ajouté !');
+    });
   };
 
   // Reorder Modules
@@ -369,6 +696,54 @@ export default function TrainerDashboard({
     }
 
     onUpdateModules(newModules);
+  };
+
+  // Helpers for unified "Structure de la formation" editing
+  const handleToggleModuleActive = async (mod: Module) => {
+    const updated = { ...mod, active: mod.active === false ? true : false };
+    const allUpdated = allModules.map(m => m.id === mod.id ? updated : m);
+    const courseModsUpdated = allUpdated.filter(m => m.courseId === selectedCourseId);
+    await onUpdateModules(courseModsUpdated);
+    triggerToast(updated.active !== false ? 'Module activé !' : 'Module désactivé (masqué) !');
+  };
+
+  const handleRenameModuleSave = async (mod: Module) => {
+    if (!modRenameTitle.trim()) return;
+    const updated = { ...mod, title: modRenameTitle.trim() };
+    const allUpdated = allModules.map(m => m.id === mod.id ? updated : m);
+    const courseModsUpdated = allUpdated.filter(m => m.courseId === selectedCourseId);
+    await onUpdateModules(courseModsUpdated);
+    setModToRenameId(null);
+    triggerToast("Module renommé !");
+  };
+
+  const handleToggleChapterActive = async (chapter: Chapter) => {
+    const updated: Chapter = { ...chapter, active: chapter.active === false ? true : false };
+    const allUpdated = allChapters.map(ch => ch.id === chapter.id ? updated : ch);
+    await onUpdateChapters(allUpdated);
+    triggerToast(updated.active !== false ? 'Chapitre activé !' : 'Chapitre désactivé (masqué) !');
+  };
+
+  const handleDeleteModuleClick = (moduleId: string) => {
+    if (!hasPermission('edit_chapters')) {
+      triggerToast('Permission refusée : Vous n\'avez pas le droit de modifier les chapitres.');
+      return;
+    }
+    if (confirm("Voulez-vous vraiment supprimer ce module et tous les chapitres qu'il contient ?")) {
+      onDeleteModule(moduleId);
+      triggerToast("Module supprimé !");
+    }
+  };
+
+  const handleDeleteChapterClick = (chapterId: string) => {
+    if (!hasPermission('edit_chapters')) {
+      triggerToast('Permission refusée : Vous n\'avez pas le droit de modifier les chapitres.');
+      return;
+    }
+    if (confirm("Voulez-vous vraiment supprimer ce chapitre ?")) {
+      onDeleteChapter(chapterId);
+      triggerToast("Chapitre supprimé !");
+    }
   };
 
   // Chapter editing form states
@@ -415,12 +790,12 @@ export default function TrainerDashboard({
   };
 
   const openEditChapter = (chapter: Chapter) => {
-    setEditingModuleId(chapter.moduleId);
-    setSelectedChapterId(chapter.id);
-    setChTitle(chapter.title);
-    setChVideoSrc(chapter.videoSource);
-    setChVideoUrl(chapter.videoUrl);
-    setChRichText(chapter.richText);
+    setEditingModuleId(chapter.moduleId || '');
+    setSelectedChapterId(chapter.id || null);
+    setChTitle(chapter.title || '');
+    setChVideoSrc(chapter.videoSource || 'youtube');
+    setChVideoUrl(chapter.videoUrl || '');
+    setChRichText(chapter.richText || '');
     setChFiles(chapter.downloadableFiles || []);
     setChLinks(chapter.externalLinks || []);
     setChBtnLabel(chapter.linkButton?.label || '');
@@ -431,18 +806,48 @@ export default function TrainerDashboard({
 
   const handleSaveChapter = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission('edit_chapters')) {
+      triggerToast('Permission refusée : Vous n\'avez pas le droit de modifier les chapitres.');
+      return;
+    }
     if (!chTitle) return;
 
-    const finalBtn = chBtnLabel && chBtnUrl ? { label: chBtnLabel, url: chBtnUrl } : undefined;
+    handleAsyncAction('saveChapter', async () => {
+      const finalBtn = chBtnLabel && chBtnUrl ? { label: chBtnLabel, url: chBtnUrl } : undefined;
 
-    if (selectedChapterId) {
-      // Update existing
-      const currentChaps = allChapters.filter(ch => ch.moduleId === editingModuleId);
-      const existing = currentChaps.find(ch => ch.id === selectedChapterId);
-      if (existing) {
-        const updated: Chapter = {
-          ...existing,
+      if (selectedChapterId) {
+        // Update existing
+        const currentChaps = allChapters.filter(ch => ch.moduleId === editingModuleId);
+        const existing = currentChaps.find(ch => ch.id === selectedChapterId);
+        if (existing) {
+          const updated: Chapter = {
+            ...existing,
+            title: chTitle,
+            videoSource: chVideoSrc,
+            videoUrl: chVideoUrl,
+            richText: chRichText,
+            downloadableFiles: chFiles,
+            externalLinks: chLinks,
+            linkButton: finalBtn,
+            isFree: chIsFree
+          };
+          // Update globally
+          const allUpdated = allChapters.map(ch => ch.id === selectedChapterId ? updated : ch);
+          await onUpdateChapters(allUpdated);
+          triggerToast('Chapitre mis à jour avec succès !');
+        }
+      } else {
+        // Create new
+        const siblingChapters = allChapters.filter(ch => ch.moduleId === editingModuleId);
+        const newOrder = siblingChapters.length + 1;
+        const parentModule = allModules.find(m => m.id === editingModuleId);
+        const courseId = parentModule ? parentModule.courseId : '';
+        const newCh: Chapter = {
+          id: `ch-${Date.now()}`,
+          moduleId: editingModuleId,
+          courseId,
           title: chTitle,
+          order: newOrder,
           videoSource: chVideoSrc,
           videoUrl: chVideoUrl,
           richText: chRichText,
@@ -451,33 +856,12 @@ export default function TrainerDashboard({
           linkButton: finalBtn,
           isFree: chIsFree
         };
-        // Update globally
-        const allUpdated = allChapters.map(ch => ch.id === selectedChapterId ? updated : ch);
-        onUpdateChapters(allUpdated);
-        triggerToast('Chapitre mis à jour avec succès !');
+        await onAddChapter(newCh);
+        triggerToast('Nouveau chapitre créé !');
       }
-    } else {
-      // Create new
-      const siblingChapters = allChapters.filter(ch => ch.moduleId === editingModuleId);
-      const newOrder = siblingChapters.length + 1;
-      const newCh: Chapter = {
-        id: `ch-${Date.now()}`,
-        moduleId: editingModuleId,
-        title: chTitle,
-        order: newOrder,
-        videoSource: chVideoSrc,
-        videoUrl: chVideoUrl,
-        richText: chRichText,
-        downloadableFiles: chFiles,
-        externalLinks: chLinks,
-        linkButton: finalBtn,
-        isFree: chIsFree
-      };
-      onAddChapter(newCh);
-      triggerToast('Nouveau chapitre créé !');
-    }
 
-    setIsEditingChapter(false);
+      setIsEditingChapter(false);
+    });
   };
 
   // Move Chapter
@@ -546,16 +930,19 @@ export default function TrainerDashboard({
 
     if (alreadyEnrolled) {
       if (alreadyEnrolled.status === 'revoked') {
-        onUpdateEnrollmentStatus(alreadyEnrolled.id, 'active');
-        triggerToast(`Accès réactivé pour ${emailTrimmed} !`);
+        handleAsyncAction('enrollStudent', async () => {
+          await onUpdateEnrollmentStatus(alreadyEnrolled.id, 'active');
+          triggerToast(`Accès réactivé pour ${emailTrimmed} !`);
+        });
         return;
       }
       alert('Cet élève est déjà inscrit à cette formation !');
       return;
     }
 
-    // Check if student has account in system
-    const studentUser = allUsers.find(u => u.email.toLowerCase() === emailTrimmed && u.role === 'student');
+    handleAsyncAction('enrollStudent', async () => {
+      // Check if student has account in system
+      const studentUser = allUsers.find(u => u.email.toLowerCase() === emailTrimmed && u.role === 'student');
 
     if (studentUser) {
       // Case 1: Student has account. Register Enrollment immediately.
@@ -602,9 +989,13 @@ Lien d'accès: ${courseSelected.title}`,
         if (!existingPre.courseIds.includes(enrollCourseId)) {
           existingPre.courseIds.push(enrollCourseId);
         }
+        if (enrollName.trim() && !existingPre.name) {
+          existingPre.name = enrollName.trim();
+        }
       } else {
         onAddPreRegistered({
           email: emailTrimmed,
+          name: enrollName.trim() || undefined,
           courseIds: [enrollCourseId]
         });
       }
@@ -632,8 +1023,9 @@ Le support Dekel.Formation`,
       triggerToast(`Cas 2 - Élève non enregistré : Invitation par email envoyée !`);
     }
 
-    setEnrollEmail('');
-    setEnrollName('');
+      setEnrollEmail('');
+      setEnrollName('');
+    });
   };
 
   const copyShareLink = (courseId: string) => {
@@ -652,9 +1044,119 @@ Le support Dekel.Formation`,
         </div>
       )}
 
+      {/* Mobile Navigation Drawer for Trainers */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden animate-fade-in">
+          {/* Backdrop */}
+          <div 
+            onClick={() => setIsMobileDrawerOpen(false)}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+          />
+          {/* Drawer content */}
+          <div className="fixed inset-y-0 left-0 w-72 bg-white text-slate-800 border-r border-slate-200 p-5 shadow-2xl flex flex-col justify-between animate-slide-in">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="bg-indigo-50 text-indigo-600 p-1.5 rounded-xl border border-indigo-100">
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-900">Espace Formateur</p>
+                    <p className="text-[9px] text-slate-400">Navigation mobile</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <button
+                  onClick={() => { setActiveTab('dashboard'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Tableau de bord</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('courses'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'courses' || activeTab === 'course-editor' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Mes formations ({trainerCourses.length})</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('students'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'students' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Mes élèves ({trainerStudents.length})</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('webhooks'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'webhooks' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Globe className="w-4 h-4 text-indigo-500" />
+                  <span>Journal des Webhooks</span>
+                </button>
+
+                {(currentUser.role === 'trainer' || currentUser.role === 'admin') && (
+                  <button
+                    onClick={() => { setActiveTab('assistants'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                      activeTab === 'assistants' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Users className="w-4 h-4 text-emerald-500" />
+                    <span>Mon Équipe (Assistants)</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => { setActiveTab('profile'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'profile' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Mes informations</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 text-center">
+              <span className="text-[10px] text-slate-400 font-medium">Dekel.Formation • Formateur</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
+          {/* Hamburger button on mobile */}
+          <button
+            onClick={() => setIsMobileDrawerOpen(true)}
+            className="md:hidden p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-all cursor-pointer mr-1"
+            title="Ouvrir le menu"
+          >
+            <Menu className="w-5.5 h-5.5" />
+          </button>
+          
           <div className="bg-indigo-50 text-indigo-600 p-2.5 rounded-2xl border border-indigo-100">
             <UserIcon className="w-6 h-6" />
           </div>
@@ -666,7 +1168,7 @@ Le support Dekel.Formation`,
         <div className="flex items-center gap-3">
           <button
             onClick={() => { setActiveTab('courses'); setShowAddCourseForm(true); }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-50"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-50 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Nouvelle formation</span>
@@ -675,7 +1177,7 @@ Le support Dekel.Formation`,
       </div>
 
       {/* Primary Navigation Menu */}
-      <div className="flex border-b border-slate-200 gap-4 text-xs font-semibold overflow-x-auto pb-1">
+      <div className="hidden md:flex border-b border-slate-200 gap-4 text-xs font-semibold overflow-x-auto pb-1">
         <button
           onClick={() => { setActiveTab('dashboard'); setSelectedCourseId(null); }}
           className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 ${
@@ -703,6 +1205,26 @@ Le support Dekel.Formation`,
           <Users className="w-4 h-4" />
           <span>Mes élèves ({trainerStudents.length})</span>
         </button>
+        <button
+          onClick={() => { setActiveTab('webhooks'); setSelectedCourseId(null); }}
+          className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 ${
+            activeTab === 'webhooks' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Globe className="w-4 h-4 text-indigo-500" />
+          <span>Journal des Webhooks</span>
+        </button>
+        {(currentUser.role === 'trainer' || currentUser.role === 'admin') && (
+          <button
+            onClick={() => { setActiveTab('assistants'); setSelectedCourseId(null); }}
+            className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 ${
+              activeTab === 'assistants' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4 text-emerald-500" />
+            <span>Mon Équipe (Assistants)</span>
+          </button>
+        )}
         <button
           onClick={() => { setActiveTab('profile'); setSelectedCourseId(null); }}
           className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 ${
@@ -781,50 +1303,9 @@ Le support Dekel.Formation`,
 
       {/* Tab 2: Profile Settings */}
       {activeTab === 'profile' && (
-        <form onSubmit={handleSaveProfile} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm max-w-lg space-y-4 animate-fade-in">
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">Informations Publiques du Formateur</h2>
-          
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Nom complet affiché</label>
-            <input
-              type="text"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-              required
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Biographie / Expertise</label>
-            <textarea
-              value={profileBio}
-              onChange={(e) => setProfileBio(e.target.value)}
-              rows={3}
-              placeholder="Ex: Formateur React et entrepreneur e-commerce depuis 10 ans..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Photo de profil URL</label>
-            <input
-              type="text"
-              value={profileAvatar}
-              onChange={(e) => setProfileAvatar(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
-            />
-            <p className="text-[9px] text-slate-400 mt-1">Entrez une URL d'image valide pour personnaliser votre avatar sur les fiches de cours.</p>
-          </div>
-
-          <button
-            type="submit"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs transition-all shadow"
-          >
-            Sauvegarder mon profil
-          </button>
-        </form>
+        <div className="max-w-2xl animate-fade-in">
+          <UserProfile currentUser={currentUser} onUpdateUser={onUpdateUser} />
+        </div>
       )}
 
       {/* Tab 3: My Courses */}
@@ -856,6 +1337,9 @@ Le support Dekel.Formation`,
                   <option value="E-commerce">E-commerce & Dropshipping</option>
                   <option value="Design">Design UX/UI & Créativité</option>
                   <option value="Marketing">Marketing Digital & SEO</option>
+                  <option value="Montage Vidéo">Montage Vidéo & Post-production</option>
+                  <option value="Miniatures">Miniatures / Thumbnails YouTube</option>
+                  <option value="Flyers">Flyers & Graphisme Promotionnel</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2">
@@ -868,9 +1352,17 @@ Le support Dekel.Formation`,
                 </button>
                 <button
                   type="submit"
-                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow"
+                  disabled={loadingActions['createCourse']}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs shadow flex items-center gap-1.5"
                 >
-                  Continuer vers l'éditeur
+                  {loadingActions['createCourse'] ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Création...</span>
+                    </>
+                  ) : (
+                    <span>Continuer vers l'éditeur</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -878,17 +1370,18 @@ Le support Dekel.Formation`,
 
           {/* Courses Table (Section 6) */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-150">
-                  <th className="px-4 py-3">Image / Nom</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Statut</th>
-                  <th className="px-4 py-3">Date Création</th>
-                  <th className="px-4 py-3">Élèves</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-150">
+                    <th className="px-4 py-3">Image / Nom</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Statut</th>
+                    <th className="px-4 py-3">Date Création</th>
+                    <th className="px-4 py-3">Élèves</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {trainerCourses.length === 0 ? (
                   <tr>
@@ -927,7 +1420,17 @@ Le support Dekel.Formation`,
                         <td className="px-4 py-3.5 font-bold text-slate-700">
                           {studentsCount}
                         </td>
-                        <td className="px-4 py-3.5 text-right space-x-1">
+                        <td className="px-4 py-3.5 text-right space-x-1.5">
+                          {onPreviewCourse && (
+                            <button
+                              onClick={() => onPreviewCourse(course)}
+                              className="text-[10px] font-semibold px-2.5 py-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all inline-flex items-center gap-1 cursor-pointer"
+                              title="Prévisualiser la formation"
+                            >
+                              <Play className="w-2.5 h-2.5 fill-current" />
+                              <span>Prévisualiser</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => { setSelectedCourseId(course.id); setActiveTab('course-editor'); }}
                             className="bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded text-[10px] font-bold transition-all"
@@ -950,18 +1453,32 @@ Le support Dekel.Formation`,
                           </button>
                           <button
                             onClick={() => handleDuplicateCourse(course)}
+                            disabled={loadingActions[`duplicate-${course.id}`]}
                             title="Dupliquer la formation"
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 inline-flex align-middle"
+                            className="p-1 hover:bg-slate-100 disabled:opacity-50 rounded text-slate-400 hover:text-slate-700 inline-flex align-middle items-center gap-1"
                           >
-                            <Copy className="w-3.5 h-3.5" />
+                            {loadingActions[`duplicate-${course.id}`] ? (
+                              <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
                           </button>
-                          <button
-                            onClick={() => onDeleteCourse(course.id)}
-                            title="Supprimer la formation"
-                            className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {currentUser.role !== 'assistant' ? (
+                            <button
+                              onClick={() => onDeleteCourse(course.id)}
+                              title="Supprimer la formation"
+                              className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <span 
+                              title="Suppression interdite pour les assistants" 
+                              className="p-1 rounded text-slate-300 inline-flex align-middle cursor-not-allowed"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 opacity-40" />
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -970,6 +1487,7 @@ Le support Dekel.Formation`,
               </tbody>
             </table>
           </div>
+        </div>
 
           {/* Edit Course Settings Modal overlay */}
           {isEditingCourseSettings && selectedCourse && (
@@ -1008,6 +1526,23 @@ Le support Dekel.Formation`,
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Catégorie</label>
+                    <select
+                      value={editType}
+                      onChange={(e) => setEditType(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
+                    >
+                      <option value="Développement">Développement Web & Logiciel</option>
+                      <option value="E-commerce">E-commerce & Dropshipping</option>
+                      <option value="Design">Design UX/UI & Créativité</option>
+                      <option value="Marketing">Marketing Digital & SEO</option>
+                      <option value="Montage Vidéo">Montage Vidéo & Post-production</option>
+                      <option value="Miniatures">Miniatures / Thumbnails YouTube</option>
+                      <option value="Flyers">Flyers & Graphisme Promotionnel</option>
+                    </select>
+                  </div>
+
                   <div className="md:col-span-2">
                     <label className="block text-xs font-semibold text-slate-500 mb-1">Description marketing du cours</label>
                     <textarea
@@ -1035,12 +1570,23 @@ Le support Dekel.Formation`,
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Prix de la formation (XAF)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Prix normal de la formation (XAF)</label>
                     <input
                       type="number"
                       value={editPrice}
                       onChange={(e) => setEditPrice(Number(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-150 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Prix promotionnel (Optionnel, XAF)</label>
+                    <input
+                      type="number"
+                      value={editPromoPrice}
+                      onChange={(e) => setEditPromoPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="Ex: 25000"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-150 transition-all"
                     />
                   </div>
 
@@ -1091,6 +1637,129 @@ Le support Dekel.Formation`,
                   </div>
                 </div>
 
+                {/* Section SEO & Open Graph (Requirement 26) */}
+                <div className="md:col-span-2 border-t border-slate-100 pt-4 space-y-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                      <span>🔍 Optimisation SEO & Partage Social (Open Graph)</span>
+                    </h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Configurez l'URL personnalisée, les métadonnées de référencement Google et l'image d'illustration pour le partage sur les réseaux sociaux (WhatsApp, Facebook, LinkedIn).
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-3.5">
+                    {/* Slug & custom URL */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-2 space-y-1">
+                        <label className="block text-xs font-semibold text-slate-600">URL personnalisée (Slug)</label>
+                        <div className="flex gap-2">
+                          <span className="bg-slate-200 border border-slate-300 rounded-xl px-2.5 py-2 text-xs text-slate-500 font-mono flex items-center select-none truncate">
+                            /marketplace/
+                          </span>
+                          <input
+                            type="text"
+                            value={editSeoSlug}
+                            onChange={(e) => setEditSeoSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                            placeholder="titre-de-la-formation"
+                            className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none font-mono focus:ring-2 focus:ring-indigo-100 transition-all"
+                          />
+                        </div>
+                        <p className="text-[9px] text-slate-450 italic">Seuls les lettres minuscules, chiffres et tirets sont autorisés.</p>
+                      </div>
+
+                      <div className="flex items-end pb-1">
+                        <button
+                          type="button"
+                          onClick={handleAutoGenerateSlug}
+                          className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-2 px-3 rounded-xl border border-indigo-200 transition-all cursor-pointer"
+                        >
+                          Générer depuis le titre
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Meta Title & Meta Description */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-xs font-semibold text-slate-600">Meta Title</label>
+                          <span className={`text-[9px] font-bold px-1 rounded ${editSeoTitle.length > 60 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {editSeoTitle.length}/60 car.
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          value={editSeoTitle}
+                          onChange={(e) => setEditSeoTitle(e.target.value)}
+                          placeholder="Titre optimisé pour les moteurs de recherche"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                        <p className="text-[9px] text-slate-400">Le titre qui s'affiche sur l'onglet du navigateur et les résultats de recherche Google.</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-xs font-semibold text-slate-600">Meta Description</label>
+                          <span className={`text-[9px] font-bold px-1 rounded ${editSeoDescription.length > 160 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {editSeoDescription.length}/160 car.
+                          </span>
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={editSeoDescription}
+                          onChange={(e) => setEditSeoDescription(e.target.value)}
+                          placeholder="Description résumée pour attirer les clics dans les moteurs de recherche."
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                        <p className="text-[9px] text-slate-400">Le résumé affiché sous le titre dans les résultats Google.</p>
+                      </div>
+                    </div>
+
+                    {/* Open Graph share image */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-slate-600">Image Open Graph (Partage Réseaux Sociaux)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={editSeoShareImage}
+                          onChange={(e) => setEditSeoShareImage(e.target.value)}
+                          placeholder="https://exemple.com/image-partage-social.png"
+                          className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditSeoShareImage(editCover)}
+                          disabled={!editCover}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
+                        >
+                          Copier couverture
+                        </button>
+                      </div>
+                      <p className="text-[9px] text-slate-400">L'image d'aperçu qui s'affiche automatiquement lorsque le lien de la formation est partagé sur WhatsApp, Facebook ou Twitter.</p>
+                    </div>
+
+                    {/* Live Preview Widget */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 mt-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Aperçu visuel du partage (WhatsApp / Facebook) :</p>
+                      <div className="border border-slate-150 rounded-lg overflow-hidden max-w-sm mx-auto shadow-sm">
+                        {editSeoShareImage ? (
+                          <img src={editSeoShareImage} alt="OG Preview" className="w-full h-32 object-cover" />
+                        ) : editCover ? (
+                          <img src={editCover} alt="OG Preview fallback" className="w-full h-32 object-cover opacity-60" />
+                        ) : (
+                          <div className="w-full h-32 bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase">Aucune image configurée</div>
+                        )}
+                        <div className="p-2.5 bg-slate-50 border-t border-slate-150">
+                          <p className="text-[10px] text-indigo-600 font-semibold truncate">https://dekel.formation/marketplace/{editSeoSlug || "slug-formation"}</p>
+                          <h5 className="text-[11px] font-bold text-slate-800 truncate">{editSeoTitle || editTitle || "Titre de la formation"}</h5>
+                          <p className="text-[10px] text-slate-500 line-clamp-1">{editSeoDescription || editDesc || "Description de la formation..."}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Section 5: Custom Payment Buttons (Requirement 5) */}
                 <div className="md:col-span-2 border-t border-slate-100 pt-4 space-y-4">
                   <div>
@@ -1098,26 +1767,45 @@ Le support Dekel.Formation`,
                     <p className="text-[10px] text-slate-400 mt-0.5">Configurez vos instructions, contacts et boutons de paiement pour cette formation. Les étudiants verront ces informations lors de leur demande d'inscription.</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Instructions de paiement</label>
-                      <textarea
-                        rows={3}
-                        value={editPaymentInstructions}
-                        onChange={(e) => setEditPaymentInstructions(e.target.value)}
-                        placeholder="Ex: Envoyez le montant par Orange Money au..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-4">
+                    <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                      <input
+                        type="checkbox"
+                        id="showPaymentInstructions"
+                        checked={editShowPaymentInstructions}
+                        onChange={(e) => setEditShowPaymentInstructions(e.target.checked)}
+                        className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-550 cursor-pointer"
                       />
+                      <label htmlFor="showPaymentInstructions" className="text-xs font-bold text-slate-700 cursor-pointer select-none uppercase tracking-wide">
+                        Afficher les instructions de paiement aux visiteurs
+                      </label>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Informations de contact</label>
-                      <textarea
-                        rows={3}
-                        value={editContactInfo}
-                        onChange={(e) => setEditContactInfo(e.target.value)}
-                        placeholder="Ex: WhatsApp: +221..."
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
-                      />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-xs font-semibold text-slate-500">Instructions de paiement (Markdown / texte libre)</label>
+                          <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">Supports Markdown</span>
+                        </div>
+                        <textarea
+                          rows={4}
+                          disabled={!editShowPaymentInstructions}
+                          value={editPaymentInstructions}
+                          onChange={(e) => setEditPaymentInstructions(e.target.value)}
+                          placeholder="Ex: Rédigez librement vos instructions de paiement..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-50 disabled:bg-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-semibold text-slate-500">Informations de contact</label>
+                        <textarea
+                          rows={4}
+                          value={editContactInfo}
+                          onChange={(e) => setEditContactInfo(e.target.value)}
+                          placeholder="Ex: WhatsApp: +221..."
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1261,29 +1949,118 @@ Le support Dekel.Formation`,
                       </div>
                     </div>
 
+                    {/* Webhook JSON mapping variables */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-200/65 pt-3.5">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase">Clé JSON pour l'adresse e-mail</label>
+                        <input
+                          type="text"
+                          value={editWebhookEmailKey}
+                          onChange={(e) => setEditWebhookEmailKey(e.target.value)}
+                          placeholder="Ex: email, customer_email, customer.email..."
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-750 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
+                          required
+                        />
+                        <p className="text-[9px] text-slate-400">La clé contenant l'adresse e-mail dans le JSON reçu par votre plateforme de paiement.</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase">Clé JSON pour le nom complet (Optionnel)</label>
+                        <input
+                          type="text"
+                          value={editWebhookNameKey}
+                          onChange={(e) => setEditWebhookNameKey(e.target.value)}
+                          placeholder="Ex: name, customer_name, customer.name..."
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-750 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
+                        />
+                        <p className="text-[9px] text-slate-400">La clé contenant le nom de l'élève pour le pré-enregistrement.</p>
+                      </div>
+                    </div>
+
                     {/* Webhook Live Tester */}
-                    <div className="border-t border-slate-200/65 pt-3.5 space-y-2">
-                      <p className="text-[10px] font-bold text-slate-600 uppercase">🧪 Testeur de Webhook en direct (Simulateur)</p>
-                      <div className="flex flex-col sm:flex-row gap-2 items-end">
-                        <div className="flex-1 space-y-0.5">
-                          <label className="block text-[9px] text-slate-400 font-semibold">Adresse e-mail de l'élève de test</label>
+                    <div className="border-t border-slate-200/65 pt-3.5 space-y-3">
+                      <p className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                        <span>🧪 Outil de test en direct (Simulateur)</span>
+                      </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-[9px] text-slate-400 font-semibold">E-mail de l'élève de test</label>
                           <input
                             type="email"
-                            placeholder="exemple.eleve@gmail.com"
+                            placeholder="sophie.ndiaye@gmail.com"
                             value={testEmail}
                             onChange={(e) => setTestEmail(e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none"
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="block text-[9px] text-slate-400 font-semibold">Nom complet de l'élève (Optionnel)</label>
+                          <input
+                            type="text"
+                            placeholder="Sophie Ndiaye"
+                            value={testName}
+                            onChange={(e) => setTestName(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-1">
                         <button
                           type="button"
                           disabled={isTestingWebhook || !testEmail}
                           onClick={handleTestWebhookSubmit}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 border border-transparent text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:border-slate-200 disabled:text-slate-400 border border-transparent text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
                         >
-                          {isTestingWebhook ? "Appel en cours..." : "Simuler POST Webhook"}
+                          {isTestingWebhook ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                              <span>Envoi en cours...</span>
+                            </>
+                          ) : (
+                            <span>Envoyer le Webhook de test</span>
+                          )}
                         </button>
                       </div>
+
+                      {/* Display test result */}
+                      {webhookTestResult && (
+                        <div className="bg-slate-100 border border-slate-200 rounded-xl p-3 space-y-3 mt-2 text-[11px] text-slate-700 animate-fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-800 uppercase tracking-wide text-[10px]">Résultat du traitement</span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                              webhookTestResult.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
+                            }`}>
+                              {webhookTestResult.success ? "200 OK - Succès" : "400 Bad Request - Échec"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">1. JSON Envoyé (Payload)</span>
+                              <pre className="bg-slate-900 text-slate-200 font-mono text-[9px] p-2 rounded-lg overflow-auto max-h-32">
+                                {JSON.stringify(webhookTestResult.sentPayload, null, 2)}
+                              </pre>
+                            </div>
+                            <div className="space-y-1">
+                              <span className="block text-[9px] font-bold text-slate-400 uppercase">2. Variables Détectées & Réponse</span>
+                              <div className="bg-slate-900 text-emerald-400 font-mono text-[9px] p-2 rounded-lg overflow-auto max-h-32 space-y-1">
+                                <div className="text-white border-b border-slate-800 pb-1 mb-1">
+                                  Clé e-mail: <span className="text-yellow-400">"{editWebhookEmailKey || 'email'}"</span><br />
+                                  Clé nom: <span className="text-yellow-400">"{editWebhookNameKey || 'name'}"</span>
+                                </div>
+                                <div>
+                                  E-mail Détecté: <span className="text-emerald-300 font-bold">"{testEmail.trim()}"</span><br />
+                                  Nom Détecté: <span className="text-emerald-300 font-bold">"{testName.trim() || ("Simulé " + testEmail.split('@')[0])}"</span>
+                                </div>
+                                <div className="text-white border-t border-slate-800 pt-1 mt-1 font-bold">Réponse serveur :</div>
+                                <pre className="text-sky-300">{JSON.stringify(webhookTestResult.response, null, 2)}</pre>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Webhook Hits History logs */}
@@ -1355,9 +2132,17 @@ Le support Dekel.Formation`,
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md"
+                    disabled={loadingActions['saveCourseSettings']}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md flex items-center gap-1.5"
                   >
-                    Enregistrer les paramètres
+                    {loadingActions['saveCourseSettings'] ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Enregistrement...</span>
+                      </>
+                    ) : (
+                      <span>Enregistrer les paramètres</span>
+                    )}
                   </button>
                 </div>
               </form>
@@ -1377,7 +2162,18 @@ Le support Dekel.Formation`,
             </p>
 
             <form onSubmit={handleEnrollStudent} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-1">Nom complet de l'élève</label>
+                  <input
+                    type="text"
+                    required
+                    value={enrollName}
+                    onChange={(e) => setEnrollName(e.target.value)}
+                    placeholder="Sophie Ndiaye"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                  />
+                </div>
                 <div>
                   <label className="block text-[10px] font-semibold text-slate-500 mb-1">Adresse e-mail de l'élève</label>
                   <input
@@ -1386,7 +2182,7 @@ Le support Dekel.Formation`,
                     value={enrollEmail}
                     onChange={(e) => setEnrollEmail(e.target.value)}
                     placeholder="sophie.eleve@gmail.com"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                   />
                 </div>
                 <div>
@@ -1395,7 +2191,7 @@ Le support Dekel.Formation`,
                     value={enrollCourseId}
                     onChange={(e) => setEnrollCourseId(e.target.value)}
                     required
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                   >
                     <option value="">-- Choisir une formation --</option>
                     {trainerCourses.map(c => (
@@ -1407,10 +2203,20 @@ Le support Dekel.Formation`,
 
               <button
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1 transition-all"
+                disabled={loadingActions['enrollStudent']}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all"
               >
-                <Plus className="w-4 h-4" />
-                <span>Valider le paiement & inscrire</span>
+                {loadingActions['enrollStudent'] ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Inscription en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Valider le paiement & inscrire</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -1431,17 +2237,18 @@ Le support Dekel.Formation`,
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-150">
-                    <th className="px-4 py-3">Élève</th>
-                    <th className="px-4 py-3">Formation</th>
-                    <th className="px-4 py-3">Date d'inscription</th>
-                    <th className="px-4 py-3">Progression</th>
-                    <th className="px-4 py-3">Statut Accès</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[750px]">
+                  <thead>
+                    <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-150">
+                      <th className="px-4 py-3">Élève</th>
+                      <th className="px-4 py-3">Formation</th>
+                      <th className="px-4 py-3">Date d'inscription</th>
+                      <th className="px-4 py-3">Progression</th>
+                      <th className="px-4 py-3">Statut Accès</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {activeEnrollments.length === 0 ? (
                     <tr>
@@ -1463,10 +2270,24 @@ Le support Dekel.Formation`,
                         const totalChaps = courseChapters.length;
                         const pct = totalChaps > 0 ? Math.round((completedCount / totalChaps) * 100) : 0;
 
+                        const matchedStudent = allUsers.find(u => u.email.toLowerCase() === enroll.studentEmail.toLowerCase());
+
                         return (
                           <tr key={enroll.id} className="hover:bg-slate-50/50">
                             <td className="px-4 py-3.5">
-                              <p className="font-bold text-slate-800">{enroll.studentEmail}</p>
+                              <div className="flex items-center gap-2">
+                                <img 
+                                  src={matchedStudent?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                                  alt="Avatar" 
+                                  className="w-7 h-7 rounded-full object-cover border border-slate-200" 
+                                />
+                                <div>
+                                  <p className="font-bold text-slate-800 leading-tight">
+                                    {matchedStudent?.firstName ? `${matchedStudent.firstName} ${matchedStudent.name}` : (matchedStudent?.name || enroll.studentEmail.split('@')[0])}
+                                  </p>
+                                  <p className="text-[10px] text-slate-450">{enroll.studentEmail}</p>
+                                </div>
+                              </div>
                             </td>
                             <td className="px-4 py-3.5 font-medium text-slate-600">
                               {course ? course.title : 'Cours inconnu'}
@@ -1489,6 +2310,19 @@ Le support Dekel.Formation`,
                               )}
                             </td>
                             <td className="px-4 py-3.5 text-right space-x-1">
+                              <button
+                                onClick={() => setViewingUserProfile(matchedStudent || {
+                                  id: 'unknown',
+                                  email: enroll.studentEmail,
+                                  name: enroll.studentEmail.split('@')[0],
+                                  role: 'student',
+                                  createdAt: enroll.enrolledAt,
+                                  status: 'active'
+                                })}
+                                className="text-[10px] font-bold px-2 py-1 rounded border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-all"
+                              >
+                                Voir Profil
+                              </button>
                               <button
                                 onClick={() => onUpdateEnrollmentStatus(enroll.id, enroll.status === 'active' ? 'revoked' : 'active')}
                                 className={`text-[10px] font-bold px-2 py-1 rounded border transition-all ${
@@ -1515,6 +2349,547 @@ Le support Dekel.Formation`,
               </table>
             </div>
           </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Assistants & Équipe (Requirement Fine-Grained Permissions) */}
+      {activeTab === 'assistants' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Gestion de l'Équipe & Assistants</h2>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Invitez des collaborateurs pour vous aider à gérer vos formations tout en contrôlant finement leurs droits.
+              </p>
+            </div>
+            {!showAddAssistantForm && (
+              <button
+                type="button"
+                onClick={() => setShowAddAssistantForm(true)}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-100 flex items-center gap-1.5 transition-all cursor-pointer self-start"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Inviter un assistant</span>
+              </button>
+            )}
+          </div>
+
+          {showAddAssistantForm && (
+            <form onSubmit={handleInviteAssistant} className="bg-white rounded-3xl border border-slate-150 p-6 shadow-xl space-y-6 animate-fade-in max-w-4xl">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-bold text-sm">
+                    👤
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Nouvelle Invitation d'Assistant</h3>
+                    <p className="text-[10px] text-slate-400">Renseignez les informations de connexion et définissez ses droits d'accès.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAssistantForm(false)}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Form fields */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Informations d'identité</h4>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-slate-600">Prénom *</label>
+                      <input
+                        type="text"
+                        required
+                        value={assistantFirstName}
+                        onChange={(e) => setAssistantFirstName(e.target.value)}
+                        placeholder="Ex: Jean"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-slate-600">Nom de famille *</label>
+                      <input
+                        type="text"
+                        required
+                        value={assistantLastName}
+                        onChange={(e) => setAssistantLastName(e.target.value)}
+                        placeholder="Ex: Dupont"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-600">Adresse E-mail de connexion *</label>
+                    <input
+                      type="email"
+                      required
+                      value={assistantEmail}
+                      onChange={(e) => setAssistantEmail(e.target.value)}
+                      placeholder="assistant@exemple.com"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-600">Mot de passe provisoire *</label>
+                    <input
+                      type="password"
+                      required
+                      value={assistantPassword}
+                      onChange={(e) => setAssistantPassword(e.target.value)}
+                      placeholder="Mot de passe secret"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                    />
+                    <p className="text-[9px] text-slate-400">Ce mot de passe permettra à l'assistant de se connecter directement à son espace.</p>
+                  </div>
+                </div>
+
+                {/* Fine-grained permissions check list */}
+                <div className="space-y-4 bg-slate-50 rounded-2xl p-4 border border-slate-150">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🛡️ Droits & Permissions Très Fines</span>
+                  </h4>
+                  
+                  <div className="space-y-3.5">
+                    {/* Permission: Edit chapters */}
+                    <label className="flex items-start gap-3 bg-white p-3 rounded-xl border border-slate-150 shadow-sm cursor-pointer hover:border-indigo-150 transition-all">
+                      <input
+                        type="checkbox"
+                        checked={assistantPermEditChapters}
+                        onChange={(e) => setAssistantPermEditChapters(e.target.checked)}
+                        className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-100"
+                      />
+                      <div>
+                        <span className="block text-xs font-bold text-slate-800">Autoriser la modification des chapitres</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">Permet de créer, réorganiser, renommer et modifier le contenu textuel/vidéo des chapitres de cours.</span>
+                      </div>
+                    </label>
+
+                    {/* Permission: Manage comments */}
+                    <label className="flex items-start gap-3 bg-white p-3 rounded-xl border border-slate-150 shadow-sm cursor-pointer hover:border-indigo-150 transition-all">
+                      <input
+                        type="checkbox"
+                        checked={assistantPermManageComments}
+                        onChange={(e) => setAssistantPermManageComments(e.target.checked)}
+                        className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-100"
+                      />
+                      <div>
+                        <span className="block text-xs font-bold text-slate-800">Autoriser la réponse aux commentaires</span>
+                        <span className="block text-[10px] text-slate-400 mt-0.5">Permet d'interagir avec les élèves, de répondre aux questions du forum d'apprentissage et de supprimer les messages inappropriés.</span>
+                      </div>
+                    </label>
+
+                    {/* Restricted/Forbidden action: Delete course */}
+                    <div className="flex items-start gap-3 bg-rose-50/50 p-3 rounded-xl border border-rose-100 shadow-sm opacity-75 select-none">
+                      <input
+                        type="checkbox"
+                        disabled
+                        checked={false}
+                        className="mt-0.5 rounded text-rose-300 border-rose-200 cursor-not-allowed bg-slate-100"
+                      />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-rose-900">Supprimer la formation (Bloqué)</span>
+                          <span className="bg-rose-100 text-rose-700 text-[8px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5">
+                            🔒 Sécurisé
+                          </span>
+                        </div>
+                        <span className="block text-[10px] text-rose-500/70 mt-0.5">Cette action critique est strictement réservée au formateur titulaire. L'assistant ne pourra jamais supprimer une formation.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAssistantForm(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-750 text-xs font-bold border border-slate-250 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-100 cursor-pointer"
+                >
+                  Envoyer l'invitation
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Assistants list */}
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Membres de l'équipe ({allUsers.filter(u => u.role === 'assistant' && u.invitedBy === currentUser.email).length})</h3>
+              <p className="text-[10px] text-slate-400">Liste des assistants autorisés sur votre compte formateur.</p>
+            </div>
+
+            {allUsers.filter(u => u.role === 'assistant' && u.invitedBy === currentUser.email).length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <div className="text-4xl">👥</div>
+                <h4 className="text-xs font-bold text-slate-700">Aucun assistant pour le moment</h4>
+                <p className="text-[10px] text-slate-400 max-w-sm mx-auto">
+                  Simplifiez-vous la vie en déléguant des tâches à un assistant (réponses aux questions, modification du contenu). Invitez votre premier assistant dès maintenant !
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAssistantForm(true)}
+                  className="mt-2 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-all inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Ajouter un premier assistant</span>
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      <th className="py-3 px-4">Collaborateur</th>
+                      <th className="py-3 px-4">E-mail</th>
+                      <th className="py-3 px-4">Permissions Très Fines</th>
+                      <th className="py-3 px-4">Statut d'accès</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                    {allUsers
+                      .filter(u => u.role === 'assistant' && u.invitedBy === currentUser.email)
+                      .map((assistant) => {
+                        const perms = assistant.permissions || [];
+                        return (
+                          <tr key={assistant.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center border border-emerald-200 uppercase">
+                                  {assistant.firstName?.[0] || assistant.name[0]}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-800">{assistant.firstName} {assistant.name}</p>
+                                  <p className="text-[10px] text-slate-400">Inscrit le {new Date(assistant.createdAt).toLocaleDateString('fr-FR')}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500">
+                              {assistant.email}
+                            </td>
+                            <td className="py-3.5 px-4 space-y-1">
+                              {/* Chapter editing permission toggler */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAssistantPermission(assistant, 'edit_chapters')}
+                                className={`text-[9px] font-bold px-2 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                  perms.includes('edit_chapters')
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                                    : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100 line-through'
+                                }`}
+                              >
+                                <span>{perms.includes('edit_chapters') ? '✓' : '✗'} Modifier les chapitres</span>
+                              </button>
+
+                              {/* Comment managing permission toggler */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAssistantPermission(assistant, 'manage_comments')}
+                                className={`text-[9px] font-bold px-2 py-1 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                                  perms.includes('manage_comments')
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                    : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100 line-through'
+                                }`}
+                              >
+                                <span>{perms.includes('manage_comments') ? '✓' : '✗'} Répondre aux commentaires</span>
+                              </button>
+
+                              {/* Forbidden delete courses permission */}
+                              <div className="text-[9px] font-bold px-2 py-1 rounded-lg border bg-rose-50 border-rose-100 text-rose-500/70 flex items-center gap-1 cursor-not-allowed select-none w-max">
+                                <span>🔒 Supprimer formations</span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
+                                assistant.status === 'active' || !assistant.status
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
+                              }`}>
+                                {assistant.status === 'active' || !assistant.status ? 'Actif' : 'Désactivé'}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAssistantStatus(assistant)}
+                                className={`text-[10px] font-bold py-1 px-2.5 rounded-xl border transition-all mr-2 cursor-pointer ${
+                                  assistant.status === 'active' || !assistant.status
+                                    ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
+                                    : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {assistant.status === 'active' || !assistant.status ? 'Suspendre' : 'Réactiver'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Webhook Journal */}
+      {activeTab === 'webhooks' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Journal de Réception des Webhooks</h2>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Suivez en temps réel tous les signaux d'inscription instantanée envoyés par vos passerelles de paiement externes.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={fetchGlobalLogs}
+                className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-100 flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span>🔄 Actualiser</span>
+              </button>
+              {globalWebhookLogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllWebhookLogs}
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-100 flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Vider les journaux</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Recherche par e-mail ou contenu</label>
+              <input
+                type="text"
+                placeholder="Ex: student@gmail.com, payload content..."
+                value={globalWebhookSearch}
+                onChange={(e) => setGlobalWebhookSearch(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filtrer par formation</label>
+              <select
+                value={globalWebhookFilterCourseId}
+                onChange={(e) => setGlobalWebhookFilterCourseId(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
+              >
+                <option value="">Toutes les formations</option>
+                {trainerCourses.map(c => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filtrer par statut</label>
+              <select
+                value={globalWebhookFilterStatus}
+                onChange={(e) => setGlobalWebhookFilterStatus(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
+              >
+                <option value="">Tous les statuts</option>
+                <option value="success">Succès (Accès accordé)</option>
+                <option value="failed">Erreur (Accès refusé)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Webhook Journal List */}
+          <div className="space-y-3">
+            {(() => {
+              // Apply filters
+              const filteredLogs = globalWebhookLogs.filter(log => {
+                const searchLower = globalWebhookSearch.toLowerCase();
+                const matchesSearch = !globalWebhookSearch ||
+                  (log.detectedEmail && log.detectedEmail.toLowerCase().includes(searchLower)) ||
+                  (log.detectedName && log.detectedName.toLowerCase().includes(searchLower)) ||
+                  (log.body && JSON.stringify(log.body).toLowerCase().includes(searchLower)) ||
+                  (log.errorMessage && log.errorMessage.toLowerCase().includes(searchLower));
+
+                const matchesCourse = !globalWebhookFilterCourseId || log.courseId === globalWebhookFilterCourseId;
+
+                const matchesStatus = !globalWebhookFilterStatus ||
+                  (globalWebhookFilterStatus === 'success' && log.status === 'success') ||
+                  (globalWebhookFilterStatus === 'failed' && log.status !== 'success');
+
+                return matchesSearch && matchesCourse && matchesStatus;
+              });
+
+              if (filteredLogs.length === 0) {
+                return (
+                  <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl">
+                    <p className="text-xs text-slate-400 italic">Aucun log de Webhook ne correspond à vos critères de recherche.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {filteredLogs.map(log => {
+                    const isExpanded = expandedLogId === log.id;
+                    const course = allCourses.find(c => c.id === log.courseId);
+                    const formattedDate = new Date(log.receivedAt).toLocaleString('fr-FR');
+
+                    return (
+                      <div
+                        key={log.id}
+                        className={`bg-white border transition-all rounded-2xl overflow-hidden shadow-sm ${
+                          isExpanded ? 'border-indigo-300 ring-2 ring-indigo-50' : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {/* Header card / Row summary */}
+                        <div
+                          onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                          className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer select-none"
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className={`px-2 py-1 rounded text-[9px] font-extrabold uppercase mt-0.5 tracking-wider shrink-0 ${
+                              log.status === 'success' 
+                                ? 'bg-emerald-50 border border-emerald-100 text-emerald-700'
+                                : 'bg-rose-50 border border-rose-100 text-rose-700'
+                            }`}>
+                              {log.status === 'success' ? 'Accordé' : 'Refusé'}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-xs font-bold text-slate-800">
+                                  {log.detectedEmail || <span className="text-rose-500 font-sans italic">E-mail non détecté</span>}
+                                </span>
+                                {log.detectedName && (
+                                  <span className="text-[11px] text-slate-500 font-medium">({log.detectedName})</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-slate-400 mt-0.5">
+                                <span className="font-semibold text-slate-500 truncate max-w-[200px]">
+                                  📚 {course ? course.title : `Formation #${log.courseId}`}
+                                </span>
+                                <span>•</span>
+                                <span>🕒 {formattedDate}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-slate-100 pt-2.5 md:pt-0">
+                            <div className="text-left md:text-right">
+                              <p className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-wider">{log.method} • HTTP {log.status === 'success' ? '200' : '400'}</p>
+                              <p className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[280px]">{log.outcome || log.status}</p>
+                            </div>
+                            <span className="text-slate-450 text-xs font-bold">
+                              {isExpanded ? '▲ Réduire' : '▼ Détails'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Collapsible expanded detail */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-4 text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Metadata Panel */}
+                              <div className="space-y-2 bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+                                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Données Détectées</h4>
+                                <table className="w-full text-left">
+                                  <tbody>
+                                    <tr className="border-b border-slate-100">
+                                      <td className="py-1 text-[10px] font-bold text-slate-400">Date de réception</td>
+                                      <td className="py-1 font-mono text-slate-700 text-[11px]">{formattedDate}</td>
+                                    </tr>
+                                    <tr className="border-b border-slate-100">
+                                      <td className="py-1 text-[10px] font-bold text-slate-400">URL appelée</td>
+                                      <td className="py-1 font-mono text-slate-700 text-[11px] break-all">{log.url}</td>
+                                    </tr>
+                                    <tr className="border-b border-slate-100">
+                                      <td className="py-1 text-[10px] font-bold text-slate-400">Méthode HTTP</td>
+                                      <td className="py-1 font-bold font-mono text-slate-700 text-[11px]">{log.method}</td>
+                                    </tr>
+                                    <tr className="border-b border-slate-100">
+                                      <td className="py-1 text-[10px] font-bold text-slate-400">Formation cible</td>
+                                      <td className="py-1 font-semibold text-slate-700">{course ? course.title : `Formation #${log.courseId}`}</td>
+                                    </tr>
+                                    <tr className="border-b border-slate-100">
+                                      <td className="py-1 text-[10px] font-bold text-slate-400">Étudiant identifié</td>
+                                      <td className="py-1 font-bold text-indigo-700 font-mono">{log.detectedEmail || "Aucun"}</td>
+                                    </tr>
+                                    {log.detectedName && (
+                                      <tr className="border-b border-slate-100">
+                                        <td className="py-1 text-[10px] font-bold text-slate-400">Nom détecté</td>
+                                        <td className="py-1 text-slate-700 font-medium">{log.detectedName}</td>
+                                      </tr>
+                                    )}
+                                    <tr className="border-b border-slate-100">
+                                      <td className="py-1 text-[10px] font-bold text-slate-400">Résultat final</td>
+                                      <td className="py-1">
+                                        <span className={`font-bold ${log.status === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                          {log.status === 'success' ? 'Accès accordé' : 'Accès refusé'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                    {log.errorMessage && (
+                                      <tr>
+                                        <td className="py-1 text-[10px] font-bold text-rose-500">Motif de l'erreur</td>
+                                        <td className="py-1 text-rose-600 font-semibold leading-tight">{log.errorMessage}</td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* HTTP Headers */}
+                              <div className="space-y-1.5 flex flex-col">
+                                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">En-têtes HTTP (Headers)</h4>
+                                <div className="bg-slate-900 text-slate-100 font-mono text-[9px] p-3 rounded-xl overflow-auto max-h-48 flex-1 shadow-inner leading-relaxed">
+                                  {log.headers ? (
+                                    <pre>{JSON.stringify(log.headers, null, 2)}</pre>
+                                  ) : (
+                                    <span className="italic text-slate-400">Aucun en-tête reçu.</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* JSON Body */}
+                            <div className="space-y-1.5">
+                              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Corps de la requête JSON (Body)</h4>
+                              <div className="bg-slate-900 text-emerald-400 font-mono text-[10px] p-3.5 rounded-xl overflow-auto max-h-64 shadow-inner leading-relaxed">
+                                {log.body ? (
+                                  <pre>{JSON.stringify(log.body, null, 2)}</pre>
+                                ) : (
+                                  <span className="italic text-slate-400">Le corps de la requête est vide ou non lisible.</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -1522,162 +2897,443 @@ Le support Dekel.Formation`,
       {activeTab === 'course-editor' && selectedCourse && (
         <div className="space-y-6 animate-fade-in">
           {/* Back to courses */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <button
               onClick={() => { setSelectedCourseId(null); setActiveTab('courses'); }}
               className="text-xs text-indigo-600 hover:underline font-bold flex items-center gap-1"
             >
               ← Retour à mes formations
             </button>
-            <h2 className="text-sm font-black text-slate-800 truncate max-w-md">Contenu de : {selectedCourse.title}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-black text-slate-800 truncate max-w-xs sm:max-w-md">Contenu de : {selectedCourse.title}</h2>
+              {onPreviewCourse && (
+                <button
+                  type="button"
+                  onClick={() => onPreviewCourse(selectedCourse)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition-all shrink-0 cursor-pointer"
+                >
+                  <Play className="w-3 h-3 fill-current" />
+                  <span>Prévisualiser</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Left side modules list */}
-            <div className="lg:col-span-1 space-y-4">
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">Structure / Modules</h3>
-                
-                {/* Add Module Form */}
-                <form onSubmit={handleAddModuleSubmit} className="flex gap-2 mb-4">
-                  <input
-                    type="text"
-                    required
-                    value={newModuleTitle}
-                    onChange={(e) => setNewModuleTitle(e.target.value)}
-                    placeholder="Nom du nouveau module"
-                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-2 rounded-xl"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </form>
-
-                <div className="space-y-2">
-                  {courseModules.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-6">Aucun module créé pour le moment.</p>
-                  ) : (
-                    courseModules.map((mod, index) => (
-                      <div
-                        key={mod.id}
-                        className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 flex items-center justify-between"
-                      >
-                        <div className="truncate pr-2">
-                          <p className="text-[10px] font-bold text-indigo-600">Module {mod.order}</p>
-                          <p className="text-xs font-bold text-slate-800 truncate">{mod.title}</p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            disabled={index === 0}
-                            onClick={() => handleMoveModule(mod, 'up')}
-                            className="p-1 hover:bg-slate-200 rounded text-slate-500 disabled:opacity-30"
-                          >
-                            <ArrowUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            disabled={index === courseModules.length - 1}
-                            onClick={() => handleMoveModule(mod, 'down')}
-                            className="p-1 hover:bg-slate-200 rounded text-slate-500 disabled:opacity-30"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => onDeleteModule(mod.id)}
-                            className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-500"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+          {/* Unique Administration Space: Structure de la formation */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+            {/* Header / Subtitle & Add module button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Structure de la formation</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Toute la gestion de la structure (modules et chapitres) est centralisée ici, proche d'un explorateur de fichiers.
+                </p>
               </div>
+              
+              {/* Add Module Form Button/Field Inline */}
+              <form onSubmit={handleAddModuleSubmit} className="flex gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  required
+                  value={newModuleTitle}
+                  onChange={(e) => setNewModuleTitle(e.target.value)}
+                  placeholder="Nom du nouveau module"
+                  className="flex-1 sm:w-64 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                />
+                <button
+                  type="submit"
+                  disabled={loadingActions['addModule']}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1 transition-all shrink-0"
+                >
+                  {loadingActions['addModule'] ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>Ajouter un module</span>
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
 
-            {/* Right side chapters inside modules list */}
-            <div className="lg:col-span-2 space-y-4">
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-6">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Chapitres par module</h3>
+            {/* Backdrops to close dropdowns when clicking outside */}
+            {activeModMenuId && (
+              <div className="fixed inset-0 z-20 bg-transparent" onClick={() => setActiveModMenuId(null)} />
+            )}
+            {activeChMenuId && (
+              <div className="fixed inset-0 z-20 bg-transparent" onClick={() => setActiveChMenuId(null)} />
+            )}
+
+            {/* Hierarchical modules list */}
+            <div className="space-y-4">
+              {courseModules.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                  <Folder className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 font-medium">Aucun module dans cette formation.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Saisissez un nom ci-dessus pour créer votre premier module.</p>
                 </div>
-
-                {courseModules.map(mod => {
+              ) : (
+                courseModules.map((mod, modIdx) => {
                   const chapters = moduleChaptersMap(mod.id);
+                  const isExpanded = !!expandedTrainerModuleIds[mod.id];
+                  const isModActive = mod.active !== false;
+                  const isRenaming = modToRenameId === mod.id;
+                  const isAnyMenuOpenInThisMod = activeModMenuId === mod.id || chapters.some(ch => ch.id === activeChMenuId);
+
                   return (
-                    <div key={mod.id} className="border border-slate-150 rounded-2xl p-4 space-y-3 bg-slate-50/20">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-wide">Module {mod.order}</p>
-                          <h4 className="text-xs font-bold text-slate-800">{mod.title}</h4>
+                    <div
+                      key={mod.id}
+                      className={`border border-slate-200 rounded-2xl transition-all duration-200 bg-white shadow-sm relative ${
+                        isAnyMenuOpenInThisMod ? 'z-30 overflow-visible' : 'z-10 overflow-hidden'
+                      }`}
+                    >
+                      
+                      {/* Module Header Row */}
+                      <div className={`course-editor-module-header p-4 flex items-center justify-between gap-3 select-none ${isModActive ? 'bg-slate-50/60' : 'bg-slate-100/50 opacity-80'}`}>
+                        <div className="flex items-center gap-2.5 truncate flex-1">
+                          {/* Accordion toggle arrow */}
+                          <button
+                            type="button"
+                            onClick={() => toggleTrainerModule(mod.id)}
+                            className="p-1 hover:bg-slate-200/60 rounded-lg text-slate-500 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </button>
+
+                          {/* Module folder/number index */}
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${isModActive ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-500'}`}>
+                            {mod.order}
+                          </div>
+
+                          {/* Title / Renaming Mode */}
+                          {isRenaming ? (
+                            <div className="flex items-center gap-1.5 flex-1 max-w-md">
+                              <input
+                                type="text"
+                                value={modRenameTitle}
+                                onChange={(e) => setModRenameTitle(e.target.value)}
+                                className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleRenameModuleSave(mod); }}
+                                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors"
+                                title="Sauvegarder"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setModToRenameId(null); }}
+                                className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors"
+                                title="Annuler"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="truncate cursor-pointer flex-1" onClick={() => toggleTrainerModule(mod.id)}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 text-xs truncate">
+                                  {mod.title}
+                                </span>
+                                {/* Active/Inactive Badge */}
+                                {isModActive ? (
+                                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-150 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase scale-90 shrink-0">
+                                    Visible
+                                  </span>
+                                ) : (
+                                  <span className="bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase scale-90 shrink-0 flex items-center gap-1">
+                                    <EyeOff className="w-2.5 h-2.5" />
+                                    Masqué
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-0.5">{chapters.length} chapitre(s)</p>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          onClick={() => openNewChapter(mod.id)}
-                          className="bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1 transition-all"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Ajouter un chapitre</span>
-                        </button>
+
+                        {/* Module Actions Toolbar */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Reordering buttons */}
+                          <button
+                            type="button"
+                            disabled={modIdx === 0}
+                            onClick={() => handleMoveModule(mod, 'up')}
+                            className="p-1.5 hover:bg-slate-200/80 rounded-lg text-slate-500 disabled:opacity-20 transition-colors"
+                            title="Déplacer vers le haut"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={modIdx === courseModules.length - 1}
+                            onClick={() => handleMoveModule(mod, 'down')}
+                            className="p-1.5 hover:bg-slate-200/80 rounded-lg text-slate-500 disabled:opacity-20 transition-colors"
+                            title="Déplacer vers le bas"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Settings Trigger Icon (⚙️) */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setActiveModMenuId(activeModMenuId === mod.id ? null : mod.id)}
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                activeModMenuId === mod.id
+                                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                              }`}
+                              title="Paramètres du module"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {activeModMenuId === mod.id && (
+                              <div className="absolute right-0 mt-1.5 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 text-slate-800 animate-fade-in">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleToggleModuleActive(mod);
+                                    setActiveModMenuId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs flex items-center gap-2.5 transition-colors"
+                                >
+                                  {isModActive ? (
+                                    <>
+                                      <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                                      <span className="text-slate-700">Désactiver le module</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye className="w-3.5 h-3.5 text-emerald-500" />
+                                      <span className="text-slate-700">Activer le module</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setModToRenameId(mod.id);
+                                    setModRenameTitle(mod.title);
+                                    setActiveModMenuId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs flex items-center gap-2.5 transition-colors"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span className="text-slate-700">Renommer</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openNewChapter(mod.id);
+                                    setActiveModMenuId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs flex items-center gap-2.5 transition-colors"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span className="text-slate-700">Ajouter un chapitre</span>
+                                </button>
+                                <hr className="border-slate-100 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleDeleteModuleClick(mod.id);
+                                    setActiveModMenuId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-rose-50 text-xs text-rose-600 flex items-center gap-2.5 font-bold transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Supprimer le module</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="space-y-2">
-                        {chapters.length === 0 ? (
-                          <p className="text-[11px] text-slate-400 italic py-2 pl-2">Aucun chapitre dans ce module.</p>
-                        ) : (
-                          chapters.map((ch, idx) => (
-                            <div key={ch.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between">
-                              <div className="flex items-center gap-2.5 truncate">
-                                <Play className="w-3.5 h-3.5 text-slate-400" />
-                                <div className="truncate">
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="text-xs font-semibold text-slate-800 truncate">{ch.title}</p>
-                                    {ch.isFree && (
-                                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase shrink-0">Gratuit</span>
-                                    )}
+                      {/* Module body - nested chapters */}
+                      {isExpanded && (
+                        <div className="course-editor-chapter-list-container p-4 bg-slate-50/30 border-t border-slate-100 space-y-3">
+                          
+                          {/* Chapters tree connection container */}
+                          <div className="border-l-2 border-slate-200 ml-5 pl-4 py-1 space-y-2.5">
+                            {chapters.length === 0 ? (
+                              <p className="text-xs text-slate-400 italic py-2">
+                                Aucun chapitre dans ce module.
+                              </p>
+                            ) : (
+                              chapters.map((ch, idx) => {
+                                const isChActive = ch.active !== false;
+
+                                return (
+                                  <div
+                                    key={ch.id}
+                                    className={`relative bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm transition-all hover:border-slate-300 ${
+                                      activeChMenuId === ch.id ? 'z-40' : 'z-10'
+                                    } ${
+                                      isChActive ? '' : 'bg-slate-100/60 opacity-85'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3 truncate">
+                                      {/* Chapter Icon */}
+                                      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${isChActive ? 'bg-indigo-50 text-indigo-500' : 'bg-slate-100 text-slate-400'}`}>
+                                        <Play className="w-3 h-3 fill-current" />
+                                      </div>
+
+                                      <div className="truncate">
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs font-bold text-slate-800 truncate">
+                                            {ch.title}
+                                          </p>
+                                          
+                                          {/* Access status */}
+                                          {ch.isFree ? (
+                                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase shrink-0">
+                                              Gratuit
+                                            </span>
+                                          ) : (
+                                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase shrink-0">
+                                              Payant
+                                            </span>
+                                          )}
+
+                                          {/* Chapter Active badge */}
+                                          {!isChActive && (
+                                            <span className="bg-slate-100 text-slate-500 border border-slate-200 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0 flex items-center gap-1 scale-90">
+                                              <EyeOff className="w-2 h-2" />
+                                              Masqué
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[9.5px] text-slate-400 font-medium mt-0.5">
+                                          Source : {ch.videoSource.toUpperCase()} • {(ch.richText || '').length} car.
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* Chapter actions toolbar */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {/* Move buttons */}
+                                      <button
+                                        type="button"
+                                        disabled={idx === 0}
+                                        onClick={() => handleMoveChapter(ch, 'up')}
+                                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 disabled:opacity-20 transition-colors"
+                                        title="Déplacer vers le haut"
+                                      >
+                                        <ArrowUp className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={idx === chapters.length - 1}
+                                        onClick={() => handleMoveChapter(ch, 'down')}
+                                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 disabled:opacity-20 transition-colors"
+                                        title="Déplacer vers le bas"
+                                      >
+                                        <ArrowDown className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Gear/Settings trigger icon (⚙️) */}
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveChMenuId(activeChMenuId === ch.id ? null : ch.id)}
+                                          className={`p-1.5 rounded-lg border transition-all ${
+                                            activeChMenuId === ch.id
+                                              ? 'bg-indigo-600 border-indigo-500 text-white'
+                                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                                          }`}
+                                          title="Paramètres du chapitre"
+                                        >
+                                          <Settings className="w-3.5 h-3.5" />
+                                        </button>
+
+                                        {/* Dropdown Menu */}
+                                        {activeChMenuId === ch.id && (
+                                          <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 text-slate-800 animate-fade-in">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleToggleChapterActive(ch);
+                                                setActiveChMenuId(null);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs flex items-center gap-2.5 transition-colors"
+                                            >
+                                              {isChActive ? (
+                                                <>
+                                                  <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                                                  <span className="text-slate-700">Désactiver le chapitre</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Eye className="w-3.5 h-3.5 text-emerald-500" />
+                                                  <span className="text-slate-700">Activer le chapitre</span>
+                                                </>
+                                              )}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                openEditChapter(ch);
+                                                setActiveChMenuId(null);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs flex items-center gap-2.5 transition-colors"
+                                            >
+                                              <Edit3 className="w-3.5 h-3.5 text-indigo-500" />
+                                              <span className="text-slate-700">Modifier</span>
+                                            </button>
+                                            <hr className="border-slate-100 my-1" />
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                handleDeleteChapterClick(ch.id);
+                                                setActiveChMenuId(null);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-rose-50 text-xs text-rose-600 flex items-center gap-2.5 font-bold transition-colors"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                              <span>Supprimer</span>
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                  <p className="text-[9px] text-slate-400 font-medium">Source : {ch.videoSource.toUpperCase()} • {(ch.richText || '').length} car.</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  disabled={idx === 0}
-                                  onClick={() => handleMoveChapter(ch, 'up')}
-                                  className="p-1 hover:bg-slate-100 rounded text-slate-500 disabled:opacity-30"
-                                >
-                                  <ArrowUp className="w-3 h-3" />
-                                </button>
-                                <button
-                                  disabled={idx === chapters.length - 1}
-                                  onClick={() => handleMoveChapter(ch, 'down')}
-                                  className="p-1 hover:bg-slate-100 rounded text-slate-500 disabled:opacity-30"
-                                >
-                                  <ArrowDown className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => openEditChapter(ch)}
-                                  className="p-1 hover:bg-slate-100 rounded text-indigo-600 hover:bg-indigo-50"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => onDeleteChapter(ch.id)}
-                                  className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
+                                );
+                              })
+                            )}
+
+                            {/* Create Chapter button inside module */}
+                            <div className="pt-2">
+                              <button
+                                type="button"
+                                onClick={() => openNewChapter(mod.id)}
+                                className="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Ajouter un chapitre</span>
+                              </button>
                             </div>
-                          ))
-                        )}
-                      </div>
+                          </div>
+
+                        </div>
+                      )}
+
                     </div>
                   );
-                })}
-              </div>
+                })
+              )}
             </div>
 
           </div>
@@ -1941,14 +3597,101 @@ Le support Dekel.Formation`,
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md"
+                    disabled={loadingActions['saveChapter']}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md flex items-center gap-1.5"
                   >
-                    Enregistrer le chapitre
+                    {loadingActions['saveChapter'] ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Enregistrement...</span>
+                      </>
+                    ) : (
+                      <span>Enregistrer le chapitre</span>
+                    )}
                   </button>
                 </div>
               </form>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Visualiser Profil Modal */}
+      {viewingUserProfile && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl relative animate-fade-in text-slate-800 space-y-4">
+            <button
+              onClick={() => setViewingUserProfile(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            
+            <div className="text-center space-y-3">
+              <img 
+                src={viewingUserProfile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                alt={viewingUserProfile.name} 
+                className="w-20 h-20 rounded-full object-cover border-4 border-indigo-500/20 shadow-md mx-auto"
+              />
+              <div>
+                <h3 className="text-base font-black text-slate-900 leading-tight">
+                  {viewingUserProfile.firstName ? `${viewingUserProfile.firstName} ${viewingUserProfile.name}` : viewingUserProfile.name}
+                </h3>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide border mt-1 ${
+                  viewingUserProfile.role === 'admin' 
+                    ? 'bg-rose-50 text-rose-700 border-rose-100'
+                    : viewingUserProfile.role === 'trainer'
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                }`}>
+                  {viewingUserProfile.role === 'admin' ? 'Administrateur' : viewingUserProfile.role === 'trainer' ? 'Formateur' : 'Étudiant'}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-150 pt-3.5 space-y-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                  <Mail className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Adresse E-mail</p>
+                  <p className="font-semibold text-slate-700">{viewingUserProfile.email}</p>
+                </div>
+              </div>
+
+              {viewingUserProfile.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                    <Phone className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Téléphone</p>
+                    <p className="font-semibold text-slate-700 font-mono">{viewingUserProfile.phone}</p>
+                  </div>
+                </div>
+              )}
+
+              {viewingUserProfile.bio && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-slate-100 rounded-lg text-slate-500 mt-0.5">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Biographie / Présentation</p>
+                    <p className="text-slate-600 leading-relaxed font-normal whitespace-pre-line bg-slate-50 border border-slate-100 p-2.5 rounded-xl mt-1 text-[11px]">{viewingUserProfile.bio}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setViewingUserProfile(null)}
+              className="w-full py-2.5 px-4 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 text-xs font-bold transition-all mt-4"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       )}
 

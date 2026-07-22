@@ -1,0 +1,159 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account information including roles (student, trainer, admin).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user ID (matches auth.uid)" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "name": { "type": "string", "maxLength": 100, "description": "Display name" },
+        "role": { "type": "string", "enum": ["admin", "trainer", "student"], "description": "Access control role" },
+        "avatarUrl": { "type": "string", "description": "URL of user avatar" },
+        "bio": { "type": "string", "maxLength": 500, "description": "Biography/description" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "status": { "type": "string", "enum": ["active", "deactivated"], "description": "Account status" }
+      },
+      "required": ["id", "email", "name", "role", "createdAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational training courses on the platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique course ID" },
+        "title": { "type": "string", "maxLength": 200, "description": "Course title" },
+        "trainerId": { "type": "string", "description": "ID of the trainer teaching this course" },
+        "trainerName": { "type": "string", "maxLength": 100, "description": "Trainer name" },
+        "language": { "type": "string", "description": "Language of instruction" },
+        "description": { "type": "string", "description": "Course detailed description" },
+        "themeColor": { "type": "string", "enum": ["indigo", "slate", "emerald", "amber", "rose", "sky"], "description": "UI Accent color theme" },
+        "trainerPhoto": { "type": "string", "description": "Trainer avatar/photo URL" },
+        "logoUrl": { "type": "string", "description": "Logo URL" },
+        "coverImage": { "type": "string", "description": "Cover/banner image URL" },
+        "status": { "type": "string", "enum": ["published", "draft"], "description": "Course publication status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "type": { "type": "string", "description": "Course category/type" },
+        "price": { "type": "number", "description": "Price in XAF" },
+        "level": { "type": "string", "enum": ["Débutant", "Intermédiaire", "Avancé", "Tous niveaux"], "description": "Target learner level" },
+        "duration": { "type": "string", "description": "Course estimated duration" },
+        "paymentInstructions": { "type": "string", "description": "Manual payment info / Mobile Money numbers" },
+        "contactInfo": { "type": "string", "description": "Trainer WhatsApp/contact info" }
+      },
+      "required": ["id", "title", "trainerId", "trainerName", "status", "createdAt", "type", "price", "level", "duration"]
+    },
+    "Module": {
+      "title": "Module",
+      "description": "Modules organizing a course's chapters.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique module ID" },
+        "courseId": { "type": "string", "description": "Associated course ID" },
+        "title": { "type": "string", "maxLength": 200, "description": "Module title" },
+        "order": { "type": "number", "description": "Ordering priority" }
+      },
+      "required": ["id", "courseId", "title", "order"]
+    },
+    "Chapter": {
+      "title": "Chapter",
+      "description": "A single learning chapter/lesson within a course module.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique chapter ID" },
+        "moduleId": { "type": "string", "description": "Associated module ID" },
+        "title": { "type": "string", "maxLength": 200, "description": "Chapter title" },
+        "order": { "type": "number", "description": "Ordering priority" },
+        "videoSource": { "type": "string", "enum": ["youtube", "vimeo", "direct", "iframe"], "description": "Video host provider" },
+        "videoUrl": { "type": "string", "description": "URL of course video" },
+        "richText": { "type": "string", "description": "Lesson markdown rich text" },
+        "imageUrl": { "type": "string", "description": "Supporting image URL" },
+        "pdfUrl": { "type": "string", "description": "Supporting pdf URL" },
+        "isFree": { "type": "boolean", "description": "Whether chapter can be viewed as free preview" }
+      },
+      "required": ["id", "moduleId", "title", "order", "videoSource", "videoUrl", "richText"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Course access/purchase enrollment record for students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique enrollment ID" },
+        "studentEmail": { "type": "string", "format": "email", "description": "Student email address" },
+        "courseId": { "type": "string", "description": "Associated course ID" },
+        "status": { "type": "string", "enum": ["active", "revoked"], "description": "Enrollment status" },
+        "enrolledAt": { "type": "string", "format": "date-time", "description": "Timestamp of enrollment" }
+      },
+      "required": ["id", "studentEmail", "courseId", "status", "enrolledAt"]
+    },
+    "StudentProgress": {
+      "title": "StudentProgress",
+      "description": "Tracking of completed chapters for a student per course.",
+      "type": "object",
+      "properties": {
+        "studentEmail": { "type": "string", "format": "email", "description": "Student email address" },
+        "courseId": { "type": "string", "description": "Course ID" },
+        "completedChapterIds": { "type": "array", "description": "Completed chapter IDs list" },
+        "lastAccessedAt": { "type": "string", "format": "date-time", "description": "Last access timestamp" },
+        "lastVideoTimestamp": { "type": "number", "description": "Last timestamp of the video watched" }
+      },
+      "required": ["studentEmail", "courseId", "completedChapterIds", "lastAccessedAt"]
+    },
+    "SimulatedEmail": {
+      "title": "SimulatedEmail",
+      "description": "Simulated system logs of emails/notifications sent to users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique log ID" },
+        "to": { "type": "string", "format": "email", "description": "Destination email" },
+        "subject": { "type": "string", "maxLength": 200, "description": "Email subject" },
+        "body": { "type": "string", "description": "Email body content" },
+        "sentAt": { "type": "string", "format": "date-time", "description": "Sent timestamp" }
+      },
+      "required": ["id", "to", "subject", "body", "sentAt"]
+    },
+    "PreRegisteredStudent": {
+      "title": "PreRegisteredStudent",
+      "description": "Students pre-registered to access courses before account creation.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "Student email" },
+        "courseIds": { "type": "array", "description": "Pre-authorized course IDs" }
+      },
+      "required": ["email", "courseIds"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Users profile mapping direct from user ID."
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Course records."
+    },
+    "/modules/{moduleId}": {
+      "schema": "Module",
+      "description": "Modules organizing course chapters."
+    },
+    "/chapters/{chapterId}": {
+      "schema": "Chapter",
+      "description": "Chapter records."
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Course enrollment states."
+    },
+    "/progress/{progressId}": {
+      "schema": "StudentProgress",
+      "description": "Progress tracking records."
+    },
+    "/emails/{emailId}": {
+      "schema": "SimulatedEmail",
+      "description": "Notification history log logs."
+    },
+    "/preregistered/{preregId}": {
+      "schema": "PreRegisteredStudent",
+      "description": "Pre-registered student authorization entries."
+    }
+  }
+}

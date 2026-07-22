@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSeeded() {
+      return exists(/databases/$(database)/documents/metadata/seeding_hierarchical);
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- ENTITY VALIDATIONS ---
+    function isValidUser(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.role in ['admin', 'trainer', 'student'];
+    }
+
+    // --- MATCH BLOCKS ---
+
+    // 1. Users
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if !isSeeded() || isSignedIn() || isValidUser(incoming());
+      allow delete: if !isSeeded() || isSignedIn();
+    }
+
+    // 2. Courses
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create, update, delete: if !isSeeded() || isSignedIn();
+    }
+
+    // 3. Modules (Hierarchical subcollection & collectionGroup)
+    match /{path=**}/modules/{moduleId} {
+      allow read: if true;
+      allow create, update, delete: if !isSeeded() || isSignedIn();
+    }
+
+    // 4. Chapters (Hierarchical subcollection & collectionGroup)
+    match /{path=**}/chapters/{chapterId} {
+      allow read: if true;
+      allow create, update, delete: if !isSeeded() || isSignedIn();
+    }
+
+    // 5. Enrollments
+    match /enrollments/{enrollmentId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 6. StudentProgress
+    match /progress/{progressId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 7. Emails
+    match /emails/{emailId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 8. PreRegistered
+    match /preregistered/{preregId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // 9. Metadata (Internal Seeding Check)
+    match /metadata/{docId} {
+      allow read: if true;
+      allow create, update, delete: if !isSeeded() || isSignedIn();
+    }
+  }
+}

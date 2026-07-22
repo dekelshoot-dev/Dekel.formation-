@@ -1,0 +1,57 @@
+{
+  "enrollments": [
+    {
+      "id": "we-1784115227430-8kpg",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784115227391@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-15T11:33:47.430Z",
+      "synced": true
+    }
+  ],
+  "logs": [
+    {
+      "id": "log-1784115226856-w6yy",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-15T11:33:47.261Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784115226852-r48y",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-15T11:33:46.853Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    }
+  ]
+}

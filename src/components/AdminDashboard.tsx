@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, UserRole, Course, Enrollment, SimulatedEmail } from '../types';
-import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck } from 'lucide-react';
+import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu } from 'lucide-react';
+import { showToast } from './Toast';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -14,6 +15,8 @@ interface AdminDashboardProps {
   onAddUser: (user: User) => void;
   onSendEmail: (email: SimulatedEmail) => void;
   onUpdateUserRole: (userId: string, newRole: UserRole) => void;
+  onUpdateUser: (user: User) => void;
+  onPreviewCourse?: (course: Course) => void;
 }
 
 export default function AdminDashboard({
@@ -27,9 +30,12 @@ export default function AdminDashboard({
   onDeleteUser,
   onAddUser,
   onSendEmail,
-  onUpdateUserRole
+  onUpdateUserRole,
+  onUpdateUser,
+  onPreviewCourse
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'settings'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'settings' | 'profile'>('stats');
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Trainer form state
@@ -42,6 +48,41 @@ export default function AdminDashboard({
   const [supportEmail, setSupportEmail] = useState('support@dekel-formation.com');
   const [allowPublicSignup, setAllowPublicSignup] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Edit Profile Form
+  const [profileName, setProfileName] = useState(currentUser.name);
+  const [profileFirstName, setProfileFirstName] = useState(currentUser.firstName || '');
+  const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
+  const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
+  const [profileBio, setProfileBio] = useState(currentUser.bio || '');
+  const [profileAvatar, setProfileAvatar] = useState(currentUser.avatarUrl || '');
+  const [profileTheme, setProfileTheme] = useState(currentUser.theme || 'theme-nature-dark');
+  const [viewingUserProfile, setViewingUserProfile] = useState<User | null>(null);
+
+  React.useEffect(() => {
+    setProfileName(currentUser.name);
+    setProfileFirstName(currentUser.firstName || '');
+    setProfilePhone(currentUser.phone || '');
+    setProfileEmail(currentUser.email || '');
+    setProfileBio(currentUser.bio || '');
+    setProfileAvatar(currentUser.avatarUrl || '');
+    setProfileTheme(currentUser.theme || 'theme-nature-dark');
+  }, [currentUser]);
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateUser({
+      ...currentUser,
+      name: profileName,
+      firstName: profileFirstName,
+      phone: profilePhone,
+      email: profileEmail,
+      bio: profileBio,
+      avatarUrl: profileAvatar,
+      theme: profileTheme
+    });
+    showToast('Vos informations de profil ont été mises à jour !', 'success');
+  };
 
   // Filter lists
   const trainers = allUsers.filter(u => u.role === 'trainer');
@@ -76,7 +117,7 @@ export default function AdminDashboard({
 
     const emailTrimmed = newTrainerEmail.trim().toLowerCase();
     if (allUsers.some(u => u.email.toLowerCase() === emailTrimmed)) {
-      alert('Cet email est déjà enregistré !');
+      showToast('Cet e-mail est déjà enregistré !', 'warning');
       return;
     }
 
@@ -91,6 +132,7 @@ export default function AdminDashboard({
     };
 
     onAddUser(newTrainer);
+    showToast('Compte formateur créé avec succès !', 'success');
     
     // Send welcome email simulation
     const welEmail: SimulatedEmail = {
@@ -116,14 +158,133 @@ Bonnes formations !`,
 
   const saveSettings = () => {
     setIsSaved(true);
+    showToast('Paramètres système enregistrés !', 'success');
     setTimeout(() => setIsSaved(false), 2000);
   };
 
   return (
     <div className="space-y-6">
+      {/* Mobile Navigation Drawer for Administrators */}
+      {isMobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden animate-fade-in">
+          {/* Backdrop */}
+          <div 
+            onClick={() => setIsMobileDrawerOpen(false)}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+          />
+          {/* Drawer content */}
+          <div className="fixed inset-y-0 left-0 w-72 bg-white text-slate-800 border-r border-slate-200 p-5 shadow-2xl flex flex-col justify-between animate-slide-in">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2">
+                  <div className="bg-red-50 text-red-600 p-1.5 rounded-xl border border-red-100">
+                    <Shield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-900">Administration</p>
+                    <p className="text-[9px] text-slate-400">Navigation mobile</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsMobileDrawerOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <button
+                  onClick={() => { setActiveTab('stats'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'stats' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 text-red-500" />
+                  <span>Tableau de bord</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('users'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'users' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4 text-red-500" />
+                  <span>Gestion des utilisateurs</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('trainers'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'trainers' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-red-500" />
+                  <span>Gérer les Formateurs</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('courses'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'courses' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 text-red-500" />
+                  <span>Toutes les formations</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('students'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'students' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users className="w-4 h-4 text-red-500" />
+                  <span>Gérer les Étudiants</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('settings'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'settings' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Settings className="w-4 h-4 text-red-500" />
+                  <span>Paramètres Globaux</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('profile'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'profile' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <UserIcon className="w-4 h-4 text-red-500" />
+                  <span>Mon Profil</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 text-center">
+              <span className="text-[10px] text-slate-400 font-medium">Dekel.Formation • Administrateur</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
+          {/* Hamburger Menu on Mobile */}
+          <button
+            onClick={() => setIsMobileDrawerOpen(true)}
+            className="md:hidden p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-all cursor-pointer mr-1"
+            title="Ouvrir le menu"
+          >
+            <Menu className="w-5.5 h-5.5" />
+          </button>
+
           <div className="bg-red-50 text-red-600 p-2.5 rounded-2xl border border-red-100">
             <Shield className="w-6 h-6" />
           </div>
@@ -188,7 +349,7 @@ Bonnes formations !`,
       {/* Tabs Layout */}
       <div className="flex flex-col md:flex-row gap-6">
         {/* Left Side Navigation Menu */}
-        <div className="md:w-60 bg-white border border-slate-200 rounded-2xl p-3 shadow-sm self-start space-y-1">
+        <div className="hidden md:block md:w-60 bg-white border border-slate-200 rounded-2xl p-3 shadow-sm self-start space-y-1">
           <button
             onClick={() => { setActiveTab('stats'); setSearchQuery(''); }}
             className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all ${
@@ -243,13 +404,22 @@ Bonnes formations !`,
             <Settings className="w-4 h-4 text-red-500" />
             <span>Paramètres Globaux</span>
           </button>
+          <button
+            onClick={() => { setActiveTab('profile'); setSearchQuery(''); }}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all ${
+              activeTab === 'profile' ? 'bg-red-50 text-red-900 font-bold border border-red-100' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <UserIcon className="w-4 h-4 text-red-500" />
+            <span>Mon Profil</span>
+          </button>
         </div>
 
         {/* Right Side Content Pane */}
         <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[500px]">
           
           {/* Active search bar when relevant */}
-          {activeTab !== 'stats' && activeTab !== 'settings' && (
+          {activeTab !== 'stats' && activeTab !== 'settings' && activeTab !== 'profile' && (
             <div className="mb-5 flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 w-4 h-4" />
@@ -410,15 +580,50 @@ Bonnes formations !`,
                                 </select>
                               </td>
                               <td className="px-4 py-3.5 text-right space-x-1.5">
-                                {isDeactivated ? (
-                                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-rose-100">
-                                    <XCircle className="w-3 h-3" /> Bloqué
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100">
-                                    <CheckCircle className="w-3 h-3" /> Actif
-                                  </span>
-                                )}
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {isDeactivated ? (
+                                    <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-rose-100">
+                                      <XCircle className="w-3 h-3" /> Bloqué
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100">
+                                      <CheckCircle className="w-3 h-3" /> Actif
+                                    </span>
+                                  )}
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewingUserProfile(u)}
+                                    className="text-[10px] font-bold px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all cursor-pointer"
+                                  >
+                                    Voir Profil
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => onUpdateUserStatus(u.id, !isDeactivated)}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                                      isDeactivated
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                        : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                                    }`}
+                                  >
+                                    {isDeactivated ? 'Débloquer' : 'Bloquer'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${u.name} ?`)) {
+                                        onDeleteUser(u.id);
+                                      }
+                                    }}
+                                    className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle cursor-pointer"
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -534,11 +739,18 @@ Bonnes formations !`,
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3.5 text-right space-x-1.5">
+                            <td className="px-4 py-3.5 text-right space-x-1.5 flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingUserProfile(t)}
+                                className="text-[10px] font-bold px-2 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all cursor-pointer"
+                              >
+                                Voir Profil
+                              </button>
                               <button
                                 onClick={() => onUpdateUserStatus(t.id, !isDeactivated)}
                                 title={isDeactivated ? "Activer l'accès" : "Désactiver l'accès"}
-                                className={`p-1.5 rounded-lg border transition-colors ${
+                                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                                   isDeactivated 
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                                     : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
@@ -618,6 +830,17 @@ Bonnes formations !`,
                               )}
                             </td>
                             <td className="px-4 py-3.5 text-right space-x-1.5">
+                              {onPreviewCourse && (
+                                <button
+                                  type="button"
+                                  onClick={() => onPreviewCourse(c)}
+                                  className="text-[10px] font-semibold px-2.5 py-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all inline-flex items-center gap-1 cursor-pointer"
+                                  title="Prévisualiser la formation"
+                                >
+                                  <Play className="w-2.5 h-2.5 fill-current" />
+                                  <span>Prévisualiser</span>
+                                </button>
+                              )}
                               <button
                                 onClick={() => onToggleCourseStatus(c.id)}
                                 className={`text-[10px] font-semibold px-2 py-1 rounded border transition-all ${
@@ -701,11 +924,18 @@ Bonnes formations !`,
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3.5 text-right space-x-1.5">
+                            <td className="px-4 py-3.5 text-right space-x-1.5 flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingUserProfile(s)}
+                                className="text-[10px] font-bold px-2 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all cursor-pointer"
+                              >
+                                Voir Profil
+                              </button>
                               <button
                                 onClick={() => onUpdateUserStatus(s.id, !isDeactivated)}
                                 title={isDeactivated ? "Réactiver l'élève" : "Suspendre l'élève"}
-                                className={`p-1.5 rounded-lg border transition-colors ${
+                                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
                                   isDeactivated 
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                                     : 'border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-100'
@@ -791,8 +1021,248 @@ Bonnes formations !`,
             </div>
           )}
 
+          {/* Tab Content: Profile */}
+          {activeTab === 'profile' && (
+            <div className="space-y-6 max-w-2xl">
+              <div>
+                <h2 className="text-base font-black text-slate-900">Mon profil d'administrateur</h2>
+                <p className="text-xs text-slate-400">Gérez vos coordonnées personnelles, votre bio de présentation et votre avatar de profil.</p>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-5">
+                <div className="flex flex-col sm:flex-row items-center gap-5 p-4 border border-slate-150 rounded-2xl bg-slate-50">
+                  <img 
+                    src={profileAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
+                    alt={profileName} 
+                    className="w-16 h-16 rounded-full object-cover border-2 border-red-500/30 shadow-sm"
+                  />
+                  <div className="flex-1 w-full space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide">URL de l'avatar (Photo de profil)</label>
+                    <input
+                      type="url"
+                      value={profileAvatar}
+                      onChange={(e) => setProfileAvatar(e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Nom de famille</label>
+                    <input
+                      type="text"
+                      required
+                      value={profileName}
+                      onChange={(e) => setProfileName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Prénom</label>
+                    <input
+                      type="text"
+                      value={profileFirstName}
+                      onChange={(e) => setProfileFirstName(e.target.value)}
+                      placeholder="Votre prénom"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Adresse E-mail</label>
+                    <input
+                      type="email"
+                      required
+                      value={profileEmail}
+                      onChange={(e) => setProfileEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Numéro de téléphone</label>
+                    <input
+                      type="tel"
+                      value={profilePhone}
+                      onChange={(e) => setProfilePhone(e.target.value)}
+                      placeholder="Ex: +237 6xx xxx xxx"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Biographie / Présentation</label>
+                  <textarea
+                    value={profileBio}
+                    onChange={(e) => setProfileBio(e.target.value)}
+                    placeholder="Écrivez quelques mots sur vous..."
+                    rows={4}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 resize-y"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Thème de l'application</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Option 1: Aura Cosmique */}
+                    <button
+                      type="button"
+                      onClick={() => setProfileTheme('theme-cosmic')}
+                      className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
+                        profileTheme === 'theme-cosmic'
+                          ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/15'
+                          : 'border-slate-150 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500/50"></span>
+                        {profileTheme === 'theme-cosmic' && (
+                          <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full">Actif</span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">Aura Cosmique</p>
+                      <p className="text-[10px] text-slate-450 mt-0.5">Thème Sombre Premium</p>
+                    </button>
+
+                    {/* Option 2: Slate (Ardoise Minimaliste) */}
+                    <button
+                      type="button"
+                      onClick={() => setProfileTheme('theme-slate')}
+                      className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
+                        profileTheme === 'theme-slate'
+                          ? 'border-slate-500 bg-slate-50/50 ring-2 ring-slate-500/15'
+                          : 'border-slate-150 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="w-4 h-4 rounded-full bg-slate-400 shadow-sm shadow-slate-400/50"></span>
+                        {profileTheme === 'theme-slate' && (
+                          <span className="text-[9px] bg-slate-700 text-white font-bold px-1.5 py-0.5 rounded-full">Actif</span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">Ardoise Minimaliste</p>
+                      <p className="text-[10px] text-slate-450 mt-0.5">Thème Clair Moderne</p>
+                    </button>
+
+                    {/* Option 3: Sauge Chaleureuse */}
+                    <button
+                      type="button"
+                      onClick={() => setProfileTheme('theme-sage')}
+                      className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
+                        profileTheme === 'theme-sage'
+                          ? 'border-[#749c85] bg-emerald-50/50 ring-2 ring-[#749c85]/15'
+                          : 'border-slate-150 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="w-4 h-4 rounded-full bg-[#749c85] shadow-sm shadow-[#749c85]/50"></span>
+                        {profileTheme === 'theme-sage' && (
+                          <span className="text-[9px] bg-emerald-700 text-white font-bold px-1.5 py-0.5 rounded-full">Actif</span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">Sauge Chaleureuse</p>
+                      <p className="text-[10px] text-slate-450 mt-0.5">Thème Naturel & Organique</p>
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition-all shadow-md shadow-red-50 inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Mettre à jour mon profil</span>
+                </button>
+              </form>
+            </div>
+          )}
+
         </div>
       </div>
+
+      {/* Visualiser Profil Modal */}
+      {viewingUserProfile && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-md w-full shadow-2xl relative text-slate-800 space-y-4">
+            <button
+              onClick={() => setViewingUserProfile(null)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            
+            <div className="text-center space-y-3">
+              <img 
+                src={viewingUserProfile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                alt={viewingUserProfile.name} 
+                className="w-20 h-20 rounded-full object-cover border-4 border-red-500/20 shadow-md mx-auto"
+              />
+              <div>
+                <h3 className="text-base font-black text-slate-900 leading-tight">
+                  {viewingUserProfile.firstName ? `${viewingUserProfile.firstName} ${viewingUserProfile.name}` : viewingUserProfile.name}
+                </h3>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide border mt-1 ${
+                  viewingUserProfile.role === 'admin' 
+                    ? 'bg-rose-50 text-rose-700 border-rose-100'
+                    : viewingUserProfile.role === 'trainer'
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                }`}>
+                  {viewingUserProfile.role === 'admin' ? 'Administrateur' : viewingUserProfile.role === 'trainer' ? 'Formateur' : 'Étudiant'}
+                </span>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-150 pt-3.5 space-y-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                  <Mail className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Adresse E-mail</p>
+                  <p className="font-semibold text-slate-700">{viewingUserProfile.email}</p>
+                </div>
+              </div>
+
+              {viewingUserProfile.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 rounded-lg text-slate-500">
+                    <Phone className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Téléphone</p>
+                    <p className="font-semibold text-slate-700 font-mono">{viewingUserProfile.phone}</p>
+                  </div>
+                </div>
+              )}
+
+              {viewingUserProfile.bio && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-slate-100 rounded-lg text-slate-500 mt-0.5">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Biographie / Présentation</p>
+                    <p className="text-slate-600 leading-relaxed font-normal whitespace-pre-line bg-slate-50 border border-slate-100 p-2.5 rounded-xl mt-1 text-[11px]">{viewingUserProfile.bio}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setViewingUserProfile(null)}
+              className="w-full py-2.5 px-4 rounded-xl text-slate-600 bg-slate-100 hover:bg-slate-200 text-xs font-bold transition-all mt-4 cursor-pointer"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

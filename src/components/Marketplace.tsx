@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { Course, Module, Chapter, Enrollment, User, SimulatedEmail } from '../types';
 import { BookOpen, User as UserIcon, Coins, MessageSquare, ShieldCheck, CheckCircle, ArrowRight, Smartphone, AlertCircle, Lock, Unlock, PlayCircle, Eye, X, ArrowLeft } from 'lucide-react';
@@ -12,6 +12,8 @@ interface MarketplaceProps {
   onEnrollStudent: (email: string, courseId: string) => void;
   onSendEmail: (email: SimulatedEmail) => void;
   onSwitchToLogin: () => void;
+  autoOpenSlug?: string;
+  onClearAutoOpen?: () => void;
 }
 
 export default function Marketplace({
@@ -22,7 +24,9 @@ export default function Marketplace({
   currentUser,
   onEnrollStudent,
   onSendEmail,
-  onSwitchToLogin
+  onSwitchToLogin,
+  autoOpenSlug,
+  onClearAutoOpen
 }: MarketplaceProps) {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -36,7 +40,43 @@ export default function Marketplace({
   const [lockedChapterAlert, setLockedChapterAlert] = useState<string | null>(null);
 
   // Filter only published courses
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
+
+  // Auto-open selected course when matching slug is passed via custom SEO URL
+  useEffect(() => {
+    if (autoOpenSlug && allCourses.length > 0) {
+      const matchedCourse = allCourses.find(
+        c => c.seoSlug === autoOpenSlug || c.id === autoOpenSlug
+      );
+      if (matchedCourse) {
+        setSelectedCourseForDetails(matchedCourse);
+        setShowDetailsModal(true);
+      }
+      if (onClearAutoOpen) {
+        onClearAutoOpen();
+      }
+    }
+  }, [autoOpenSlug, allCourses, onClearAutoOpen]);
+
+  const categories = [
+    { id: 'Tous', label: 'Toutes les catégories' },
+    { id: 'Développement', label: 'Développement' },
+    { id: 'E-commerce', label: 'E-Commerce' },
+    { id: 'Design', label: 'Design' },
+    { id: 'Marketing', label: 'Marketing' },
+    { id: 'Montage Vidéo', label: 'Montage Vidéo 🎬' },
+    { id: 'Miniatures', label: 'Miniatures 🖼️' },
+    { id: 'Flyers', label: 'Flyers 📄' }
+  ];
+
   const publishedCourses = allCourses.filter(c => c.status === 'published');
+
+  const filteredCourses = publishedCourses.filter(course => {
+    if (selectedCategory === 'Tous') return true;
+    const cType = course.type.toLowerCase();
+    const target = selectedCategory.toLowerCase();
+    return cType.includes(target) || target.includes(cType);
+  });
 
   const openCheckout = (course: Course) => {
     setSelectedCourse(course);
@@ -84,14 +124,15 @@ Bon apprentissage !`,
 
   // Pre-fill WhatsApp message
   const getWhatsAppMessage = (course: Course) => {
-    const text = `Bonjour, je viens d'effectuer le paiement de ${course.price.toLocaleString('fr-FR')} XAF pour la formation "${course.title}". Voici ma preuve de paiement pour activer mon compte (${currentUser?.email || 'mon-email@exemple.com'}). Merci !`;
+    const activePrice = course.promoPrice && course.promoPrice > 0 ? course.promoPrice : course.price;
+    const text = `Bonjour, je viens d'effectuer le paiement de ${activePrice.toLocaleString('fr-FR')} XAF pour la formation "${course.title}". Voici ma preuve de paiement pour activer mon compte (${currentUser?.email || 'mon-email@exemple.com'}). Merci !`;
     return `https://wa.me/33600000000?text=${encodeURIComponent(text)}`;
   };
 
   return (
     <div className="space-y-6">
       {/* Hero Banner */}
-      <div className="glass border-white/10 text-white rounded-3xl p-8 relative overflow-hidden">
+      <div className="glass border-white/10 text-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl"></div>
         <div className="relative z-10 max-w-2xl space-y-3">
           <span className="bg-indigo-500/20 text-indigo-300 font-bold px-3 py-1 rounded-full text-xs border border-indigo-500/30">
@@ -106,12 +147,35 @@ Bon apprentissage !`,
         </div>
       </div>
 
+      {/* Category Filter Navigation */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {categories.map((cat) => {
+          const isActive = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                isActive
+                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/10'
+                  : 'bg-white/5 text-slate-350 border-white/10 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Courses Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {publishedCourses.length === 0 ? (
-          <p className="text-xs text-slate-400 text-center col-span-full py-12">Aucune formation n'est publiée dans le catalogue pour le moment.</p>
+        {filteredCourses.length === 0 ? (
+          <div className="text-center col-span-full py-16 bg-white/5 border border-white/15 rounded-3xl p-6 space-y-2">
+            <p className="text-sm font-bold text-slate-200">Aucune formation trouvée</p>
+            <p className="text-xs text-slate-400">Il n'y a pas encore de formation publiée dans cette catégorie.</p>
+          </div>
         ) : (
-          publishedCourses.map(course => {
+          filteredCourses.map(course => {
             const courseModules = allModules.filter(m => m.courseId === course.id);
             const courseChapters = allChapters.filter(ch => {
               const mod = courseModules.find(m => m.id === ch.moduleId);
@@ -139,8 +203,19 @@ Bon apprentissage !`,
                     alt={course.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <span className="absolute top-3 right-3 glass-light backdrop-blur shadow text-white font-black px-3 py-1 rounded-full text-xs">
-                    {course.price.toLocaleString('fr-FR')} XAF
+                  <span className="absolute top-3 right-3 glass-light backdrop-blur shadow text-white font-black px-3 py-1 rounded-full text-xs flex flex-col items-end">
+                    {course.promoPrice && course.promoPrice > 0 ? (
+                      <>
+                        <span className="line-through text-[10px] text-slate-350 font-normal">
+                          {course.price.toLocaleString('fr-FR')} XAF
+                        </span>
+                        <span className="text-emerald-300 font-extrabold">
+                          {course.promoPrice.toLocaleString('fr-FR')} XAF
+                        </span>
+                      </>
+                    ) : (
+                      <span>{course.price.toLocaleString('fr-FR')} XAF</span>
+                    )}
                   </span>
                   <span className="absolute bottom-3 left-3 bg-slate-900/80 text-white font-semibold px-2 py-0.5 rounded text-[10px] uppercase">
                     {course.type}
@@ -239,9 +314,9 @@ Bon apprentissage !`,
       {/* Checkout Instructions Modal Overlay (Section 13) */}
       {showCheckoutModal && selectedCourse && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="glass rounded-3xl border border-white/15 p-6 w-full max-w-lg shadow-2xl space-y-5 text-slate-200">
+          <div className="glass rounded-3xl border border-white/15 p-6 w-full max-w-lg shadow-2xl space-y-4 text-slate-200 flex flex-col max-h-[90vh]">
             
-            <div className="flex justify-between items-start border-b border-white/10 pb-3">
+            <div className="flex justify-between items-start border-b border-white/10 pb-3 shrink-0">
               <div>
                 <span className="bg-indigo-500/20 text-indigo-300 font-bold px-2 py-0.5 rounded text-[10px] uppercase">Paiement Manuel</span>
                 <h3 className="font-black text-white text-base mt-1">S'inscrire à : {selectedCourse.title}</h3>
@@ -254,123 +329,131 @@ Bon apprentissage !`,
               </button>
             </div>
 
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 flex items-start gap-2.5 text-[11px] text-amber-300">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                Dans cette version, aucun paiement par carte n'est requis. L'accès est validé manuellement par le formateur après réception de votre preuve de paiement.
-              </div>
-            </div>
-
-            {/* Instruction Steps (Requirement 6) */}
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Instructions de paiement (Moyens acceptés) :</h4>
-              
-              {selectedCourse.paymentInstructions ? (
-                <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 text-xs text-slate-300 whitespace-pre-line leading-relaxed">
-                  {selectedCourse.paymentInstructions}
-                </div>
-              ) : (
-                <div className="space-y-2.5 text-xs text-slate-300">
-                  <div className="flex items-start gap-3 bg-white/5 p-2.5 rounded-xl border border-white/10">
-                    <Smartphone className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-white">Mobile Money (Orange / MTN / Wave)</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Envoyez le montant de <span className="font-bold text-white">{selectedCourse.price.toLocaleString('fr-FR')} XAF</span> au numéro suivant :</p>
-                      <p className="font-mono text-xs font-bold text-indigo-400 mt-1">+225 07 00 00 00 00 ({selectedCourse.trainerName})</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3 bg-white/5 p-2.5 rounded-xl border border-white/10">
-                    <Coins className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-white">Virement bancaire classique</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">RIB international de l'instructeur :</p>
-                      <p className="font-mono text-[10px] font-bold text-slate-300 bg-white/5 border border-white/10 px-2 py-1 rounded mt-1 select-all">
-                        FR76 3000 1000 2000 3000 4000 500
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Contact info */}
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Informations de contact :</p>
-                <div className="bg-white/5 p-3 rounded-xl border border-white/10 text-xs text-slate-300 whitespace-pre-line leading-relaxed font-mono">
-                  {selectedCourse.contactInfo || "WhatsApp: +225 07 00 00 00 00\nE-mail: support@formateur.com"}
+            {/* Scrollable Container for Instructions content */}
+            <div className="overflow-y-auto pr-1.5 flex-1 space-y-4">
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 flex items-start gap-2.5 text-[11px] text-amber-300">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  Dans cette version, aucun paiement par carte n'est requis. L'accès est validé manuellement par le formateur après réception de votre preuve de paiement.
                 </div>
               </div>
 
-              {/* Custom payment buttons (Requirement 6) */}
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Boutons de paiement disponibles :</p>
-                {selectedCourse.customPaymentButtons && selectedCourse.customPaymentButtons.filter(b => b.active).length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {selectedCourse.customPaymentButtons.filter(b => b.active).map(btn => {
-                      let colorClasses = 'bg-indigo-600/25 border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/35';
-                      if (btn.color === 'blue') {
-                        colorClasses = 'bg-blue-600/25 border-blue-500/40 text-blue-300 hover:bg-blue-600/35';
-                      } else if (btn.color === 'green') {
-                        colorClasses = 'bg-emerald-600/25 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/35';
-                      } else if (btn.color === 'red') {
-                        colorClasses = 'bg-rose-600/25 border-rose-500/40 text-rose-300 hover:bg-rose-600/35';
-                      } else if (btn.color === 'yellow') {
-                        colorClasses = 'bg-amber-600/25 border-amber-500/40 text-amber-300 hover:bg-amber-600/35';
-                      } else if (btn.color === 'purple') {
-                        colorClasses = 'bg-purple-600/25 border-purple-500/40 text-purple-300 hover:bg-purple-600/35';
-                      }
+              {/* Instruction Steps (Requirement 6) */}
+              <div className="space-y-4">
+                {/* 1. Custom payment buttons (Requirement 6) */}
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Boutons de paiement disponibles :</p>
+                  {selectedCourse.customPaymentButtons && selectedCourse.customPaymentButtons.filter(b => b.active).length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {selectedCourse.customPaymentButtons.filter(b => b.active).map(btn => {
+                        let colorClasses = 'bg-indigo-600/25 border-indigo-500/40 text-indigo-300 hover:bg-indigo-600/35';
+                        if (btn.color === 'blue') {
+                          colorClasses = 'bg-blue-600/25 border-blue-500/40 text-blue-300 hover:bg-blue-600/35';
+                        } else if (btn.color === 'green') {
+                          colorClasses = 'bg-emerald-600/25 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/35';
+                        } else if (btn.color === 'red') {
+                          colorClasses = 'bg-rose-600/25 border-rose-500/40 text-rose-300 hover:bg-rose-600/35';
+                        } else if (btn.color === 'yellow') {
+                          colorClasses = 'bg-amber-600/25 border-amber-500/40 text-amber-300 hover:bg-amber-600/35';
+                        } else if (btn.color === 'purple') {
+                          colorClasses = 'bg-purple-600/25 border-purple-500/40 text-purple-300 hover:bg-purple-600/35';
+                        }
 
-                      return (
-                        <a
-                          key={btn.id}
-                          href={btn.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all shadow-sm ${colorClasses}`}
-                        >
-                          <ArrowRight className="w-3.5 h-3.5" />
-                          <span>{btn.text}</span>
-                        </a>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <a
-                      href="https://wave.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-blue-600/25 border-blue-500/40 text-blue-300 hover:bg-blue-600/35 transition-all shadow-sm"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                      <span>Payer par Wave</span>
-                    </a>
-                    <a
-                      href="https://orangemoney.com"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-amber-600/25 border-amber-500/40 text-amber-300 hover:bg-amber-600/35 transition-all shadow-sm"
-                    >
-                      <ArrowRight className="w-3.5 h-3.5" />
-                      <span>Payer par Orange Money</span>
-                    </a>
+                        return (
+                          <a
+                            key={btn.id}
+                            href={btn.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all shadow-sm ${colorClasses}`}
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                            <span>{btn.text}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <a
+                        href="https://wave.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-blue-600/25 border-blue-500/40 text-blue-300 hover:bg-blue-600/35 transition-all shadow-sm"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        <span>Payer par Wave</span>
+                      </a>
+                      <a
+                        href="https://orangemoney.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-amber-600/25 border-amber-500/40 text-amber-300 hover:bg-amber-600/35 transition-all shadow-sm"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        <span>Payer par Orange Money</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Instructions de paiement (si activées) */}
+                {selectedCourse.showPaymentInstructions !== false && (
+                  <div className="space-y-4 pt-2">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Instructions de paiement (Moyens acceptés) :</h4>
+                    
+                    {selectedCourse.paymentInstructions ? (
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 text-xs text-slate-300 leading-relaxed markdown-body">
+                        <Markdown>{selectedCourse.paymentInstructions}</Markdown>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 text-xs text-slate-300">
+                        <div className="flex items-start gap-3 bg-white/5 p-2.5 rounded-xl border border-white/10">
+                          <Smartphone className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-white">Mobile Money (Orange / MTN / Wave)</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">Envoyez le montant de <span className="font-bold text-white">{(selectedCourse.promoPrice && selectedCourse.promoPrice > 0 ? selectedCourse.promoPrice : selectedCourse.price).toLocaleString('fr-FR')} XAF</span> au numéro suivant :</p>
+                            <p className="font-mono text-xs font-bold text-indigo-400 mt-1">+225 07 00 00 00 00 ({selectedCourse.trainerName})</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 bg-white/5 p-2.5 rounded-xl border border-white/10">
+                          <Coins className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-white">Virement bancaire classique</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">RIB international de l'instructeur :</p>
+                            <p className="font-mono text-[10px] font-bold text-slate-300 bg-white/5 border border-white/10 px-2 py-1 rounded mt-1 select-all">
+                              FR76 3000 1000 2000 3000 4000 500
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
 
-              {/* Steps checklist */}
-              <div className="border-t border-white/10 pt-3 space-y-1.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Étapes de validation :</p>
-                <ol className="text-xs text-slate-300 space-y-1 list-decimal list-inside leading-relaxed">
-                  <li>Effectuez la transaction du montant exact (<span className="font-bold text-white">{selectedCourse.price.toLocaleString('fr-FR')} XAF</span>) via l'un des boutons ou moyens ci-dessus.</li>
-                  <li>Prenez une capture d'écran du reçu de paiement.</li>
-                  <li>Cliquez sur le bouton ci-dessous pour envoyer la preuve via WhatsApp au formateur pour validation.</li>
-                </ol>
+                {/* 3. Informations de contact */}
+                <div className="space-y-1.5 pt-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Informations de contact :</p>
+                  <div className="bg-white/5 p-3 rounded-xl border border-white/10 text-xs text-slate-300 whitespace-pre-line leading-relaxed font-mono">
+                    {selectedCourse.contactInfo || "WhatsApp: +225 07 00 00 00 00\nE-mail: support@formateur.com"}
+                  </div>
+                </div>
+
+                {/* Steps checklist */}
+                <div className="border-t border-white/10 pt-3 space-y-1.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Étapes de validation :</p>
+                  <ol className="text-xs text-slate-300 space-y-1 list-decimal list-inside leading-relaxed">
+                    <li>Effectuez la transaction du montant exact (<span className="font-bold text-white">{(selectedCourse.promoPrice && selectedCourse.promoPrice > 0 ? selectedCourse.promoPrice : selectedCourse.price).toLocaleString('fr-FR')} XAF</span>) via l'un des boutons ou moyens ci-dessus.</li>
+                    <li>Prenez une capture d'écran du reçu de paiement.</li>
+                    <li>Cliquez sur le bouton ci-dessous pour envoyer la preuve via WhatsApp au formateur pour validation.</li>
+                  </ol>
+                </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col gap-2 pt-3 border-t border-white/10">
+            <div className="flex flex-col gap-2 pt-3 border-t border-white/10 shrink-0">
               {paymentDone ? (
                 <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-3 rounded-2xl text-center text-xs space-y-1.5 animate-fade-in">
                   <CheckCircle className="w-5 h-5 text-emerald-400 mx-auto" />
@@ -403,7 +486,10 @@ Bon apprentissage !`,
                     className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 font-bold py-2.5 rounded-xl text-xs text-center flex items-center justify-center gap-1.5 transition-all"
                   >
                     {simulatingPayment ? (
-                      <span>Vérification de la capture d'écran en cours...</span>
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Vérification de la capture d'écran en cours...</span>
+                      </>
                     ) : (
                       <>
                         <ShieldCheck className="w-4 h-4 text-indigo-400" />
@@ -476,10 +562,10 @@ Bon apprentissage !`,
               </div>
 
               {/* Grid content */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-y-auto lg:overflow-hidden">
                 
                 {/* Left Panel: Curriculum Modules and Chapters (7 cols) */}
-                <div className="lg:col-span-5 p-4 md:p-5 overflow-y-auto border-r border-white/10 space-y-4 max-h-[40vh] lg:max-h-[70vh]">
+                <div className="lg:col-span-5 p-4 md:p-5 lg:overflow-y-auto border-b lg:border-b-0 lg:border-r border-white/10 space-y-4 lg:max-h-[70vh]">
                   <div className="space-y-1">
                     <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Description</p>
                     <p className="text-xs text-slate-300 leading-relaxed">{selectedCourseForDetails.description}</p>
@@ -566,7 +652,7 @@ Bon apprentissage !`,
                 </div>
 
                 {/* Right Panel: Active Preview Area (7 cols) */}
-                <div className="lg:col-span-7 p-4 md:p-5 flex flex-col justify-start bg-slate-900/50 max-h-[50vh] lg:max-h-[70vh] overflow-y-auto space-y-4">
+                <div className="lg:col-span-7 p-4 md:p-5 flex flex-col justify-start bg-slate-900/50 lg:max-h-[70vh] lg:overflow-y-auto space-y-4">
                   {lockedChapterAlert ? (
                     <div className="bg-slate-950/60 border border-white/10 rounded-3xl p-6 text-center space-y-5 my-auto">
                       <div className="w-14 h-14 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
@@ -589,7 +675,7 @@ Bon apprentissage !`,
                           }}
                           className="accent-gradient hover:opacity-95 text-white font-bold text-xs py-2.5 px-6 rounded-xl transition-all shadow-lg shadow-indigo-500/25"
                         >
-                          S'inscrire à la formation ({selectedCourseForDetails.price.toLocaleString('fr-FR')} XAF)
+                          S'inscrire à la formation ({(selectedCourseForDetails.promoPrice && selectedCourseForDetails.promoPrice > 0 ? selectedCourseForDetails.promoPrice : selectedCourseForDetails.price).toLocaleString('fr-FR')} XAF)
                         </button>
                       </div>
                     </div>
@@ -672,7 +758,7 @@ Bon apprentissage !`,
                           }}
                           className="accent-gradient hover:opacity-95 text-white font-bold text-xs py-2.5 px-6 rounded-xl transition-all shadow-lg"
                         >
-                          S'inscrire pour débloquer tout ({selectedCourseForDetails.price.toLocaleString('fr-FR')} XAF)
+                          S'inscrire pour débloquer tout ({(selectedCourseForDetails.promoPrice && selectedCourseForDetails.promoPrice > 0 ? selectedCourseForDetails.promoPrice : selectedCourseForDetails.price).toLocaleString('fr-FR')} XAF)
                         </button>
                       </div>
                     </div>

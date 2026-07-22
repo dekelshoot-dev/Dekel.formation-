@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { User, UserRole, SimulatedEmail } from '../types';
 import { Mail, Key, User as UserIcon, BookOpen, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../firebase';
+import { showToast } from './Toast';
 
 interface AuthProps {
   allUsers: User[];
@@ -12,68 +15,119 @@ interface AuthProps {
 export default function Auth({ allUsers, onLogin, onAddUser, onSendEmail }: AuthProps) {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // Simulated
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<UserRole>('student');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setError('');
     setMessage('');
-
-    if (!email) {
-      setError('Veuillez saisir votre adresse e-mail.');
-      return;
-    }
-
-    const trimmedEmail = email.trim().toLowerCase();
-    const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
-
-    if (found) {
-      onLogin(found);
-    } else {
-      setError(`Adresse email non enregistrée. Vous pouvez créer un compte avec cet email en cliquant sur "S'inscrire".`);
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      setMessage('Connexion Google réussie !');
+      showToast('Connexion Google réussie !', 'success');
+    } catch (err: any) {
+      console.error(err);
+      let errMsg = `Échec de la connexion Google: ${err.message || err}`;
+      if (err.code === 'auth/operation-not-allowed') {
+        errMsg = "La connexion avec Google n'est pas activée dans votre console Firebase Authentication. Veuillez l'activer sous l'onglet 'Sign-in method'.";
+      }
+      setError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
+    setIsLoading(true);
 
-    if (!email || !name) {
+    if (!email || !password) {
       setError('Veuillez remplir tous les champs.');
+      showToast('Veuillez remplir tous les champs.', 'warning');
+      setIsLoading(false);
       return;
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
-    const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
+      // Verify credentials with real Firebase Auth
+      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      showToast('Connexion réussie !', 'success');
+    } catch (err: any) {
+      console.error(err);
+      let errMsg = 'Échec de la connexion. Veuillez vérifier vos identifiants.';
+      if (err.code === 'auth/user-not-found') {
+        errMsg = 'Adresse e-mail non enregistrée.';
+      } else if (err.code === 'auth/wrong-password') {
+        errMsg = 'Mot de passe incorrect.';
+      } else if (err.code === 'auth/invalid-credential') {
+        errMsg = 'Identifiants incorrects.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errMsg = "La méthode de connexion par E-mail/Mot de passe n'est pas activée dans votre console Firebase Authentication. Veuillez l'activer sous l'onglet 'Sign-in method'.";
+      } else {
+        errMsg = err.message || errMsg;
+      }
+      setError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    if (found) {
-      setError('Cet email est déjà associé à un compte.');
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    setIsLoading(true);
+
+    if (!email || !name || !password) {
+      setError('Veuillez remplir tous les champs.');
+      showToast('Veuillez remplir tous les champs.', 'warning');
+      setIsLoading(false);
       return;
     }
 
-    const newUser: User = {
-      id: `u-${Date.now()}`,
-      email: trimmedEmail,
-      name,
-      role: 'student',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      createdAt: new Date().toISOString(),
-      status: 'active'
-    };
+    try {
+      const trimmedEmail = email.trim().toLowerCase();
 
-    onAddUser(newUser);
+      // 1. Create the Firebase Auth account first
+      const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
 
-    // Send Simulated Welcome Email (Section 16)
-    const welcomeEmail: SimulatedEmail = {
-      id: `em-${Date.now()}`,
-      to: trimmedEmail,
-      subject: `Création de compte réussie - Plateforme Dekel.Formation`,
-      body: `Bonjour ${name},
+      // 2. Set the display name in Auth
+      if (credential.user) {
+        await updateProfile(credential.user, {
+          displayName: name
+        });
+      }
+
+      // 3. Define complementary profile data (Default role is Student)
+      const newUser: User = {
+        id: credential.user.uid,
+        email: trimmedEmail,
+        name,
+        role: 'student',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        createdAt: new Date().toISOString(),
+        status: 'active'
+      };
+
+      // 4. Save to Firestore DB
+      await onAddUser(newUser);
+
+      // Send Simulated Welcome Email
+      const welcomeEmail: SimulatedEmail = {
+        id: `em-${Date.now()}`,
+        to: trimmedEmail,
+        subject: `Création de compte réussie - Plateforme Dekel.Formation`,
+        body: `Bonjour ${name},
 
 Bienvenue sur la plateforme de formation Dekel.Formation !
 Votre compte en tant qu'Étudiant a été créé avec succès.
@@ -83,48 +137,83 @@ Vous pouvez dès à présent accéder à votre espace de travail.
 
 Cordialement,
 L'équipe Dekel.Formation`,
-      sentAt: new Date().toISOString()
-    };
-    onSendEmail(welcomeEmail);
+        sentAt: new Date().toISOString()
+      };
+      onSendEmail(welcomeEmail);
 
-    onLogin(newUser);
+      showToast('Compte créé avec succès !', 'success');
+      onLogin(newUser);
+    } catch (err: any) {
+      console.error(err);
+      let errMsg = 'Échec de la création du compte.';
+      if (err.code === 'auth/email-already-in-use') {
+        errMsg = 'Cet e-mail est déjà associé à un compte.';
+      } else if (err.code === 'auth/weak-password') {
+        errMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        errMsg = "La méthode de connexion par E-mail/Mot de passe n'est pas activée dans votre console Firebase Authentication. Veuillez l'activer sous l'onglet 'Sign-in method'.";
+      } else {
+        errMsg = err.message || errMsg;
+      }
+      setError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleForgot = (e: React.FormEvent) => {
+  const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
+    setIsLoading(true);
 
     if (!email) {
       setError('Veuillez renseigner votre adresse e-mail.');
+      showToast('Veuillez renseigner votre adresse e-mail.', 'warning');
+      setIsLoading(false);
       return;
     }
 
     const trimmedEmail = email.trim().toLowerCase();
-    const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
 
-    if (found) {
-      // Send Simulated Email (Section 16)
-      const resetEmail: SimulatedEmail = {
-        id: `em-${Date.now()}`,
-        to: trimmedEmail,
-        subject: 'Réinitialisation de votre mot de passe',
-        body: `Bonjour ${found.name},
+    try {
+      // Send real reset email or simulate it for the demo system SMTP simulation
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      showToast('E-mail de réinitialisation envoyé !', 'success');
+      setMessage('Un e-mail de réinitialisation de mot de passe a été envoyé par Firebase.');
+    } catch (err: any) {
+      console.error(err);
+      // Fallback email simulation if user doesn't exist yet but has database record
+      const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+      if (found) {
+        const resetEmail: SimulatedEmail = {
+          id: `em-${Date.now()}`,
+          to: trimmedEmail,
+          subject: 'Réinitialisation de votre mot de passe (Simulation)',
+          body: `Bonjour ${found.name},
 
 Une demande de réinitialisation de mot de passe a été effectuée pour votre compte.
 Veuillez cliquer sur le lien ci-dessous pour configurer un nouveau mot de passe :
 
 https://dekel-formation.com/reset-password?token=simulated_token_${Date.now()}
 
-Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.`,
-        sentAt: new Date().toISOString()
-      };
-      onSendEmail(resetEmail);
-      setMessage('Un e-mail de réinitialisation a été envoyé (voir la section "Logs Emails" en bas à gauche pour consulter l\'email envoyé).');
-    } else {
-      setError('Aucun compte n\'est associé à cette adresse e-mail.');
+Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.`,
+          sentAt: new Date().toISOString()
+        };
+        onSendEmail(resetEmail);
+        setMessage('Un e-mail de réinitialisation a été simulé (voir l\'onglet "Logs Emails" en bas à gauche).');
+        showToast('E-mail de réinitialisation simulé.', 'info');
+      } else {
+        const errMsg = err.message || 'Adresse e-mail non reconnue.';
+        setError(errMsg);
+        showToast(errMsg, 'error');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
@@ -206,10 +295,63 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email
 
             <button
               type="submit"
-              className="w-full accent-gradient hover:opacity-95 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              disabled={isLoading}
+              className="w-full accent-gradient hover:opacity-95 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
             >
-              <span>Se connecter</span>
-              <ChevronRight className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Connexion en cours...</span>
+                </>
+              ) : (
+                <>
+                  <span>Se connecter</span>
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+
+            <div className="relative my-4 flex items-center justify-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-white/10"></div>
+              </div>
+              <span className="relative bg-[#12162e] px-3 text-xs text-slate-400 font-medium">Ou continuer avec</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+              className="w-full bg-white text-slate-900 hover:bg-slate-50 disabled:opacity-50 font-bold py-2.5 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-xs cursor-pointer"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Connexion Google...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.04c1.64 0 3.12.56 4.28 1.67l3.2-3.2C17.52 1.56 14.96 1 12 1 7.35 1 3.4 3.65 1.5 7.5l3.6 2.8C6.01 7.21 8.79 5.04 12 5.04z"
+                    />
+                    <path
+                      fill="#4285F4"
+                      d="M23.5 12.3c0-.82-.07-1.6-.2-2.3H12v4.4h6.5c-.28 1.48-1.12 2.73-2.38 3.58l3.6 2.8c2.1-1.94 3.78-4.8 3.78-8.48z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.1 14.7c-.25-.75-.4-1.55-.4-2.7s.15-1.95.4-2.7L1.5 6.5C.54 8.42 0 10.65 0 13s.54 4.58 1.5 6.5l3.6-2.8z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c3.24 0 5.97-1.08 7.96-2.92l-3.6-2.8c-1.1.74-2.52 1.18-4.36 1.18-3.21 0-5.99-2.17-6.9-5.26l-3.6 2.8C3.4 20.35 7.35 23 12 23z"
+                    />
+                  </svg>
+                  <span>Se connecter avec Google</span>
+                </>
+              )}
             </button>
 
             <div className="text-center pt-4 border-t border-white/10 text-sm text-slate-300">
@@ -283,10 +425,20 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email
 
             <button
               type="submit"
-              className="w-full accent-gradient hover:opacity-95 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              disabled={isLoading}
+              className="w-full accent-gradient hover:opacity-95 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
             >
-              <span>Créer mon compte</span>
-              <ChevronRight className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Création du compte...</span>
+                </>
+              ) : (
+                <>
+                  <span>Créer mon compte</span>
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
             <div className="text-center pt-4 border-t border-white/10 text-sm text-slate-300">
@@ -323,10 +475,20 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email
 
             <button
               type="submit"
-              className="w-full accent-gradient hover:opacity-95 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              disabled={isLoading}
+              className="w-full accent-gradient hover:opacity-95 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
             >
-              <span>Envoyer les instructions</span>
-              <ChevronRight className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Envoi en cours...</span>
+                </>
+              ) : (
+                <>
+                  <span>Envoyer les instructions</span>
+                  <ChevronRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
             <div className="text-center pt-4 border-t border-white/10 text-sm text-slate-300 flex justify-between items-center">

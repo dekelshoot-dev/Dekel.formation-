@@ -2,6 +2,15 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+
+// Read Firebase config from json file
+const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+
+const firebaseApp = initializeApp(firebaseConfig);
+const dbFirestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
 const app = express();
 const PORT = 3000;
@@ -10,6 +19,45 @@ const DB_FILE = path.join(process.cwd(), "webhook_db.json");
 // Parse payloads
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Robust global JSON syntax error interceptor middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
+    const db = readDb();
+    const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+    
+    const logEntry = {
+      id: logId,
+      courseId: "malformed_json_payload",
+      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      method: req.method,
+      headers: req.headers,
+      body: null,
+      query: req.query,
+      detectedEmail: null,
+      detectedName: null,
+      receivedAt: new Date().toISOString(),
+      status: "failed_malformed_json",
+      errorMessage: `Format JSON invalide : ${err.message}`,
+      outcome: "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    };
+
+    db.logs.unshift(logEntry);
+    if (db.logs.length > 200) {
+      db.logs = db.logs.slice(0, 200);
+    }
+    writeDb(db);
+
+    return res.status(400).json({
+      status: "error",
+      message: "Bad Request: Malformed JSON payload received.",
+      error: err.message,
+      logId,
+      outcome: logEntry.outcome
+    });
+  }
+  next();
+});
 
 // Ensure database file exists
 function readDb() {
@@ -27,24 +75,179 @@ function writeDb(data: any) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
 
+function getValueByPath(obj: any, path: string): any {
+  if (!obj || !path) return undefined;
+  const parts = path.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
 // API: Webhook Receiver (Requirement 2)
-app.post("/api/webhooks/payment/:courseId", (req, res) => {
+app.post("/api/webhooks/payment/:courseId", async (req, res) => {
   const { courseId } = req.params;
-  
-  // Log the raw incoming request to help trainers debug
   const db = readDb();
   const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-  
-  // Generic Email Detection from common payment platform formats
+
+  // 1. Validate that the target course actually exists in Firestore (401 Unauthorized check)
+  let webhookEmailKey = "email";
+  let webhookNameKey = "name";
+  let courseExists = false;
+  let courseTitle = "";
+
+  try {
+    const courseRef = doc(dbFirestore, "courses", courseId);
+    const courseSnap = await getDoc(courseRef);
+    if (courseSnap.exists()) {
+      courseExists = true;
+      const courseData = courseSnap.data();
+      courseTitle = courseData.title || "";
+      if (courseData.webhookEmailKey) {
+        webhookEmailKey = courseData.webhookEmailKey;
+      }
+      if (courseData.webhookNameKey) {
+        webhookNameKey = courseData.webhookNameKey;
+      }
+    }
+  } catch (e: any) {
+    console.warn("Could not read course config from Firestore", e);
+  }
+
+  if (!courseExists) {
+    const errorMessage = `Accès non autorisé : La formation avec l'identifiant '${courseId}' n'existe pas ou le webhook n'est pas autorisé.`;
+    const outcome = "Accès refusé (formation introuvable ou non enregistrée)";
+    
+    const logEntry = {
+      id: logId,
+      courseId,
+      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      query: req.query,
+      detectedEmail: null,
+      detectedName: null,
+      receivedAt: new Date().toISOString(),
+      status: "failed_unauthorized_course",
+      errorMessage,
+      outcome
+    };
+
+    db.logs.unshift(logEntry);
+    if (db.logs.length > 200) {
+      db.logs = db.logs.slice(0, 200);
+    }
+    writeDb(db);
+
+    return res.status(401).json({
+      status: "error",
+      message: errorMessage,
+      logId,
+      error: "Unauthorized target resource"
+    });
+  }
+
+  // 2. Extract and strictly validate JSON payload structure & format
+  let body = req.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch (e: any) {
+      const errorMessage = `Format JSON invalide dans le corps brut : ${e.message}`;
+      const outcome = "Échec du parsing JSON (Données brutes illisibles)";
+      
+      const logEntry = {
+        id: logId,
+        courseId,
+        url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+        method: req.method,
+        headers: req.headers,
+        body: null,
+        query: req.query,
+        detectedEmail: null,
+        detectedName: null,
+        receivedAt: new Date().toISOString(),
+        status: "failed_malformed_json",
+        errorMessage,
+        outcome
+      };
+
+      db.logs.unshift(logEntry);
+      if (db.logs.length > 200) {
+        db.logs = db.logs.slice(0, 200);
+      }
+      writeDb(db);
+
+      return res.status(400).json({
+        status: "error",
+        message: "Bad Request: Unable to parse payload body as valid JSON object.",
+        logId,
+        error: errorMessage
+      });
+    }
+  }
+
+  body = body || {};
+
+  // Check if body is empty or null (which could happen if payload is missing or invalid content type)
+  if (Object.keys(body).length === 0 && Object.keys(req.query).length === 0) {
+    const errorMessage = "La charge utile JSON reçue et les paramètres de requête sont complètement vides.";
+    const outcome = "Échec de validation (Requête vide)";
+    
+    const logEntry = {
+      id: logId,
+      courseId,
+      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      method: req.method,
+      headers: req.headers,
+      body: body,
+      query: req.query,
+      detectedEmail: null,
+      detectedName: null,
+      receivedAt: new Date().toISOString(),
+      status: "failed_empty_payload",
+      errorMessage,
+      outcome
+    };
+
+    db.logs.unshift(logEntry);
+    if (db.logs.length > 200) {
+      db.logs = db.logs.slice(0, 200);
+    }
+    writeDb(db);
+
+    return res.status(400).json({
+      status: "error",
+      message: "Bad Request: Request payload is empty.",
+      logId,
+      error: errorMessage
+    });
+  }
+
+  // 3. Extract mapped/fallback attributes
   let detectedEmail = "";
-  
-  // Check Query params first
-  if (req.query.email && typeof req.query.email === "string") {
+  let detectedName = "";
+
+  // Try custom path values first
+  const emailVal = getValueByPath(body, webhookEmailKey);
+  if (emailVal && typeof emailVal === "string") {
+    detectedEmail = emailVal;
+  }
+
+  const nameVal = getValueByPath(body, webhookNameKey);
+  if (nameVal && typeof nameVal === "string") {
+    detectedName = nameVal;
+  }
+
+  // Check Query params second
+  if (!detectedEmail && req.query.email && typeof req.query.email === "string") {
     detectedEmail = req.query.email;
   }
   
-  // Inspect request body
-  const body = req.body || {};
+  // Inspect request body fallbacks
   if (!detectedEmail && body) {
     detectedEmail = 
       body.email || 
@@ -59,49 +262,128 @@ app.post("/api/webhooks/payment/:courseId", (req, res) => {
       "";
   }
 
-  const logEntry = {
-    id: logId,
-    courseId,
-    headers: req.headers,
-    body: req.body,
-    query: req.query,
-    detectedEmail: detectedEmail || null,
-    receivedAt: new Date().toISOString(),
-    status: detectedEmail ? "success" : "failed_missing_email"
-  };
-
-  db.logs.unshift(logEntry);
-  if (db.logs.length > 50) {
-    db.logs = db.logs.slice(0, 50); // Keep last 50 logs
+  // Generic fallback for name
+  if (!detectedName && body) {
+    detectedName = 
+      body.name ||
+      body.customer_name ||
+      body.studentName ||
+      body.student_name ||
+      body.customer?.name ||
+      body.data?.object?.customer_details?.name ||
+      "";
   }
 
+  // 4. Validate Email Format constraints
+  detectedEmail = detectedEmail ? detectedEmail.trim() : "";
+  detectedName = detectedName ? detectedName.trim() : "";
+
+  let emailError = "";
+  let emailStatus = "";
+  let emailOutcome = "";
+
   if (!detectedEmail) {
+    emailError = "Adresse e-mail manquante dans la charge utile JSON ou les paramètres de requête.";
+    emailStatus = "failed_missing_email";
+    emailOutcome = "Accès refusé (adresse e-mail introuvable)";
+  } else {
+    // Validate with strict regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(detectedEmail)) {
+      emailError = `L'adresse e-mail '${detectedEmail}' a un format syntaxique invalide (ex attendu: nom@domaine.com).`;
+      emailStatus = "failed_invalid_email_format";
+      emailOutcome = "Accès refusé (format d'e-mail incorrect)";
+    }
+  }
+
+  if (emailError) {
+    const logEntry = {
+      id: logId,
+      courseId,
+      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      query: req.query,
+      detectedEmail: detectedEmail || null,
+      detectedName: detectedName || null,
+      receivedAt: new Date().toISOString(),
+      status: emailStatus,
+      errorMessage: emailError,
+      outcome: emailOutcome
+    };
+
+    db.logs.unshift(logEntry);
+    if (db.logs.length > 200) {
+      db.logs = db.logs.slice(0, 200);
+    }
     writeDb(db);
+
     return res.status(400).json({
       status: "error",
-      message: "Webhook processed but no email address was found in the payload or query parameters. Please send '?email=...' or pass 'email' inside the JSON body.",
-      logId
+      message: "Bad Request: Validation failed for student email.",
+      logId,
+      error: emailError,
+      outcome: emailOutcome
     });
   }
 
-  // Record active pending enrollment to be fetched by the SPA
+  // 5. Successful Processing - Register Enrollment & Log Success (200 OK)
+  const finalOutcome = `Accès accordé avec succès pour la formation "${courseTitle}"`;
+  const logEntry = {
+    id: logId,
+    courseId,
+    url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+    method: req.method,
+    headers: req.headers,
+    body: req.body,
+    query: req.query,
+    detectedEmail,
+    detectedName: detectedName || null,
+    receivedAt: new Date().toISOString(),
+    status: "success",
+    errorMessage: "",
+    outcome: finalOutcome
+  };
+
+  // Record active pending enrollment to be fetched by the SPA sync process
   const enrollmentRecord = {
     id: `we-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     courseId,
-    studentEmail: detectedEmail.trim().toLowerCase(),
+    studentEmail: detectedEmail.toLowerCase(),
+    studentName: detectedName || undefined,
     enrolledAt: new Date().toISOString(),
     synced: false
   };
 
+  db.logs.unshift(logEntry);
+  if (db.logs.length > 200) {
+    db.logs = db.logs.slice(0, 200);
+  }
   db.enrollments.push(enrollmentRecord);
   writeDb(db);
 
-  return res.json({
+  return res.status(200).json({
     status: "success",
-    message: `Payment registered successfully. User ${detectedEmail} has been granted access to course ${courseId}.`,
+    message: `Payment registered successfully. Student ${detectedEmail} has been enrolled in "${courseTitle}".`,
     enrollmentId: enrollmentRecord.id,
-    logId
+    logId,
+    outcome: finalOutcome
   });
+});
+
+// API: Read ALL webhook logs for the general administrator tab
+app.get("/api/webhooks/logs", (req, res) => {
+  const db = readDb();
+  res.json({ logs: db.logs || [] });
+});
+
+// API: Clear ALL webhook logs
+app.delete("/api/webhooks/logs", (req, res) => {
+  const db = readDb();
+  db.logs = [];
+  writeDb(db);
+  res.json({ status: "success", message: "All webhook logs cleared" });
 });
 
 // API: Read recent webhook logs (Requirement 2 UI)

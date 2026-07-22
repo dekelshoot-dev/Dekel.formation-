@@ -123,6 +123,60 @@ export const INITIAL_COURSES: Course[] = [
     price: 75000,
     level: 'Débutant',
     duration: '8 heures'
+  },
+  {
+    id: 'c-5',
+    title: 'Montage Vidéo de Pro : De CapCut à Premiere Pro',
+    trainerId: 'u-2',
+    trainerName: 'Jean Dupont',
+    language: 'Français',
+    description: 'Maîtrisez les techniques de montage vidéo professionnelles. Apprenez à couper, rythmer, étalonner, ajouter des effets sonores et exporter des vidéos captivantes pour YouTube, TikTok et Instagram.',
+    themeColor: 'sky',
+    trainerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    logoUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=100',
+    coverImage: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800',
+    status: 'published',
+    createdAt: '2026-05-01T10:00:00Z',
+    type: 'Montage Vidéo',
+    price: 95000,
+    level: 'Débutant',
+    duration: '12 heures'
+  },
+  {
+    id: 'c-6',
+    title: 'L\'Art des Miniatures YouTube Explosives',
+    trainerId: 'u-2',
+    trainerName: 'Jean Dupont',
+    language: 'Français',
+    description: 'La méthode complète pour concevoir des miniatures (thumbnails) qui maximisent le taux de clic (CTR). Maîtrisez le cadrage, la théorie des couleurs, le détourage et l\'intégration de textes impactants sur Photoshop et Canva.',
+    themeColor: 'rose',
+    trainerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    logoUrl: 'https://images.unsplash.com/photo-1626379616459-b2ce1d9decbc?w=100',
+    coverImage: 'https://images.unsplash.com/photo-1626379616459-b2ce1d9decbc?w=800',
+    status: 'published',
+    createdAt: '2026-05-10T14:00:00Z',
+    type: 'Miniatures',
+    price: 45000,
+    level: 'Tous niveaux',
+    duration: '6 heures'
+  },
+  {
+    id: 'c-7',
+    title: 'Conception de Flyers & Identités Visuelles d\'Impact',
+    trainerId: 'u-3',
+    trainerName: 'Marie Laurent',
+    language: 'Français',
+    description: 'Créez des flyers promotionnels professionnels, des affiches publicitaires et des visuels pour réseaux sociaux qui captent l\'attention. Idéal pour freelances, créateurs de contenu et entreprises.',
+    themeColor: 'emerald',
+    trainerPhoto: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
+    logoUrl: 'https://images.unsplash.com/photo-1542744094-3a31f103e35f?w=100',
+    coverImage: 'https://images.unsplash.com/photo-1542744094-3a31f103e35f?w=800',
+    status: 'published',
+    createdAt: '2026-05-15T09:00:00Z',
+    type: 'Flyers',
+    price: 60000,
+    level: 'Débutant',
+    duration: '8 heures'
   }
 ];
 
@@ -134,7 +188,16 @@ export const INITIAL_MODULES: Module[] = [
   
   // Modules for Course 2 (c-2)
   { id: 'm-4', courseId: 'c-2', title: 'Module 1 : Les bases de la niche', order: 1 },
-  { id: 'm-5', courseId: 'c-2', title: 'Module 2 : Créer sa boutique Shopify', order: 2 }
+  { id: 'm-5', courseId: 'c-2', title: 'Module 2 : Créer sa boutique Shopify', order: 2 },
+
+  // Modules for Course 5 (c-5)
+  { id: 'm-6', courseId: 'c-5', title: 'Module 1 : Maîtrise des logiciels de montage', order: 1 },
+
+  // Modules for Course 6 (c-6)
+  { id: 'm-7', courseId: 'c-6', title: 'Module 1 : Les règles d\'or de la Miniature', order: 1 },
+
+  // Modules for Course 7 (c-7)
+  { id: 'm-8', courseId: 'c-7', title: 'Module 1 : Fondations du Graphisme & Flyers', order: 1 }
 ];
 
 export const INITIAL_CHAPTERS: Chapter[] = [
@@ -142,6 +205,7 @@ export const INITIAL_CHAPTERS: Chapter[] = [
   {
     id: 'ch-1',
     moduleId: 'm-1',
+    courseId: 'c-1',
     title: 'Bienvenue dans la formation !',
     order: 1,
     videoSource: 'youtube',
@@ -165,6 +229,7 @@ N'oubliez pas de télécharger le plan d'études ci-dessous pour suivre votre pr
   {
     id: 'ch-2',
     moduleId: 'm-1',
+    courseId: 'c-1',
     title: 'Installation de VS Code & extensions utiles',
     order: 2,
     videoSource: 'vimeo',
@@ -183,6 +248,7 @@ N'oubliez pas de télécharger le plan d'études ci-dessous pour suivre votre pr
   {
     id: 'ch-3',
     moduleId: 'm-2',
+    courseId: 'c-1',
     title: 'La structure de base d\'une page HTML',
     order: 1,
     videoSource: 'youtube',
@@ -215,6 +281,7 @@ N'oubliez pas de télécharger le plan d'études ci-dessous pour suivre votre pr
   {
     id: 'ch-4',
     moduleId: 'm-2',
+    courseId: 'c-1',
     title: 'Les balises de texte principales (h1, p, strong, ul)',
     order: 2,
     videoSource: 'youtube',
@@ -233,6 +300,7 @@ Prenez le temps d'ouvrir VS Code et d'expérimenter en direct avec ces différen
   {
     id: 'ch-5',
     moduleId: 'm-3',
+    courseId: 'c-1',
     title: 'Introduction aux sélecteurs et à CSS',
     order: 1,
     videoSource: 'youtube',
@@ -249,6 +317,7 @@ Sélecteurs principaux que nous étudions :
   {
     id: 'ch-6',
     moduleId: 'm-4',
+    courseId: 'c-2',
     title: 'L\'état d\'esprit de l\'e-commerçant à succès',
     order: 1,
     videoSource: 'youtube',
@@ -266,6 +335,7 @@ Nous verrons comment :
   {
     id: 'ch-7',
     moduleId: 'm-4',
+    courseId: 'c-2',
     title: 'Comment valider une niche de produit ?',
     order: 2,
     videoSource: 'vimeo',
@@ -282,12 +352,66 @@ Nous utilisons des outils gratuits comme Google Trends pour valider nos hypothè
   {
     id: 'ch-8',
     moduleId: 'm-5',
+    courseId: 'c-2',
     title: 'Création du compte Shopify & configuration de base',
     order: 1,
     videoSource: 'youtube',
     videoUrl: 'https://www.youtube.com/watch?v=pQN-pnXPaVg',
     richText: `Découverte pas-à-pas de l'interface d'administration de Shopify. Nous allons configurer votre devise, vos informations de livraison et vos conditions générales obligatoires.`,
     linkButton: { label: 'Profiter de Shopify à 1€ par mois', url: 'https://shopify.pxf.io/free-trial' }
+  },
+  {
+    id: 'ch-9',
+    moduleId: 'm-6',
+    courseId: 'c-5',
+    title: 'Les bases du montage : Découpe, rythme et transition',
+    order: 1,
+    videoSource: 'youtube',
+    videoUrl: 'https://www.youtube.com/watch?v=Ke90Tje7VS0',
+    richText: `Dans ce cours, nous allons poser les bases du montage vidéo.
+
+### Ce que vous allez apprendre :
+* Comment organise votre timeline de projet.
+* L'art du "cut" pour éliminer les temps morts.
+* L'intégration de transitions fluides et professionnelles.
+
+Prenez vos fichiers d'entraînement ci-dessous et commencez à pratiquer en direct !`,
+    downloadableFiles: [
+      { id: 'df-3', name: 'Pack de Rushs d\'entraînement (Vlog & Facecam).zip', url: '#', size: '145 Mo' }
+    ]
+  },
+  {
+    id: 'ch-10',
+    moduleId: 'm-7',
+    courseId: 'c-6',
+    title: 'La psychologie du clic : théorie des visages et couleurs',
+    order: 1,
+    videoSource: 'youtube',
+    videoUrl: 'https://www.youtube.com/watch?v=M9mCHtIisdM',
+    richText: `Pourquoi un internaute clique-t-il sur une vidéo plutôt qu'une autre ?
+
+### Les secrets d'une miniature cliquable :
+1. **La règle des 3 éléments max** : Le cerveau humain doit comprendre le sujet de la vidéo en moins d'une seconde.
+2. **L'expression faciale exagérée** : Les visages génèrent de l'empathie et de la curiosité.
+3. **Le contraste fort** : Utiliser des contours lumineux et des textes à fort contraste (jaune, rouge, blanc sur fond sombre).`,
+    externalLinks: [
+      { id: 'el-3', title: 'Site de référence : Thumbsup.tv (Tester son design en direct)', url: 'https://thumbsup.tv' }
+    ]
+  },
+  {
+    id: 'ch-11',
+    moduleId: 'm-8',
+    courseId: 'c-7',
+    title: 'Composer une affiche commerciale équilibrée',
+    order: 1,
+    videoSource: 'youtube',
+    videoUrl: 'https://www.youtube.com/watch?v=pQN-pnXPaVg',
+    richText: `Un flyer efficace doit guider l'œil du prospect.
+
+### Structure universelle d'un flyer :
+* **Accroche principale** : visible à plus de 2 mètres.
+* **L'offre ou la valeur ajoutée** : claire et chiffrée (ex: -20% sur tout).
+* **Call to action (Appel à l'action)** : QR Code, numéro de téléphone WhatsApp ou adresse de l'événement.`
   }
 ];
 

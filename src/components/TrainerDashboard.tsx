@@ -4,7 +4,7 @@ import {
   BarChart3, BookOpen, Users, Settings, User as UserIcon, Plus, Trash2, Copy, 
   Share2, Edit3, Save, ArrowUp, ArrowDown, Check, CheckCircle2, AlertCircle, 
   HelpCircle, Eye, EyeOff, Play, FileText, ExternalLink as LinkIcon, Globe, Image, Video,
-  Mail, Phone, X, ChevronDown, ChevronRight, Folder, Menu
+  Mail, Phone, X, ChevronDown, ChevronRight, Folder, Menu, MessageSquare
 } from 'lucide-react';
 import { showToast } from './Toast';
 import UserProfile from './UserProfile';
@@ -18,6 +18,9 @@ interface TrainerDashboardProps {
   allEnrollments: Enrollment[];
   allProgress: StudentProgress[];
   preRegistered: PreRegisteredStudent[];
+  categories?: string[];
+  onAddCategory?: (cat: string) => void;
+  onDeleteCategory?: (cat: string) => void;
   
   // State changers
   onAddCourse: (course: Course) => void;
@@ -48,6 +51,9 @@ export default function TrainerDashboard({
   allEnrollments,
   allProgress,
   preRegistered,
+  categories = ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'],
+  onAddCategory,
+  onDeleteCategory,
   onAddCourse,
   onUpdateCourse,
   onDeleteCourse,
@@ -435,6 +441,7 @@ export default function TrainerDashboard({
   // Custom Payment settings (Requirement 5)
   const [editPaymentInstructions, setEditPaymentInstructions] = useState('');
   const [editContactInfo, setEditContactInfo] = useState('');
+  const [editWhatsappNumber, setEditWhatsappNumber] = useState('');
   const [editPaymentButtons, setEditPaymentButtons] = useState<CustomPaymentButton[]>([]);
   const [editShowPaymentInstructions, setEditShowPaymentInstructions] = useState(true);
   const [editPromoPrice, setEditPromoPrice] = useState<number | ''>('');
@@ -501,6 +508,7 @@ export default function TrainerDashboard({
     setEditStatus(c.status);
     setEditPaymentInstructions(c.paymentInstructions || 'Veuillez effectuer le paiement par Mobile Money (Orange Money, Wave ou MTN) ou par virement bancaire puis envoyer votre justificatif sur WhatsApp pour validation de votre inscription.');
     setEditContactInfo(c.contactInfo || 'WhatsApp: +221 77 123 45 67\nE-mail: support@formateur.com');
+    setEditWhatsappNumber(c.whatsappNumber || '+221771234567');
     setEditPaymentButtons(c.customPaymentButtons || [
       { id: 'btn-1', active: true, text: 'Payer par Wave', color: 'blue', url: 'https://wave.com' },
       { id: 'btn-2', active: true, text: 'Payer par Orange Money', color: 'yellow', url: 'https://orangemoney.com' }
@@ -555,6 +563,7 @@ export default function TrainerDashboard({
         status: editStatus,
         paymentInstructions: editPaymentInstructions,
         contactInfo: editContactInfo,
+        whatsappNumber: editWhatsappNumber,
         customPaymentButtons: editPaymentButtons,
         showPaymentInstructions: editShowPaymentInstructions,
         promoPrice: editPromoPrice !== '' ? Number(editPromoPrice) : undefined,
@@ -1333,13 +1342,9 @@ Le support Dekel.Formation`,
                   onChange={(e) => setNewCourseType(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
                 >
-                  <option value="Développement">Développement Web & Logiciel</option>
-                  <option value="E-commerce">E-commerce & Dropshipping</option>
-                  <option value="Design">Design UX/UI & Créativité</option>
-                  <option value="Marketing">Marketing Digital & SEO</option>
-                  <option value="Montage Vidéo">Montage Vidéo & Post-production</option>
-                  <option value="Miniatures">Miniatures / Thumbnails YouTube</option>
-                  <option value="Flyers">Flyers & Graphisme Promotionnel</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex justify-end gap-2">
@@ -1533,13 +1538,9 @@ Le support Dekel.Formation`,
                       onChange={(e) => setEditType(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
                     >
-                      <option value="Développement">Développement Web & Logiciel</option>
-                      <option value="E-commerce">E-commerce & Dropshipping</option>
-                      <option value="Design">Design UX/UI & Créativité</option>
-                      <option value="Marketing">Marketing Digital & SEO</option>
-                      <option value="Montage Vidéo">Montage Vidéo & Post-production</option>
-                      <option value="Miniatures">Miniatures / Thumbnails YouTube</option>
-                      <option value="Flyers">Flyers & Graphisme Promotionnel</option>
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
                     </select>
                   </div>
 
@@ -1684,7 +1685,10 @@ Le support Dekel.Formation`,
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
                           <label className="block text-xs font-semibold text-slate-600">Meta Title</label>
-                          <span className={`text-[9px] font-bold px-1 rounded ${editSeoTitle.length > 60 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                          <span
+                            style={{ backgroundColor: '#0c0d0f' }}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${editSeoTitle.length > 60 ? 'text-amber-400' : 'text-slate-200'}`}
+                          >
                             {editSeoTitle.length}/60 car.
                           </span>
                         </div>
@@ -1701,7 +1705,10 @@ Le support Dekel.Formation`,
                       <div className="space-y-1">
                         <div className="flex justify-between items-center">
                           <label className="block text-xs font-semibold text-slate-600">Meta Description</label>
-                          <span className={`text-[9px] font-bold px-1 rounded ${editSeoDescription.length > 160 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                          <span
+                            style={{ backgroundColor: '#000000' }}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${editSeoDescription.length > 160 ? 'text-amber-400' : 'text-slate-200'}`}
+                          >
                             {editSeoDescription.length}/160 car.
                           </span>
                         </div>
@@ -1806,6 +1813,23 @@ Le support Dekel.Formation`,
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
+                      <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Numéro WhatsApp de réception des preuves de paiement</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={editWhatsappNumber}
+                        onChange={(e) => setEditWhatsappNumber(e.target.value)}
+                        placeholder="Ex: +221 77 123 45 67 ou 221771234567"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-200 transition-all font-mono"
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        Ce numéro sera directement utilisé lorsqu'un étudiant clique sur "Envoyer la preuve par WhatsApp" sur la page de paiement.
+                      </p>
                     </div>
                   </div>
 

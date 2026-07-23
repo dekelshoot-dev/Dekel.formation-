@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent } from './types';
 import { 
   INITIAL_USERS, INITIAL_COURSES, INITIAL_MODULES, INITIAL_CHAPTERS, 
-  INITIAL_ENROLLMENTS, INITIAL_PROGRESS, INITIAL_EMAILS, INITIAL_PRE_REGISTERED 
+  INITIAL_ENROLLMENTS, INITIAL_PROGRESS, INITIAL_EMAILS, INITIAL_PRE_REGISTERED,
+  INITIAL_CATEGORIES
 } from './mockData';
 
 // Modular Components
@@ -12,15 +13,14 @@ import TrainerDashboard from './components/TrainerDashboard';
 import StudentDashboard from './components/StudentDashboard';
 import CoursePlayer from './components/CoursePlayer';
 import Marketplace from './components/Marketplace';
-import NotificationLog from './components/NotificationLog';
 import UserProfile from './components/UserProfile';
 import { ToastContainer, showToast } from './components/Toast';
 
 // Icons
-import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Palette, Check, Menu, X, User as UserIcon } from 'lucide-react';
+import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Menu, X, User as UserIcon } from 'lucide-react';
 
 // Firebase
-import { onSnapshot, collection, doc, getDoc, collectionGroup } from 'firebase/firestore';
+import { onSnapshot, collection, doc, getDoc, setDoc, collectionGroup } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
@@ -71,6 +71,55 @@ export default function App() {
     const saved = localStorage.getItem('sio_preregistered');
     return saved ? JSON.parse(saved) : INITIAL_PRE_REGISTERED;
   });
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('sio_categories');
+    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+  });
+
+  // Sync categories with Firestore settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'categories'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (Array.isArray(data.list) && data.list.length > 0) {
+          setCategories(data.list);
+          localStorage.setItem('sio_categories', JSON.stringify(data.list));
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const handleAddCategory = async (catName: string) => {
+    const trimmed = catName.trim();
+    if (!trimmed) return;
+    if (categories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      showToast('Cette catégorie existe déjà !', 'warning');
+      return;
+    }
+    const updated = [...categories, trimmed];
+    setCategories(updated);
+    localStorage.setItem('sio_categories', JSON.stringify(updated));
+    try {
+      await setDoc(doc(db, 'settings', 'categories'), { list: updated });
+    } catch (err) {
+      console.error('Error saving category to Firestore:', err);
+    }
+    showToast(`Catégorie "${trimmed}" ajoutée avec succès !`, 'success');
+  };
+
+  const handleDeleteCategory = async (catToDelete: string) => {
+    const updated = categories.filter(c => c !== catToDelete);
+    setCategories(updated);
+    localStorage.setItem('sio_categories', JSON.stringify(updated));
+    try {
+      await setDoc(doc(db, 'settings', 'categories'), { list: updated });
+    } catch (err) {
+      console.error('Error deleting category from Firestore:', err);
+    }
+    showToast(`Catégorie "${catToDelete}" supprimée.`, 'info');
+  };
 
   // Active session and view management
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -173,32 +222,12 @@ export default function App() {
     };
   }, [allCourses, currentUser]);
 
-  // Dynamic theme management
-  const [currentTheme, setCurrentTheme] = useState<'theme-cosmic' | 'theme-slate' | 'theme-sage' | 'theme-nature' | 'theme-nature-dark'>(() => {
-    const saved = localStorage.getItem('sio_theme');
-    return (saved as any) || 'theme-nature-dark'; // Nature Dark is default
-  });
+  // Single application theme: Nature Dark (Premium)
+  const currentTheme = 'theme-nature-dark';
 
-  const [showThemeDropdown, setShowThemeDropdown] = useState(false);
-
-  // Sync theme when user object loads or updates
   useEffect(() => {
-    if (currentUser?.theme) {
-      setCurrentTheme(currentUser.theme as any);
-      localStorage.setItem('sio_theme', currentUser.theme);
-    }
-  }, [currentUser?.theme]);
-
-  const handleThemeChange = async (themeClass: 'theme-cosmic' | 'theme-slate' | 'theme-sage' | 'theme-nature' | 'theme-nature-dark') => {
-    setCurrentTheme(themeClass);
-    localStorage.setItem('sio_theme', themeClass);
-    if (currentUser) {
-      const updatedUser = { ...currentUser, theme: themeClass };
-      setCurrentUser(updatedUser);
-      await saveUserProfile(updatedUser);
-    }
-    showToast('Thème mis à jour !', 'success');
-  };
+    localStorage.setItem('sio_theme', 'theme-nature-dark');
+  }, []);
 
   // Trigger local cache persistence on updates
   useEffect(() => {
@@ -759,96 +788,7 @@ Bon apprentissage.`,
               </div>
             )}
 
-            {/* Global Theme Selector */}
-            <div className="relative">
-              <button
-                onClick={() => setShowThemeDropdown(!showThemeDropdown)}
-                className="p-2 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer theme-header-text"
-                title="Changer le thème de l'application"
-              >
-                <Palette className="w-4 h-4 theme-brand-logo" />
-                <span className="hidden sm:inline">Thème</span>
-              </button>
-              
-              {showThemeDropdown && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setShowThemeDropdown(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-52 bg-slate-900/95 border border-white/10 rounded-2xl p-2.5 shadow-xl z-50 backdrop-blur-md animate-fade-in space-y-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1 mb-1 border-b border-white/5">
-                      Choisir un thème
-                    </p>
-                    
-                    <button
-                      onClick={() => { handleThemeChange('theme-cosmic'); setShowThemeDropdown(false); }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-white/5 text-left cursor-pointer ${
-                        currentTheme === 'theme-cosmic' ? 'bg-white/10 text-indigo-400' : 'text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500/50"></span>
-                        <span>Aura Cosmique (Sombre)</span>
-                      </div>
-                      {currentTheme === 'theme-cosmic' && <Check className="w-3.5 h-3.5 text-indigo-400" />}
-                    </button>
 
-                    <button
-                      onClick={() => { handleThemeChange('theme-slate'); setShowThemeDropdown(false); }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-white/5 text-left cursor-pointer ${
-                        currentTheme === 'theme-slate' ? 'bg-white/10 text-indigo-600 dark:text-white font-bold' : 'text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-slate-400 shadow-sm shadow-slate-400/50"></span>
-                        <span>Ardoise (Clair Moderne)</span>
-                      </div>
-                      {currentTheme === 'theme-slate' && <Check className="w-3.5 h-3.5 text-slate-500" />}
-                    </button>
-
-                    <button
-                      onClick={() => { handleThemeChange('theme-sage'); setShowThemeDropdown(false); }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-white/5 text-left cursor-pointer ${
-                        currentTheme === 'theme-sage' ? 'bg-white/10 text-emerald-600 font-bold' : 'text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#749c85] shadow-sm shadow-[#749c85]/50"></span>
-                        <span>Sauge Chaleureuse</span>
-                      </div>
-                      {currentTheme === 'theme-sage' && <Check className="w-3.5 h-3.5 text-[#749c85]" />}
-                    </button>
-
-                    <button
-                      onClick={() => { handleThemeChange('theme-nature'); setShowThemeDropdown(false); }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-white/5 text-left cursor-pointer ${
-                        currentTheme === 'theme-nature' ? 'bg-white/10 text-emerald-500 font-bold' : 'text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#1DB954] shadow-sm shadow-[#1DB954]/50"></span>
-                        <span>Nature (Style Spotify)</span>
-                      </div>
-                      {currentTheme === 'theme-nature' && <Check className="w-3.5 h-3.5 text-[#1DB954]" />}
-                    </button>
-
-                    <button
-                      onClick={() => { handleThemeChange('theme-nature-dark'); setShowThemeDropdown(false); }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-white/5 text-left cursor-pointer ${
-                        currentTheme === 'theme-nature-dark' ? 'bg-white/10 text-emerald-400 font-bold' : 'text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-[#1ED760] shadow-sm shadow-[#1ED760]/50 animate-pulse"></span>
-                        <span>Nature Dark (Premium)</span>
-                      </div>
-                      {currentTheme === 'theme-nature-dark' && <Check className="w-3.5 h-3.5 text-[#1ED760]" />}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
 
             {/* Logout actions */}
             {currentUser && (
@@ -912,6 +852,9 @@ Bon apprentissage.`,
                     allChapters={allChapters}
                     allEnrollments={allEnrollments}
                     currentUser={null}
+                    categories={categories}
+                    onAddCategory={handleAddCategory}
+                    onDeleteCategory={handleDeleteCategory}
                     onEnrollStudent={handleEnrollStudent}
                     onSendEmail={handleSendEmail}
                     onSwitchToLogin={() => setVisitorTab('auth')}
@@ -975,6 +918,9 @@ Bon apprentissage.`,
                   saveUserProfile(updatedUser);
                 }}
                 onPreviewCourse={setActiveCoursePlayer}
+                categories={categories}
+                onAddCategory={handleAddCategory}
+                onDeleteCategory={handleDeleteCategory}
               />
             )}
 
@@ -989,6 +935,9 @@ Bon apprentissage.`,
                 allEnrollments={allEnrollments}
                 allProgress={allProgress}
                 preRegistered={preRegistered}
+                categories={categories}
+                onAddCategory={handleAddCategory}
+                onDeleteCategory={handleDeleteCategory}
                 
                 // State changers
                 onAddCourse={(newCourse) => {
@@ -1095,6 +1044,9 @@ Bon apprentissage.`,
                     allChapters={allChapters}
                     allEnrollments={allEnrollments}
                     currentUser={currentUser}
+                    categories={categories}
+                    onAddCategory={handleAddCategory}
+                    onDeleteCategory={handleDeleteCategory}
                     onEnrollStudent={handleEnrollStudent}
                     onSendEmail={handleSendEmail}
                     onSwitchToLogin={() => setStudentTab('my-space')}
@@ -1108,12 +1060,6 @@ Bon apprentissage.`,
         )}
 
       </main>
-
-      {/* Persistent SMTP mail simulator helper (Section 16) */}
-      <NotificationLog
-        emails={emails}
-        onClear={handleClearEmails}
-      />
 
       {/* Mobile Offcanvas Sidebar Drawer */}
       {isMobileDrawerOpen && (

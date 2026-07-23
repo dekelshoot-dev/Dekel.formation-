@@ -52,6 +52,7 @@ export interface Course {
   paymentInstructions?: string;
   showPaymentInstructions?: boolean;
   contactInfo?: string;
+  whatsappNumber?: string;
   customPaymentButtons?: CustomPaymentButton[];
   webhookEmailKey?: string;
   webhookNameKey?: string;
@@ -136,12 +137,18 @@ export interface StudentProgress {
   lastChapterId?: string;
 }
 
+export * from './types/email';
+
 export interface SimulatedEmail {
   id: string;
   to: string;
   subject: string;
   body: string;
   sentAt: string;
+  type?: string;
+  category?: string;
+  status?: string;
+  htmlBody?: string;
 }
 
 export interface PreRegisteredStudent {

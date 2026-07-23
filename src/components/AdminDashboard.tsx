@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { User, UserRole, Course, Enrollment, SimulatedEmail } from '../types';
-import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu } from 'lucide-react';
+import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag } from 'lucide-react';
 import { showToast } from './Toast';
+import TransactionalEmailDashboard from './TransactionalEmailDashboard';
 
 interface AdminDashboardProps {
   currentUser: User;
   allUsers: User[];
   allCourses: Course[];
   allEnrollments: Enrollment[];
+  categories?: string[];
+  onAddCategory?: (cat: string) => void;
+  onDeleteCategory?: (cat: string) => void;
   onToggleCourseStatus: (courseId: string) => void;
   onDeleteCourse: (courseId: string) => void;
   onUpdateUserStatus: (userId: string, isDeactivated: boolean) => void;
@@ -24,6 +28,9 @@ export default function AdminDashboard({
   allUsers,
   allCourses,
   allEnrollments,
+  categories = ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'],
+  onAddCategory,
+  onDeleteCategory,
   onToggleCourseStatus,
   onDeleteCourse,
   onUpdateUserStatus,
@@ -34,9 +41,12 @@ export default function AdminDashboard({
   onUpdateUser,
   onPreviewCourse
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'settings' | 'profile'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'settings' | 'profile'>('stats');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Category input state for admin
+  const [adminCatInput, setAdminCatInput] = useState('');
   
   // Trainer form state
   const [newTrainerName, setNewTrainerName] = useState('');
@@ -245,6 +255,16 @@ Bonnes formations !`,
                 </button>
 
                 <button
+                  onClick={() => { setActiveTab('emails'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'emails' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Mail className="w-4 h-4 text-emerald-600" />
+                  <span>E-mails Transactionnels</span>
+                </button>
+
+                <button
                   onClick={() => { setActiveTab('settings'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                     activeTab === 'settings' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
@@ -394,6 +414,16 @@ Bonnes formations !`,
           >
             <Users className="w-4 h-4 text-red-500" />
             <span>Gérer les Étudiants</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('emails'); setSearchQuery(''); }}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all ${
+              activeTab === 'emails' ? 'bg-red-50 text-red-900 font-bold border border-red-100' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Mail className="w-4 h-4 text-emerald-600" />
+            <span>E-mails Transactionnels</span>
           </button>
           <button
             onClick={() => { setActiveTab('settings'); setSearchQuery(''); }}
@@ -961,6 +991,11 @@ Bonnes formations !`,
             </div>
           )}
 
+          {/* Tab Content: Transactional Emails */}
+          {activeTab === 'emails' && (
+            <TransactionalEmailDashboard />
+          )}
+
           {/* Tab Content: Settings */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
@@ -1006,7 +1041,7 @@ Bonnes formations !`,
                 <button
                   type="button"
                   onClick={saveSettings}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-xl text-xs transition-all shadow-md shadow-red-50 flex items-center gap-1.5"
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-5 rounded-xl text-xs transition-all shadow-md shadow-red-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   <Settings className="w-4 h-4" />
                   <span>Enregistrer les paramètres</span>
@@ -1017,6 +1052,65 @@ Bonnes formations !`,
                     <CheckCircle className="w-4 h-4" /> Les paramètres ont été mis à jour avec succès.
                   </p>
                 )}
+              </div>
+
+              {/* Category Management Block */}
+              <div className="border border-slate-200 rounded-2xl p-5 bg-white space-y-4 shadow-sm">
+                <div className="flex items-center gap-2 text-slate-800">
+                  <Tag className="w-4 h-4 text-red-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider">Gestion des catégories de formations</h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Ajoutez les catégories disponibles dans le catalogue marketplace et dans les formulaires des formateurs.
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (adminCatInput.trim() && onAddCategory) {
+                      onAddCategory(adminCatInput.trim());
+                      setAdminCatInput('');
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    type="text"
+                    value={adminCatInput}
+                    onChange={(e) => setAdminCatInput(e.target.value)}
+                    placeholder="Nouvelle catégorie (ex: Intelligence Artificielle...)"
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!adminCatInput.trim()}
+                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Ajouter</span>
+                  </button>
+                </form>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {categories.map((cat) => (
+                    <div
+                      key={cat}
+                      className="bg-slate-100 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-700 font-medium flex items-center gap-2"
+                    >
+                      <span>{cat}</span>
+                      {onDeleteCategory && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteCategory(cat)}
+                          title={`Supprimer la catégorie ${cat}`}
+                          className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1107,66 +1201,15 @@ Bonnes formations !`,
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Thème de l'application</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Option 1: Aura Cosmique */}
-                    <button
-                      type="button"
-                      onClick={() => setProfileTheme('theme-cosmic')}
-                      className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
-                        profileTheme === 'theme-cosmic'
-                          ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-500/15'
-                          : 'border-slate-150 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="w-4 h-4 rounded-full bg-indigo-500 shadow-sm shadow-indigo-500/50"></span>
-                        {profileTheme === 'theme-cosmic' && (
-                          <span className="text-[9px] bg-indigo-600 text-white font-bold px-1.5 py-0.5 rounded-full">Actif</span>
-                        )}
+                  <div style={{ backgroundColor: '#1b2028' }} className="p-3.5 rounded-2xl border border-emerald-500/30 text-white flex items-center justify-between">
+                    <div style={{ backgroundColor: '#1b2028' }} className="flex items-center gap-3">
+                      <span className="w-4 h-4 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></span>
+                      <div>
+                        <p className="text-xs font-bold text-white">Nature Dark (Premium)</p>
+                        <p className="text-[10px] text-slate-300 mt-0.5">Thème unique de l'application (#1b2028)</p>
                       </div>
-                      <p className="text-xs font-bold text-slate-800">Aura Cosmique</p>
-                      <p className="text-[10px] text-slate-450 mt-0.5">Thème Sombre Premium</p>
-                    </button>
-
-                    {/* Option 2: Slate (Ardoise Minimaliste) */}
-                    <button
-                      type="button"
-                      onClick={() => setProfileTheme('theme-slate')}
-                      className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
-                        profileTheme === 'theme-slate'
-                          ? 'border-slate-500 bg-slate-50/50 ring-2 ring-slate-500/15'
-                          : 'border-slate-150 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="w-4 h-4 rounded-full bg-slate-400 shadow-sm shadow-slate-400/50"></span>
-                        {profileTheme === 'theme-slate' && (
-                          <span className="text-[9px] bg-slate-700 text-white font-bold px-1.5 py-0.5 rounded-full">Actif</span>
-                        )}
-                      </div>
-                      <p className="text-xs font-bold text-slate-800">Ardoise Minimaliste</p>
-                      <p className="text-[10px] text-slate-450 mt-0.5">Thème Clair Moderne</p>
-                    </button>
-
-                    {/* Option 3: Sauge Chaleureuse */}
-                    <button
-                      type="button"
-                      onClick={() => setProfileTheme('theme-sage')}
-                      className={`p-3.5 rounded-2xl border text-left transition-all relative cursor-pointer ${
-                        profileTheme === 'theme-sage'
-                          ? 'border-[#749c85] bg-emerald-50/50 ring-2 ring-[#749c85]/15'
-                          : 'border-slate-150 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[#749c85] shadow-sm shadow-[#749c85]/50"></span>
-                        {profileTheme === 'theme-sage' && (
-                          <span className="text-[9px] bg-emerald-700 text-white font-bold px-1.5 py-0.5 rounded-full">Actif</span>
-                        )}
-                      </div>
-                      <p className="text-xs font-bold text-slate-800">Sauge Chaleureuse</p>
-                      <p className="text-[10px] text-slate-450 mt-0.5">Thème Naturel & Organique</p>
-                    </button>
+                    </div>
+                    <span className="text-[9px] bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 font-bold px-2 py-0.5 rounded-full">Actif</span>
                   </div>
                 </div>
 

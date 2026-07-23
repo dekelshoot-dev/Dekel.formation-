@@ -1072,8 +1072,141 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
     }, 2000);
   };
 
-  const handlePrint = () => {
+  const handleDownloadCertificate = () => {
+    if (!certificate) return;
+
+    // Create printable HTML Blob for direct download
+    const htmlContent = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Certificat de Réussite - ${certificate.studentName}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800;900&family=Playfair+Display:ital,wght@1,500;1,700&display=swap');
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #090d16;
+      color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .cert-container {
+      width: 100%;
+      max-width: 800px;
+      border: 6px double rgba(99, 102, 241, 0.4);
+      border-radius: 24px;
+      padding: 48px;
+      background: linear-gradient(135deg, #0f172a 0%, #030712 100%);
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+    .brand {
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      font-size: 14px;
+      color: #6366f1;
+      margin-bottom: 24px;
+    }
+    .title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      color: #818cf8;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .awarded {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 28px;
+      color: #f8fafc;
+      margin: 16px 0;
+    }
+    .student-name {
+      font-size: 24px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #38bdf8;
+      margin-bottom: 24px;
+    }
+    .course-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #10b981;
+      margin-top: 8px;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 40px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .code {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: bold;
+      color: #a5b4fc;
+    }
+    @media print {
+      body { background: white; color: black; padding: 0; }
+      .cert-container { border-color: #333; background: white; color: black; box-shadow: none; }
+      .student-name { color: #000; }
+      .course-title { color: #000; }
+      .awarded { color: #111; }
+    }
+  </style>
+</head>
+<body>
+  <div class="cert-container">
+    <div class="brand">DEKEL.FORMATION ACADEMY</div>
+    <div class="title">Certificat Officiel de Réussite</div>
+    <div class="awarded">Ce certificat est fièrement décerné à</div>
+    <div class="student-name">${certificate.studentName}</div>
+    <p style="font-size: 14px; color: #cbd5e1; max-width: 600px; margin: 0 auto 16px auto;">
+      pour avoir validé avec succès l'intégralité du cursus de formation :
+      <div class="course-title">"${certificate.courseTitle}"</div>
+    </p>
+    <div class="footer">
+      <div style="text-align: left;">
+        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Délivré le</div>
+        <div style="font-size: 12px; font-weight: bold; color: #f1f5f9;">${new Date(certificate.issuedAt).toLocaleDateString('fr-FR')}</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">ID de Vérification</div>
+        <div class="code">${certificate.verificationCode}</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 500);
+    };
+  </script>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Certificat_${certificate.verificationCode}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
     window.print();
+    showToast('Téléchargement du certificat démarré !', 'success');
   };
 
   return (
@@ -1180,11 +1313,11 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
 
           <div className="flex justify-end gap-2.5">
             <button
-              onClick={handlePrint}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl border border-white/5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 font-sans"
+              onClick={handleDownloadCertificate}
+              className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-90 text-white rounded-xl shadow-lg border border-white/10 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 font-sans"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Imprimer ou Enregistrer PDF</span>
+              <Download className="w-4 h-4" />
+              <span>Télécharger le Certificat (PDF / HTML)</span>
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { Course, Module, Chapter, Enrollment, User, SimulatedEmail } from '../types';
-import { BookOpen, User as UserIcon, Coins, MessageSquare, ShieldCheck, CheckCircle, ArrowRight, Smartphone, AlertCircle, Lock, Unlock, PlayCircle, Eye, X, ArrowLeft } from 'lucide-react';
+import { BookOpen, User as UserIcon, Coins, MessageSquare, ShieldCheck, CheckCircle, ArrowRight, Smartphone, AlertCircle, Lock, Unlock, PlayCircle, Eye, X, ArrowLeft, Search, Plus, Trash2, Tag } from 'lucide-react';
 
 interface MarketplaceProps {
   allCourses: Course[];
@@ -9,6 +9,9 @@ interface MarketplaceProps {
   allChapters: Chapter[];
   allEnrollments: Enrollment[];
   currentUser: User | null;
+  categories?: string[];
+  onAddCategory?: (cat: string) => void;
+  onDeleteCategory?: (cat: string) => void;
   onEnrollStudent: (email: string, courseId: string) => void;
   onSendEmail: (email: SimulatedEmail) => void;
   onSwitchToLogin: () => void;
@@ -22,6 +25,9 @@ export default function Marketplace({
   allChapters,
   allEnrollments,
   currentUser,
+  categories: categoriesProp,
+  onAddCategory,
+  onDeleteCategory,
   onEnrollStudent,
   onSendEmail,
   onSwitchToLogin,
@@ -30,7 +36,7 @@ export default function Marketplace({
 }: MarketplaceProps) {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [simulatingPayment, setSimulatingPayment] = useState(false);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const [paymentDone, setPaymentDone] = useState(false);
 
   // Detailed view program modal states
@@ -39,8 +45,11 @@ export default function Marketplace({
   const [previewChapter, setPreviewChapter] = useState<Chapter | null>(null);
   const [lockedChapterAlert, setLockedChapterAlert] = useState<string | null>(null);
 
-  // Filter only published courses
+  // Search & Category Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
+  const [newCategoryInput, setNewCategoryInput] = useState<string>('');
 
   // Auto-open selected course when matching slug is passed via custom SEO URL
   useEffect(() => {
@@ -58,35 +67,95 @@ export default function Marketplace({
     }
   }, [autoOpenSlug, allCourses, onClearAutoOpen]);
 
-  const categories = [
-    { id: 'Tous', label: 'Toutes les catégories' },
-    { id: 'Développement', label: 'Développement' },
-    { id: 'E-commerce', label: 'E-Commerce' },
-    { id: 'Design', label: 'Design' },
-    { id: 'Marketing', label: 'Marketing' },
-    { id: 'Montage Vidéo', label: 'Montage Vidéo 🎬' },
-    { id: 'Miniatures', label: 'Miniatures 🖼️' },
-    { id: 'Flyers', label: 'Flyers 📄' }
-  ];
+  const categoryList = categoriesProp && categoriesProp.length > 0 
+    ? categoriesProp 
+    : ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'];
 
   const publishedCourses = allCourses.filter(c => c.status === 'published');
 
   const filteredCourses = publishedCourses.filter(course => {
-    if (selectedCategory === 'Tous') return true;
-    const cType = course.type.toLowerCase();
-    const target = selectedCategory.toLowerCase();
-    return cType.includes(target) || target.includes(cType);
+    // 1. Category Filter
+    let matchesCategory = true;
+    if (selectedCategory !== 'Tous') {
+      const cType = (course.type || '').toLowerCase();
+      const target = selectedCategory.toLowerCase();
+      matchesCategory = cType.includes(target) || target.includes(cType);
+    }
+
+    // 2. Search Query Filter
+    let matchesSearch = true;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const titleMatch = (course.title || '').toLowerCase().includes(q);
+      const descMatch = (course.description || '').toLowerCase().includes(q);
+      const trainerMatch = (course.trainerName || '').toLowerCase().includes(q);
+      const typeMatch = (course.type || '').toLowerCase().includes(q);
+      matchesSearch = titleMatch || descMatch || trainerMatch || typeMatch;
+    }
+
+    return matchesCategory && matchesSearch;
   });
+
+  const isUserEnrolledInSelectedCourse = (courseId?: string): boolean => {
+    if (!currentUser || (!courseId && !selectedCourse)) return false;
+    const targetCourseId = courseId || selectedCourse?.id;
+    const userEmail = currentUser.email.trim().toLowerCase();
+    return allEnrollments.some(
+      e => e.courseId === targetCourseId &&
+           e.studentEmail.trim().toLowerCase() === userEmail &&
+           e.status === 'active'
+    );
+  };
 
   const openCheckout = (course: Course) => {
     setSelectedCourse(course);
     setShowCheckoutModal(true);
-    setPaymentDone(false);
+    setIsCheckingPayment(false);
+    
+    // Check immediately if already enrolled
+    if (currentUser) {
+      const userEmail = currentUser.email.trim().toLowerCase();
+      const alreadyEnrolled = allEnrollments.some(
+        e => e.courseId === course.id &&
+             e.studentEmail.trim().toLowerCase() === userEmail &&
+             e.status === 'active'
+      );
+      setPaymentDone(alreadyEnrolled);
+    } else {
+      setPaymentDone(false);
+    }
   };
 
-  const handleSimulatePaymentProof = () => {
+  // Poll every 3 seconds while isCheckingPayment is true until user is enrolled
+  useEffect(() => {
+    if (!isCheckingPayment || !selectedCourse || !currentUser) return;
+
+    // Check immediately
+    if (isUserEnrolledInSelectedCourse(selectedCourse.id)) {
+      setIsCheckingPayment(false);
+      setPaymentDone(true);
+      return;
+    }
+
+    const intervalId = setInterval(async () => {
+      try {
+        await fetch('/api/sync-enrollments');
+      } catch {
+        // sync error ignored
+      }
+
+      if (isUserEnrolledInSelectedCourse(selectedCourse.id)) {
+        setIsCheckingPayment(false);
+        setPaymentDone(true);
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [isCheckingPayment, allEnrollments, currentUser, selectedCourse]);
+
+  const handleVerifyPayment = () => {
     if (!currentUser) {
-      alert('Veuillez d\'abord vous connecter ou créer un compte étudiant.');
+      alert('Veuillez d\'abord vous connecter à votre compte étudiant pour vérifier votre paiement.');
       onSwitchToLogin();
       setShowCheckoutModal(false);
       return;
@@ -94,39 +163,21 @@ export default function Marketplace({
 
     if (!selectedCourse) return;
 
-    setSimulatingPayment(true);
-    
-    setTimeout(() => {
-      // 1. Enroll the student
-      onEnrollStudent(currentUser.email, selectedCourse.id);
-
-      // 2. Send simulation email (Section 16)
-      const confirmationEmail: SimulatedEmail = {
-        id: `em-${Date.now()}`,
-        to: currentUser.email,
-        subject: `Accès validé ! Bienvenue sur ${selectedCourse.title}`,
-        body: `Bonjour ${currentUser.name},
-
-Nous avons bien reçu votre preuve de paiement WhatsApp pour la formation "${selectedCourse.title}".
-Votre accès vient d'être activé par le formateur ${selectedCourse.trainerName} !
-
-Vous pouvez dès à présent retourner sur votre tableau de bord étudiant pour suivre la formation.
-
-Bon apprentissage !`,
-        sentAt: new Date().toISOString()
-      };
-      onSendEmail(confirmationEmail);
-
-      setSimulatingPayment(false);
+    if (isUserEnrolledInSelectedCourse(selectedCourse.id)) {
       setPaymentDone(true);
-    }, 1500);
+      setIsCheckingPayment(false);
+    } else {
+      setIsCheckingPayment(true);
+      setPaymentDone(false);
+    }
   };
 
   // Pre-fill WhatsApp message
   const getWhatsAppMessage = (course: Course) => {
     const activePrice = course.promoPrice && course.promoPrice > 0 ? course.promoPrice : course.price;
     const text = `Bonjour, je viens d'effectuer le paiement de ${activePrice.toLocaleString('fr-FR')} XAF pour la formation "${course.title}". Voici ma preuve de paiement pour activer mon compte (${currentUser?.email || 'mon-email@exemple.com'}). Merci !`;
-    return `https://wa.me/33600000000?text=${encodeURIComponent(text)}`;
+    const cleanNumber = course.whatsappNumber ? course.whatsappNumber.replace(/[^0-9]/g, '') : '221771234567';
+    return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(text)}`;
   };
 
   return (
@@ -147,24 +198,78 @@ Bon apprentissage !`,
         </div>
       </div>
 
-      {/* Category Filter Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {categories.map((cat) => {
-          const isActive = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
-                isActive
-                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/10'
-                  : 'bg-white/5 text-slate-350 border-white/10 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
+      {/* Search Bar & Stats */}
+      <div className="glass border-white/10 rounded-2xl sm:rounded-3xl p-4 space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          {/* Search Input Box */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher une formation par titre, sujet ou formateur..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-9 py-2.5 text-xs text-white placeholder-slate-400 outline-none focus:border-indigo-500 focus:bg-white/10 transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Results Badge & Add Category Trigger */}
+          <div className="flex items-center justify-between md:justify-end gap-2 text-xs">
+            <span className="text-slate-300 font-medium px-3 py-2 bg-white/5 border border-white/10 rounded-xl whitespace-nowrap">
+              {filteredCourses.length} formation{filteredCourses.length > 1 ? 's' : ''} {searchQuery ? 'trouvée(s)' : 'disponible(s)'}
+            </span>
+
+            {(currentUser?.role === 'admin' || currentUser?.role === 'trainer') && (
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(true)}
+                className="bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600/30 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+              >
+                <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Gérer les catégories</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1 scrollbar-none">
+          <button
+            onClick={() => setSelectedCategory('Tous')}
+            className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+              selectedCategory === 'Tous'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/10'
+                : 'bg-white/5 text-slate-350 border-white/10 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            Toutes les catégories
+          </button>
+          {categoryList.map((cat) => {
+            const isActive = selectedCategory.toLowerCase() === cat.toLowerCase();
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                  isActive
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/10'
+                    : 'bg-white/5 text-slate-350 border-white/10 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Courses Grid */}
@@ -455,15 +560,53 @@ Bon apprentissage !`,
             {/* Action Buttons */}
             <div className="flex flex-col gap-2 pt-3 border-t border-white/10 shrink-0">
               {paymentDone ? (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-3 rounded-2xl text-center text-xs space-y-1.5 animate-fade-in">
-                  <CheckCircle className="w-5 h-5 text-emerald-400 mx-auto" />
-                  <p className="font-bold text-emerald-200">Accès accordé avec succès !</p>
-                  <p className="text-[11px] text-emerald-400">Le cours est maintenant débloqué dans votre tableau de bord étudiant.</p>
+                <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 p-4 rounded-2xl text-center space-y-3 animate-fade-in">
+                  <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-emerald-200">Paiement vérifié avec succès !</h4>
+                    <p className="text-xs text-emerald-300/90 mt-1 leading-relaxed">
+                      Votre inscription à la formation « <strong className="text-white">{selectedCourse.title}</strong> » est validée et active.
+                    </p>
+                  </div>
+                  <div className="bg-slate-900/60 p-3 rounded-xl border border-emerald-500/20 text-left text-xs text-slate-300 space-y-1.5">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>📌 Instructions pour accéder à votre formation :</span>
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-300 text-[11px] leading-relaxed">
+                      <li>Cliquez sur le bouton ci-dessous pour fermer la fenêtre de paiement.</li>
+                      <li>Rendez-vous dans votre espace étudiant sous la rubrique <strong className="text-white">"Mes Formations"</strong>.</li>
+                      <li>Cliquez sur la formation pour démarrer le premier module.</li>
+                    </ol>
+                  </div>
                   <button
+                    type="button"
                     onClick={() => setShowCheckoutModal(false)}
-                    className="mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-1 px-3 rounded-lg text-[10px]"
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
                   >
-                    Aller au tableau de bord
+                    <span>Accéder à ma formation</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : isCheckingPayment ? (
+                <div className="bg-amber-500/10 border border-amber-500/25 p-4 rounded-2xl text-amber-200 space-y-3 animate-fade-in text-center">
+                  <div className="flex items-center justify-center gap-2.5 text-amber-400">
+                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="font-bold text-xs">Vérification du paiement en cours...</span>
+                  </div>
+                  <p className="text-xs text-amber-300/90 leading-relaxed">
+                    Nous vérifions si votre accès pour la formation <strong className="text-white">{selectedCourse.title}</strong> a été validé.
+                  </p>
+                  <div className="bg-slate-900/50 p-2.5 rounded-xl border border-amber-500/20 text-[11px] text-slate-300">
+                    ⏳ Vérification automatique <strong className="text-amber-300">toutes les 3 secondes</strong>. Dès que le formateur ou l'administrateur valide votre inscription, cette page se mettra à jour.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCheckingPayment(false)}
+                    className="text-[11px] text-slate-400 hover:text-slate-200 underline mt-1"
+                  >
+                    Arrêter la vérification
                   </button>
                 </div>
               ) : (
@@ -478,24 +621,13 @@ Bon apprentissage !`,
                     <span>Envoyer la preuve par WhatsApp</span>
                   </a>
 
-                  {/* Simulator action for quick eval */}
                   <button
                     type="button"
-                    onClick={handleSimulatePaymentProof}
-                    disabled={simulatingPayment}
-                    className="w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/25 font-bold py-2.5 rounded-xl text-xs text-center flex items-center justify-center gap-1.5 transition-all"
+                    onClick={handleVerifyPayment}
+                    className="w-full bg-[#009966] hover:bg-[#008055] text-white font-bold py-2.5 rounded-xl text-xs text-center flex items-center justify-center gap-2 transition-all shadow-md"
                   >
-                    {simulatingPayment ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                        <span>Vérification de la capture d'écran en cours...</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="w-4 h-4 text-indigo-400" />
-                        <span>Simuler la validation instantanée (Démo)</span>
-                      </>
-                    )}
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                    <span>Vérifier le paiement</span>
                   </button>
                 </>
               )}
@@ -771,6 +903,94 @@ Bon apprentissage !`,
           </div>
         );
       })()}
+
+      {/* Category Management Modal (Admin/Trainer) */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/15 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 relative text-white">
+            <button
+              type="button"
+              onClick={() => setShowCategoryModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-indigo-400">
+                <Tag className="w-5 h-5" />
+                <h3 className="text-base font-black">Gestion des catégories</h3>
+              </div>
+              <p className="text-xs text-slate-400">
+                Ajoutez ou supprimez les catégories de formations proposées sur la marketplace.
+              </p>
+            </div>
+
+            {/* Add New Category Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newCategoryInput.trim() && onAddCategory) {
+                  onAddCategory(newCategoryInput.trim());
+                  setNewCategoryInput('');
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={newCategoryInput}
+                onChange={(e) => setNewCategoryInput(e.target.value)}
+                placeholder="Ex: Intelligence Artificielle, Trading..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 outline-none focus:border-indigo-500 focus:bg-white/10 transition-all"
+              />
+              <button
+                type="submit"
+                disabled={!newCategoryInput.trim()}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shadow-md shadow-indigo-500/20"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Ajouter</span>
+              </button>
+            </form>
+
+            {/* Existing Categories List */}
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Catégories actuelles ({categoryList.length})</p>
+              <div className="flex flex-wrap gap-2">
+                {categoryList.map((cat) => (
+                  <div
+                    key={cat}
+                    className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-200 flex items-center gap-2 group hover:border-white/20 transition-all"
+                  >
+                    <span>{cat}</span>
+                    {onDeleteCategory && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteCategory(cat)}
+                        title={`Supprimer la catégorie ${cat}`}
+                        className="text-slate-500 hover:text-red-400 transition-colors p-0.5 rounded cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="px-4 py-2 bg-white/10 hover:bg-white/15 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

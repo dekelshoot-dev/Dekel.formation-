@@ -477,3 +477,13 @@ export const INITIAL_PRE_REGISTERED: PreRegisteredStudent[] = [
     courseIds: ['c-1', 'c-3']
   }
 ];
+
+export const INITIAL_CATEGORIES: string[] = [
+  'Développement',
+  'E-commerce',
+  'Design',
+  'Marketing',
+  'Montage Vidéo',
+  'Miniatures',
+  'Flyers'
+];

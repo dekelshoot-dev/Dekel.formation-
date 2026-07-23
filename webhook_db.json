@@ -7,9 +7,546 @@
       "studentName": "Étudiant E2E Succès",
       "enrolledAt": "2026-07-15T11:33:47.430Z",
       "synced": true
+    },
+    {
+      "id": "we-1784797546699-xy23",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784797546662@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:05:46.699Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784797880577-bry6",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784797880538@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:11:20.577Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784798236199-pec0",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784798236169@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:17:16.199Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784798443065-fxd9",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784798443025@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:20:43.065Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784798507247-how9",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784798507206@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:21:47.247Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784798605289-67um",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784798605246@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:23:25.289Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784799288815-evzf",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784799288773@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:34:48.815Z",
+      "synced": true
+    },
+    {
+      "id": "we-1784799644488-12xo",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1784799644469@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-07-23T09:40:44.488Z",
+      "synced": true
     }
   ],
   "logs": [
+    {
+      "id": "log-1784799643966-2b1l",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:40:44.385Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784799643961-8jjo",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:40:43.962Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784799288120-pwqs",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:34:48.627Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784799288114-x2d7",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:34:48.114Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784798604618-zdrj",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:23:25.114Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784798604613-4mwn",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:23:24.613Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784798506650-9mrv",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:21:47.073Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784798506645-puyx",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:21:46.646Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784798442400-k0gb",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:20:42.888Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784798442396-sinp",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:20:42.396Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784798235708-f2wo",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:17:16.097Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784798235703-bujf",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:17:15.703Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784797879896-vgxo",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:11:20.407Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784797879890-j7w1",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:11:19.891Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784797546060-4v87",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:46.533Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784797546052-jesc",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:46.053Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784797535582-sbg1",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:35.618Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784797535579-cxyd",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:35.579Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784797520784-l6dn",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:20.846Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784797520780-ace9",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:20.780Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
+    {
+      "id": "log-1784797504935-k3c2",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:05.562Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1784797504928-x616",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-07-23T09:05:04.929Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
     {
       "id": "log-1784115226856-w6yy",
       "courseId": "unknown-course-id",

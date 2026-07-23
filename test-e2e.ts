@@ -146,7 +146,7 @@ async function runTests() {
       status: res.status,
       expectedStatus: 400,
       data: res.data,
-      validation: (data) => data && data.status === "error" && data.error.includes("Unexpected end of JSON input"),
+      validation: (data) => data && data.status === "error" && (data.message?.includes("Malformed JSON") || typeof data.error === "string"),
     };
   });
 

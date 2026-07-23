@@ -1,66 +1,66 @@
-import express from "express";
-import path from "path";
-import fs from "fs";
-import { createServer as createViteServer } from "vite";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-
-// Read Firebase config from json file
-const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
-
-const firebaseApp = initializeApp(firebaseConfig);
-const dbFirestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
-
-const app = express();
-const PORT = Number(process.env.PORT) || 3000;
-const DB_FILE = path.join(process.cwd(), "webhook_db.json");
-
-// Parse payloads
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// CORS Configuration - Allow requests from all origins (accept both localhost and production domains)
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-  res.header("Access-Control-Allow-Credentials", "true");
-  
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
   }
-  next();
-});
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
-// Robust global JSON syntax error interceptor middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+// server.ts
+var import_express = __toESM(require("express"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_fs = __toESM(require("fs"), 1);
+var import_vite = require("vite");
+var import_app = require("firebase/app");
+var import_firestore = require("firebase/firestore");
+var firebaseConfigPath = import_path.default.join(process.cwd(), "firebase-applet-config.json");
+var firebaseConfig = JSON.parse(import_fs.default.readFileSync(firebaseConfigPath, "utf-8"));
+var firebaseApp = (0, import_app.initializeApp)(firebaseConfig);
+var dbFirestore = (0, import_firestore.getFirestore)(firebaseApp, firebaseConfig.firestoreDatabaseId);
+var app = (0, import_express.default)();
+var PORT = 3e3;
+var DB_FILE = import_path.default.join(process.cwd(), "webhook_db.json");
+app.use(import_express.default.json());
+app.use(import_express.default.urlencoded({ extended: true }));
+app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && "status" in err && err.status === 400 && "body" in err) {
     const db = readDb();
     const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    
     const logEntry = {
       id: logId,
       courseId: "malformed_json_payload",
-      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
       method: req.method,
       headers: req.headers,
       body: null,
       query: req.query,
       detectedEmail: null,
       detectedName: null,
-      receivedAt: new Date().toISOString(),
+      receivedAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: "failed_malformed_json",
       errorMessage: `Format JSON invalide : ${err.message}`,
-      outcome: "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+      outcome: "\xC9chec critique du parsing JSON (La charge utile brute envoy\xE9e est syntaxiquement incorrecte ou tronqu\xE9e)"
     };
-
     db.logs.unshift(logEntry);
     if (db.logs.length > 200) {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
-
     return res.status(400).json({
       status: "error",
       message: "Bad Request: Malformed JSON payload received.",
@@ -71,49 +71,40 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   }
   next();
 });
-
-// Ensure database file exists
 function readDb() {
-  if (!fs.existsSync(DB_FILE)) {
+  if (!import_fs.default.existsSync(DB_FILE)) {
     return { enrollments: [], logs: [] };
   }
   try {
-    return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+    return JSON.parse(import_fs.default.readFileSync(DB_FILE, "utf-8"));
   } catch (e) {
     return { enrollments: [], logs: [] };
   }
 }
-
-function writeDb(data: any) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+function writeDb(data) {
+  import_fs.default.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
 }
-
-function getValueByPath(obj: any, path: string): any {
-  if (!obj || !path) return undefined;
-  const parts = path.split('.');
+function getValueByPath(obj, path2) {
+  if (!obj || !path2) return void 0;
+  const parts = path2.split(".");
   let current = obj;
   for (const part of parts) {
-    if (current === null || current === undefined) return undefined;
+    if (current === null || current === void 0) return void 0;
     current = current[part];
   }
   return current;
 }
-
-// API: Webhook Receiver (Requirement 2)
 app.post("/api/webhooks/payment/:courseId", async (req, res) => {
   const { courseId } = req.params;
   const db = readDb();
   const logId = `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-
-  // 1. Validate that the target course actually exists in Firestore (401 Unauthorized check)
   let webhookEmailKey = "email";
   let webhookNameKey = "name";
   let courseExists = false;
   let courseTitle = "";
-
   try {
-    const courseRef = doc(dbFirestore, "courses", courseId);
-    const courseSnap = await getDoc(courseRef);
+    const courseRef = (0, import_firestore.doc)(dbFirestore, "courses", courseId);
+    const courseSnap = await (0, import_firestore.getDoc)(courseRef);
     if (courseSnap.exists()) {
       courseExists = true;
       const courseData = courseSnap.data();
@@ -125,36 +116,32 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
         webhookNameKey = courseData.webhookNameKey;
       }
     }
-  } catch (e: any) {
+  } catch (e) {
     console.warn("Could not read course config from Firestore", e);
   }
-
   if (!courseExists) {
-    const errorMessage = `Accès non autorisé : La formation avec l'identifiant '${courseId}' n'existe pas ou le webhook n'est pas autorisé.`;
-    const outcome = "Accès refusé (formation introuvable ou non enregistrée)";
-    
-    const logEntry = {
+    const errorMessage = `Acc\xE8s non autoris\xE9 : La formation avec l'identifiant '${courseId}' n'existe pas ou le webhook n'est pas autoris\xE9.`;
+    const outcome = "Acc\xE8s refus\xE9 (formation introuvable ou non enregistr\xE9e)";
+    const logEntry2 = {
       id: logId,
       courseId,
-      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
       method: req.method,
       headers: req.headers,
       body: req.body,
       query: req.query,
       detectedEmail: null,
       detectedName: null,
-      receivedAt: new Date().toISOString(),
+      receivedAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: "failed_unauthorized_course",
       errorMessage,
       outcome
     };
-
-    db.logs.unshift(logEntry);
+    db.logs.unshift(logEntry2);
     if (db.logs.length > 200) {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
-
     return res.status(401).json({
       status: "error",
       message: errorMessage,
@@ -162,38 +149,33 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       error: "Unauthorized target resource"
     });
   }
-
-  // 2. Extract and strictly validate JSON payload structure & format
   let body = req.body;
   if (typeof body === "string") {
     try {
       body = JSON.parse(body);
-    } catch (e: any) {
+    } catch (e) {
       const errorMessage = `Format JSON invalide dans le corps brut : ${e.message}`;
-      const outcome = "Échec du parsing JSON (Données brutes illisibles)";
-      
-      const logEntry = {
+      const outcome = "\xC9chec du parsing JSON (Donn\xE9es brutes illisibles)";
+      const logEntry2 = {
         id: logId,
         courseId,
-        url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+        url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
         method: req.method,
         headers: req.headers,
         body: null,
         query: req.query,
         detectedEmail: null,
         detectedName: null,
-        receivedAt: new Date().toISOString(),
+        receivedAt: (/* @__PURE__ */ new Date()).toISOString(),
         status: "failed_malformed_json",
         errorMessage,
         outcome
       };
-
-      db.logs.unshift(logEntry);
+      db.logs.unshift(logEntry2);
       if (db.logs.length > 200) {
         db.logs = db.logs.slice(0, 200);
       }
       writeDb(db);
-
       return res.status(400).json({
         status: "error",
         message: "Bad Request: Unable to parse payload body as valid JSON object.",
@@ -202,36 +184,30 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       });
     }
   }
-
   body = body || {};
-
-  // Check if body is empty or null (which could happen if payload is missing or invalid content type)
   if (Object.keys(body).length === 0 && Object.keys(req.query).length === 0) {
-    const errorMessage = "La charge utile JSON reçue et les paramètres de requête sont complètement vides.";
-    const outcome = "Échec de validation (Requête vide)";
-    
-    const logEntry = {
+    const errorMessage = "La charge utile JSON re\xE7ue et les param\xE8tres de requ\xEAte sont compl\xE8tement vides.";
+    const outcome = "\xC9chec de validation (Requ\xEAte vide)";
+    const logEntry2 = {
       id: logId,
       courseId,
-      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
       method: req.method,
       headers: req.headers,
-      body: body,
+      body,
       query: req.query,
       detectedEmail: null,
       detectedName: null,
-      receivedAt: new Date().toISOString(),
+      receivedAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: "failed_empty_payload",
       errorMessage,
       outcome
     };
-
-    db.logs.unshift(logEntry);
+    db.logs.unshift(logEntry2);
     if (db.logs.length > 200) {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
-
     return res.status(400).json({
       status: "error",
       message: "Bad Request: Request payload is empty.",
@@ -239,99 +215,65 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       error: errorMessage
     });
   }
-
-  // 3. Extract mapped/fallback attributes
   let detectedEmail = "";
   let detectedName = "";
-
-  // Try custom path values first
   const emailVal = getValueByPath(body, webhookEmailKey);
   if (emailVal && typeof emailVal === "string") {
     detectedEmail = emailVal;
   }
-
   const nameVal = getValueByPath(body, webhookNameKey);
   if (nameVal && typeof nameVal === "string") {
     detectedName = nameVal;
   }
-
-  // Check Query params second
   if (!detectedEmail && req.query.email && typeof req.query.email === "string") {
     detectedEmail = req.query.email;
   }
-  
-  // Inspect request body fallbacks
   if (!detectedEmail && body) {
-    detectedEmail = 
-      body.email || 
-      body.customer_email || 
-      body.studentEmail ||
-      body.student_email ||
-      body.customer?.email ||
-      body.data?.object?.customer_details?.email || // Stripe Checkout payload
-      body.payer?.email_address ||                 // PayPal standard payload
-      body.email_address ||
-      body.payload?.email ||
-      "";
+    detectedEmail = body.email || body.customer_email || body.studentEmail || body.student_email || body.customer?.email || body.data?.object?.customer_details?.email || // Stripe Checkout payload
+    body.payer?.email_address || // PayPal standard payload
+    body.email_address || body.payload?.email || "";
   }
-
-  // Generic fallback for name
   if (!detectedName && body) {
-    detectedName = 
-      body.name ||
-      body.customer_name ||
-      body.studentName ||
-      body.student_name ||
-      body.customer?.name ||
-      body.data?.object?.customer_details?.name ||
-      "";
+    detectedName = body.name || body.customer_name || body.studentName || body.student_name || body.customer?.name || body.data?.object?.customer_details?.name || "";
   }
-
-  // 4. Validate Email Format constraints
   detectedEmail = detectedEmail ? detectedEmail.trim() : "";
   detectedName = detectedName ? detectedName.trim() : "";
-
   let emailError = "";
   let emailStatus = "";
   let emailOutcome = "";
-
   if (!detectedEmail) {
-    emailError = "Adresse e-mail manquante dans la charge utile JSON ou les paramètres de requête.";
+    emailError = "Adresse e-mail manquante dans la charge utile JSON ou les param\xE8tres de requ\xEAte.";
     emailStatus = "failed_missing_email";
-    emailOutcome = "Accès refusé (adresse e-mail introuvable)";
+    emailOutcome = "Acc\xE8s refus\xE9 (adresse e-mail introuvable)";
   } else {
-    // Validate with strict regex
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(detectedEmail)) {
       emailError = `L'adresse e-mail '${detectedEmail}' a un format syntaxique invalide (ex attendu: nom@domaine.com).`;
       emailStatus = "failed_invalid_email_format";
-      emailOutcome = "Accès refusé (format d'e-mail incorrect)";
+      emailOutcome = "Acc\xE8s refus\xE9 (format d'e-mail incorrect)";
     }
   }
-
   if (emailError) {
-    const logEntry = {
+    const logEntry2 = {
       id: logId,
       courseId,
-      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
       method: req.method,
       headers: req.headers,
       body: req.body,
       query: req.query,
       detectedEmail: detectedEmail || null,
       detectedName: detectedName || null,
-      receivedAt: new Date().toISOString(),
+      receivedAt: (/* @__PURE__ */ new Date()).toISOString(),
       status: emailStatus,
       errorMessage: emailError,
       outcome: emailOutcome
     };
-
-    db.logs.unshift(logEntry);
+    db.logs.unshift(logEntry2);
     if (db.logs.length > 200) {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
-
     return res.status(400).json({
       status: "error",
       message: "Bad Request: Validation failed for student email.",
@@ -340,42 +282,36 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       outcome: emailOutcome
     });
   }
-
-  // 5. Successful Processing - Register Enrollment & Log Success (200 OK)
-  const finalOutcome = `Accès accordé avec succès pour la formation "${courseTitle}"`;
+  const finalOutcome = `Acc\xE8s accord\xE9 avec succ\xE8s pour la formation "${courseTitle}"`;
   const logEntry = {
     id: logId,
     courseId,
-    url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+    url: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
     method: req.method,
     headers: req.headers,
     body: req.body,
     query: req.query,
     detectedEmail,
     detectedName: detectedName || null,
-    receivedAt: new Date().toISOString(),
+    receivedAt: (/* @__PURE__ */ new Date()).toISOString(),
     status: "success",
     errorMessage: "",
     outcome: finalOutcome
   };
-
-  // Record active pending enrollment to be fetched by the SPA sync process
   const enrollmentRecord = {
     id: `we-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     courseId,
     studentEmail: detectedEmail.toLowerCase(),
-    studentName: detectedName || undefined,
-    enrolledAt: new Date().toISOString(),
+    studentName: detectedName || void 0,
+    enrolledAt: (/* @__PURE__ */ new Date()).toISOString(),
     synced: false
   };
-
   db.logs.unshift(logEntry);
   if (db.logs.length > 200) {
     db.logs = db.logs.slice(0, 200);
   }
   db.enrollments.push(enrollmentRecord);
   writeDb(db);
-
   return res.status(200).json({
     status: "success",
     message: `Payment registered successfully. Student ${detectedEmail} has been enrolled in "${courseTitle}".`,
@@ -384,76 +320,53 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
     outcome: finalOutcome
   });
 });
-
-// API: Read ALL webhook logs for the general administrator tab
 app.get("/api/webhooks/logs", (req, res) => {
   const db = readDb();
   res.json({ logs: db.logs || [] });
 });
-
-// API: Clear ALL webhook logs
 app.delete("/api/webhooks/logs", (req, res) => {
   const db = readDb();
   db.logs = [];
   writeDb(db);
   res.json({ status: "success", message: "All webhook logs cleared" });
 });
-
-// API: Read recent webhook logs (Requirement 2 UI)
 app.get("/api/webhooks/logs/:courseId", (req, res) => {
   const { courseId } = req.params;
   const db = readDb();
-  const courseLogs = db.logs.filter((l: any) => l.courseId === courseId);
+  const courseLogs = db.logs.filter((l) => l.courseId === courseId);
   res.json({ logs: courseLogs });
 });
-
-// API: Clear all webhook logs for a course (Requirement 2 UI)
 app.delete("/api/webhooks/logs/:courseId", (req, res) => {
   const { courseId } = req.params;
   const db = readDb();
-  db.logs = db.logs.filter((l: any) => l.courseId !== courseId);
+  db.logs = db.logs.filter((l) => l.courseId !== courseId);
   writeDb(db);
   res.json({ status: "success", message: "Logs cleared" });
 });
-
-// API: Sync Pending Enrollments (Requirement 2 client sync)
 app.get("/api/sync-enrollments", (req, res) => {
   const db = readDb();
-  // Filter unsynced enrollments
-  const unsynced = db.enrollments.filter((e: any) => !e.synced);
-  
-  // Mark them as synced now so they are not synchronized again
-  db.enrollments = db.enrollments.map((e: any) => ({ ...e, synced: true }));
+  const unsynced = db.enrollments.filter((e) => !e.synced);
+  db.enrollments = db.enrollments.map((e) => ({ ...e, synced: true }));
   writeDb(db);
-
   res.json({ enrollments: unsynced });
 });
-
-// Vite Middleware & SPA Static Serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    const vite = await (0, import_vite.createServer)({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "spa"
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    
-    // Catch-all for SPA - but NOT for API routes
+    const distPath = import_path.default.join(process.cwd(), "dist");
+    app.use(import_express.default.static(distPath));
     app.get("*", (req, res) => {
-      // Don't intercept API routes
-      if (req.path.startsWith("/api/")) {
-        return res.status(404).json({ error: "API route not found" });
-      }
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(import_path.default.join(distPath, "index.html"));
     });
   }
-
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Dekel.Formation running on http://0.0.0.0:${PORT}`);
   });
 }
-
 startServer();
+//# sourceMappingURL=server.cjs.map

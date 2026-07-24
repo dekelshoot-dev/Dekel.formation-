@@ -15,6 +15,7 @@ import CoursePlayer from './components/CoursePlayer';
 import Marketplace from './components/Marketplace';
 import UserProfile from './components/UserProfile';
 import { ToastContainer, showToast } from './components/Toast';
+import GlobalOverflowPopover from './components/GlobalOverflowPopover';
 
 // Icons
 import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Menu, X, User as UserIcon } from 'lucide-react';
@@ -86,7 +87,14 @@ export default function App() {
           setCategories(data.list);
           localStorage.setItem('sio_categories', JSON.stringify(data.list));
         }
+      } else {
+        // Seed default categories into Firestore database if document does not exist yet
+        setDoc(doc(db, 'settings', 'categories'), { list: INITIAL_CATEGORIES }).catch(err => {
+          console.warn('Could not seed initial categories to Firestore:', err);
+        });
       }
+    }, (err) => {
+      console.warn('Settings categories snapshot listener warning:', err.message);
     });
     return () => unsub();
   }, []);
@@ -1209,6 +1217,7 @@ Bon apprentissage.`,
 
       {/* Toast notifications container */}
       <ToastContainer />
+      <GlobalOverflowPopover />
 
     </div>
   );

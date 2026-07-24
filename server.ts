@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
 import { 
   queueTransactionalEmail, 
   processTransactionalEmailQueue, 
@@ -111,14 +111,18 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
     const courseRef = doc(dbFirestore, "courses", courseId);
     const courseSnap = await getDoc(courseRef);
     if (courseSnap.exists()) {
-      courseExists = true;
       const courseData = courseSnap.data();
-      courseTitle = courseData.title || "";
-      if (courseData.webhookEmailKey) {
-        webhookEmailKey = courseData.webhookEmailKey;
-      }
-      if (courseData.webhookNameKey) {
-        webhookNameKey = courseData.webhookNameKey;
+      if (courseData.webhookDisabled === true || courseData.webhookUrl === 'disabled') {
+        courseExists = false;
+      } else {
+        courseExists = true;
+        courseTitle = courseData.title || "";
+        if (courseData.webhookEmailKey) {
+          webhookEmailKey = courseData.webhookEmailKey;
+        }
+        if (courseData.webhookNameKey) {
+          webhookNameKey = courseData.webhookNameKey;
+        }
       }
     } else if (courseId === 'c-1' || courseId === 'c-2' || courseId === 'c-3' || courseId.startsWith('c-')) {
       courseExists = true;
@@ -629,6 +633,20 @@ app.delete("/api/webhooks/logs/:courseId", (req, res) => {
   db.logs = db.logs.filter((l: any) => l.courseId !== courseId);
   writeDb(db);
   res.json({ status: "success", message: "Logs cleared" });
+});
+
+// API: Delete a single webhook log entry
+app.delete("/api/webhooks/log/:logId", async (req, res) => {
+  const { logId } = req.params;
+  const db = readDb();
+  db.logs = db.logs.filter((l: any) => l.id !== logId);
+  writeDb(db);
+  try {
+    await deleteDoc(doc(dbFirestore, "webhook_logs", logId));
+  } catch (err) {
+    // Ignore if not in firestore
+  }
+  res.json({ status: "success", message: "Single webhook log deleted" });
 });
 
 // API: Sync Pending Enrollments (Requirement 2 client sync)

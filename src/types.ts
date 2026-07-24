@@ -56,6 +56,8 @@ export interface Course {
   customPaymentButtons?: CustomPaymentButton[];
   webhookEmailKey?: string;
   webhookNameKey?: string;
+  webhookUrl?: string;
+  webhookDisabled?: boolean;
   // Advanced fields
   scheduledPublishDate?: string;
   startDate?: string;
@@ -168,9 +170,71 @@ export interface AuditLog {
   timestamp: string;
 }
 
+// Expanded Quiz and Question Types (Google Forms style)
+export type QuestionType = 
+  | 'single_choice'    // Réponse unique (Radio)
+  | 'multiple_choice'  // Réponses multiples (Checkboxes)
+  | 'image_question'   // Question avec image + propositions
+  | 'short_text'       // Question textuelle (Réponse courte)
+  | 'section_header';  // Description / Texte explicatif entre questions (0 point)
+
+export interface CourseQuizQuestion {
+  id: string;
+  type: QuestionType;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  points: number;
+  options?: string[];
+  correctAnswers: string[]; // Option indices (e.g., ["0"], ["0", "2"]) or exact text
+  explanation?: string;
+}
+
+export interface CourseQuiz {
+  id: string;
+  courseId: string;
+  title: string;
+  description?: string;
+  instructions?: string;
+  associationType: 'chapter' | 'module' | 'course_end';
+  targetId?: string; // chapterId or moduleId
+  moduleId?: string;
+  chapterId?: string;
+  order: number;
+  durationMinutes?: number; // 0 = unlimited
+  passingScore: number; // e.g., 80 %
+  allowedAttempts: number; // 0 = unlimited
+  questionOrder: 'fixed' | 'random';
+  showCorrections: 'immediate' | 'after_submission' | 'never';
+  status: 'published' | 'draft';
+  isPublished?: boolean;
+  isRequired: boolean;
+  questions: CourseQuizQuestion[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CourseQuizAttempt {
+  id: string;
+  quizId: string;
+  courseId: string;
+  quizTitle?: string;
+  targetId?: string;
+  studentEmail: string;
+  studentName?: string;
+  answers: Record<string, string | string[]>; // questionId -> answer index string or array of strings
+  score: number; // points obtained
+  totalPoints: number; // max points possible
+  percentage: number; // 0-100
+  passed: boolean;
+  timeSpentSeconds: number;
+  attemptNumber: number;
+  submittedAt: string;
+}
+
 export interface QuizQuestion {
   id: string;
-  type: 'qcm' | 'true_false' | 'text';
+  type: 'qcm' | 'true_false' | 'text' | QuestionType;
   question: string;
   options?: string[]; // For QCM
   correctAnswer: string; // index (e.g., "0") or "True"/"False" or text match

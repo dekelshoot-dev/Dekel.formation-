@@ -3,6 +3,17 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-slate-50: #0f1115;
+  --color-slate-100: #0f1115;
+  --color-slate-150: #161a20;
+  --color-slate-200: #1b2028;
+  --color-slate-250: #1b2028;
+  --color-slate-300: #20262f;
+  --color-gray-50: #0f1115;
+  --color-gray-100: #0f1115;
+  --color-gray-200: #1b2028;
+  --color-zinc-100: #0f1115;
+  --color-zinc-200: #1b2028;
 }
 
 /* Theme 1: Aura Cosmique (Option 1 - Thème Sombre Premium) */
@@ -38,7 +49,7 @@
 :root, .theme-slate {
   --bg-app: #f8fafc;
   --text-app: #0f172a;
-  --mesh-bg-image: radial-gradient(at 0% 0%, #f1f5f9 0, transparent 70%), 
+  --mesh-bg-image: radial-gradient(at 0% 0%, #0f1115 0, transparent 70%), 
                      radial-gradient(at 50% 0%, #e2e8f0 0, transparent 70%), 
                      radial-gradient(at 100% 0%, #cbd5e1 0, transparent 70%);
   --glass-bg: #ffffff;
@@ -936,11 +947,9 @@ body.theme-nature-dark,
 
 /* Secondary off-black layout backgrounds and general non-elevated states */
 .theme-nature-dark .bg-slate-50,
-.theme-nature-dark .bg-slate-100,
 .theme-nature-dark .bg-slate-150,
 .theme-nature-dark .bg-slate-200/50,
 .theme-nature-dark .bg-slate-50/50,
-.theme-nature-dark .bg-slate-100/50,
 .theme-nature-dark .bg-slate-900\/40,
 .theme-nature-dark .bg-gray-50,
 .theme-nature-dark .bg-gray-100,
@@ -948,18 +957,23 @@ body.theme-nature-dark,
 .theme-nature-dark .bg-white/10,
 .theme-nature-dark .bg-white\/5,
 .theme-nature-dark .bg-white\/10,
-.theme-nature-dark .bg-slate-50\/50,
-.theme-nature-dark .bg-slate-100\/50 {
+.theme-nature-dark .bg-slate-50\/50 {
   background-color: #1B2028 !important; /* Elegant card background */
+  color: #E5E7EB !important;
+  border-color: #2D3748 !important;
+}
+
+.theme-nature-dark .bg-slate-100,
+.theme-nature-dark .bg-slate-100/50,
+.theme-nature-dark .bg-slate-100\/50 {
+  background-color: #0f1115 !important;
   color: #E5E7EB !important;
   border-color: #2D3748 !important;
 }
 
 /* Elevating elements inside the right-side content pane to #1B2028 or #20262F */
 .theme-nature-dark .flex-1.bg-white .bg-slate-50,
-.theme-nature-dark .flex-1.bg-white .bg-slate-100,
 .theme-nature-dark .flex-1.bg-white .bg-slate-50\/50,
-.theme-nature-dark .flex-1.bg-white .bg-slate-100\/50,
 .theme-nature-dark .flex-1.bg-white .bg-white,
 .theme-nature-dark .flex-1.bg-white .bg-white.rounded-xl,
 .theme-nature-dark .flex-1.bg-white .bg-white.rounded-2xl {
@@ -1398,6 +1412,44 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-
 div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > button:nth-of-type(1):hover {
   transform: scale(1.05) !important;
   background: rgba(15, 23, 42, 0.95) !important;
+}
+
+/* Strict Platform Background Rule: No light gray backgrounds */
+body, #root, .bg-slate-100, .bg-slate-200, .bg-slate-300, .bg-gray-100, .bg-gray-200, .bg-slate-50, [style*="background-color: #f1f5f9"], [style*="background-color: #8c9197"] {
+  background-color: #0f1115 !important;
+}
+
+/* Global Text Overflow Ellipsis & Popover on Hover */
+.truncate-popover, [data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background-color: #0f1115;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: normal;
+  max-width: 280px;
+  word-break: break-word;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 99999;
+  pointer-events: none;
+  animation: fadeInPopover 0.15s ease-out;
+}
+
+@keyframes fadeInPopover {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 

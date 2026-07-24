@@ -266,7 +266,7 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
       contentHtml = `
         <p>Bonjour <strong>${name}</strong>,</p>
         <p>L'adresse e-mail associée à votre compte <strong>${appName}</strong> vient d'être modifiée avec succès.</p>
-        ${data.customMessage ? `<p style="font-size: 13px; color: #64748b; background: #f1f5f9; padding: 10px; border-radius: 6px;">${data.customMessage}</p>` : ''}
+        ${data.customMessage ? `<p style="font-size: 13px; color: #64748b; background: #0f1115; padding: 10px; border-radius: 6px;">${data.customMessage}</p>` : ''}
         <p>Si vous êtes à l'origine de cette modification, aucune action supplémentaire n'est requise.</p>
         <p style="color: #dc2626; font-weight: 600;">Si vous n'avez pas demandé ce changement, veuillez contacter immédiatement le support de la plateforme.</p>
       `;
@@ -522,8 +522,8 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f1f5f9; padding: 24px 12px;">
+<body style="margin: 0; padding: 0; background-color: #0f1115; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #0f1115; padding: 24px 12px;">
     <tr>
       <td align="center">
         <!-- Main Card Container -->
@@ -577,7 +577,7 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
               ` : ''}
 
               <!-- Expiration or Security Disclaimer -->
-              <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #f1f5f9; font-size: 12px; color: #64748b; line-height: 1.5;">
+              <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #2D3748; font-size: 12px; color: #64748b; line-height: 1.5;">
                 <p style="margin: 0;">Si le bouton ne fonctionne pas, copiez-collez l'adresse suivante dans votre navigateur :</p>
                 <p style="margin: 4px 0 0 0; word-break: break-all; color: #2563eb; font-family: monospace;">${callToActionUrl}</p>
               </div>

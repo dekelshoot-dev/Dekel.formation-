@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import { 
   User, Course, Chapter, StudentProgress, Bookmark, ChapterQuiz, 
-  QuizQuestion, QuizSubmission, Exercise, ExerciseSubmission, ChapterComment, Certificate 
+  QuizQuestion, QuizSubmission, Exercise, ExerciseSubmission, ChapterComment, Certificate, CourseQuiz 
 } from '../types';
+import { QuizPlayerModal } from './QuizPlayerModal';
 import { showToast } from './Toast';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, getDocs, onSnapshot, query, where, addDoc } from 'firebase/firestore';
@@ -170,6 +171,8 @@ export function ChapterQuizComponent({ currentUser, chapterId }: ChapterQuizProp
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fullQuiz, setFullQuiz] = useState<CourseQuiz | null>(null);
+  const [isPlayerOpen, setIsPlayerOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -206,8 +209,13 @@ export function ChapterQuizComponent({ currentUser, chapterId }: ChapterQuizProp
     const qRef = doc(db, 'quizzes', chapterId);
     onSnapshot(qRef, (docSnap) => {
       if (docSnap.exists()) {
-        const quiz = docSnap.data() as ChapterQuiz;
-        setQuestions(quiz.questions || []);
+        const data = docSnap.data();
+        if (data.questions) {
+          setFullQuiz({ id: docSnap.id, ...data } as CourseQuiz);
+          setQuestions(data.questions || []);
+        } else {
+          setQuestions((data as ChapterQuiz).questions || []);
+        }
       } else {
         // Fallback to static quiz templates
         setQuestions(DEFAULT_QUIZZES[chapterId] || []);
@@ -1004,6 +1012,9 @@ interface CourseCertificateProps {
 export function CourseCertificateComponent({ currentUser, course, progressPercent }: CourseCertificateProps) {
   const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [quizzes, setQuizzes] = useState<CourseQuiz[]>([]);
+  const [submissions, setSubmissions] = useState<QuizSubmission[]>([]);
+  const [loadingQuizzes, setLoadingQuizzes] = useState(true);
 
   useEffect(() => {
     // Look up issued certificate
@@ -1024,11 +1035,77 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
         setCertificate(JSON.parse(saved) as Certificate);
       }
     });
+
+    // Fetch course mandatory quizzes
+    const qQ = query(collection(db, 'quizzes'), where('courseId', '==', course.id));
+    getDocs(qQ).then(snap => {
+      const list: CourseQuiz[] = [];
+      snap.forEach(d => {
+        const qData = d.data() as CourseQuiz;
+        if (qData.status === 'published' && qData.isRequired !== false) {
+          list.push(qData);
+        }
+      });
+      setQuizzes(list);
+    }).catch(() => {
+      setQuizzes([]);
+    });
+
+    // Fetch user quiz submissions for this course
+    const subQ = query(
+      collection(db, 'quiz_submissions'),
+      where('studentEmail', '==', currentUser.email),
+      where('courseId', '==', course.id)
+    );
+    getDocs(subQ).then(snap => {
+      const list: QuizSubmission[] = [];
+      snap.forEach(d => list.push(d.data() as QuizSubmission));
+      setSubmissions(list);
+      setLoadingQuizzes(false);
+    }).catch(() => {
+      setLoadingQuizzes(false);
+    });
+
   }, [course.id, currentUser.email]);
+
+  // Calculate student best scores for mandatory quizzes
+  const mandatoryQuizzesCount = quizzes.length;
+  let totalBestPercentageSum = 0;
+  let completedMandatoryQuizzesCount = 0;
+
+  quizzes.forEach(quiz => {
+    const quizSubs = submissions.filter(s => (s as any).quizId === quiz.id || s.chapterId === quiz.targetId || s.chapterId === quiz.id);
+    if (quizSubs.length > 0) {
+      completedMandatoryQuizzesCount += 1;
+      // Get highest percentage score achieved
+      const bestScore = Math.max(...quizSubs.map(s => s.score || (s as any).percentage || 0));
+      totalBestPercentageSum += bestScore;
+    }
+  });
+
+  const overallQuizAverage = mandatoryQuizzesCount > 0 
+    ? Math.round(totalBestPercentageSum / mandatoryQuizzesCount) 
+    : 100;
+
+  const isQuizzesQualified = mandatoryQuizzesCount === 0 || (
+    completedMandatoryQuizzesCount >= mandatoryQuizzesCount && overallQuizAverage >= 80
+  );
+
+  const canGenerateCertificate = progressPercent >= 100 && isQuizzesQualified;
 
   const handleGenerateCertificate = () => {
     if (progressPercent < 100) {
-      showToast('Vous devez compléter 100% de la formation pour débloquer votre certificat !', 'warning');
+      showToast('Vous devez compléter 100% des chapitres de la formation !', 'warning');
+      return;
+    }
+
+    if (mandatoryQuizzesCount > 0 && completedMandatoryQuizzesCount < mandatoryQuizzesCount) {
+      showToast(`Vous devez répondre à tous les quiz obligatoires (${completedMandatoryQuizzesCount}/${mandatoryQuizzesCount}) !`, 'warning');
+      return;
+    }
+
+    if (mandatoryQuizzesCount > 0 && overallQuizAverage < 80) {
+      showToast(`Moyenne générale insuffisante (${overallQuizAverage}% / 80% requis). Veuillez repasser vos quiz pour améliorer votre moyenne.`, 'warning');
       return;
     }
 
@@ -1056,7 +1133,7 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
           userName: currentUser.name,
           userRole: currentUser.role,
           action: 'Certificat généré',
-          details: `Obtention du certificat ${uniqueCode} pour le cours ${course.title}`,
+          details: `Obtention du certificat ${uniqueCode} pour le cours ${course.title} avec moyenne aux quiz ${overallQuizAverage}%`,
           timestamp: new Date().toISOString()
         });
 
@@ -1249,14 +1326,53 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
         )}
       </div>
 
-      {progressPercent < 100 && (
-        <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-2">
-          <p className="text-xs text-slate-300 font-sans leading-relaxed">
-            Pour obtenir votre certificat Dekel.Formation, vous devez marquer tous les chapitres de cette formation comme terminés.
-          </p>
-          <div className="flex items-center gap-2 text-[10px] text-indigo-300 font-bold font-sans">
-            <ArrowRight className="w-3.5 h-3.5" /> Continuez de visionner et d'apprendre pour débloquer votre diplôme.
+      {/* Certificate conditions status card */}
+      {!certificate && (
+        <div className="p-4 bg-slate-900/80 border border-slate-700/80 rounded-2xl space-y-3">
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Conditions d'obtention du certificat :</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+              progressPercent >= 100 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                : 'bg-slate-800/60 border-slate-700 text-slate-400'
+            }`}>
+              <CheckCircle2 className={`w-4 h-4 shrink-0 ${progressPercent >= 100 ? 'text-emerald-400' : 'text-slate-500'}`} />
+              <div>
+                <span className="font-bold block">Chapitres terminés</span>
+                <span className="text-[10px] opacity-80">{progressPercent}% / 100%</span>
+              </div>
+            </div>
+
+            <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+              mandatoryQuizzesCount === 0 || completedMandatoryQuizzesCount >= mandatoryQuizzesCount 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                : 'bg-slate-800/60 border-slate-700 text-slate-400'
+            }`}>
+              <CheckCircle2 className={`w-4 h-4 shrink-0 ${mandatoryQuizzesCount === 0 || completedMandatoryQuizzesCount >= mandatoryQuizzesCount ? 'text-emerald-400' : 'text-slate-500'}`} />
+              <div>
+                <span className="font-bold block">Quiz obligatoires</span>
+                <span className="text-[10px] opacity-80">{completedMandatoryQuizzesCount} / {mandatoryQuizzesCount} complétés</span>
+              </div>
+            </div>
+
+            <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+              overallQuizAverage >= 80 
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+            }`}>
+              <Award className={`w-4 h-4 shrink-0 ${overallQuizAverage >= 80 ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <div>
+                <span className="font-bold block">Moyenne Générale</span>
+                <span className="text-[10px] opacity-80">{overallQuizAverage}% (Requis: ≥ 80%)</span>
+              </div>
+            </div>
           </div>
+
+          {overallQuizAverage < 80 && mandatoryQuizzesCount > 0 && completedMandatoryQuizzesCount > 0 && (
+            <div className="bg-amber-950/40 border border-amber-500/30 p-3 rounded-xl text-xs text-amber-200">
+              <strong>Moyenne insuffisante :</strong> Votre moyenne actuelle aux quiz est de <strong>{overallQuizAverage}%</strong>. Pour débloquer votre certificat, vous devez atteindre une moyenne d'au moins 80%. Vous pouvez repasser les quiz pour augmenter votre note.
+            </div>
+          )}
         </div>
       )}
 

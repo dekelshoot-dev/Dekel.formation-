@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 1. Global Safety Net
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Helper functions
     function isSignedIn() {
       return request.auth != null;
@@ -24,69 +19,112 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // --- ENTITY VALIDATIONS ---
-    function isValidUser(data) {
-      return data.id is string && data.id.size() <= 128 &&
-             data.email is string && data.email.size() <= 100 &&
-             data.name is string && data.name.size() <= 100 &&
-             data.role in ['admin', 'trainer', 'student'];
-    }
-
     // --- MATCH BLOCKS ---
 
     // 1. Users
     match /users/{userId} {
-      allow read: if true;
-      allow create, update: if !isSeeded() || isSignedIn() || isValidUser(incoming());
-      allow delete: if !isSeeded() || isSignedIn();
+      allow read, write: if true;
     }
 
     // 2. Courses
     match /courses/{courseId} {
-      allow read: if true;
-      allow create, update, delete: if !isSeeded() || isSignedIn();
+      allow read, write: if true;
     }
 
     // 3. Modules (Hierarchical subcollection & collectionGroup)
     match /{path=**}/modules/{moduleId} {
-      allow read: if true;
-      allow create, update, delete: if !isSeeded() || isSignedIn();
+      allow read, write: if true;
+    }
+
+    match /modules/{moduleId} {
+      allow read, write: if true;
     }
 
     // 4. Chapters (Hierarchical subcollection & collectionGroup)
     match /{path=**}/chapters/{chapterId} {
-      allow read: if true;
-      allow create, update, delete: if !isSeeded() || isSignedIn();
+      allow read, write: if true;
+    }
+
+    match /chapters/{chapterId} {
+      allow read, write: if true;
     }
 
     // 5. Enrollments
     match /enrollments/{enrollmentId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
     // 6. StudentProgress
     match /progress/{progressId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
     // 7. Emails
     match /emails/{emailId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
     // 8. PreRegistered
     match /preregistered/{preregId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if true;
     }
 
-    // 9. Metadata (Internal Seeding Check)
+    // 9. Metadata
     match /metadata/{docId} {
-      allow read: if true;
-      allow create, update, delete: if !isSeeded() || isSignedIn();
+      allow read, write: if true;
+    }
+
+    // 10. Settings (Categories, system settings)
+    match /settings/{docId} {
+      allow read, write: if true;
+    }
+
+    // 11. Bookmarks
+    match /bookmarks/{bookmarkId} {
+      allow read, write: if true;
+    }
+
+    // 12. Quiz Submissions & Quizzes
+    match /quiz_submissions/{submissionId} {
+      allow read, write: if true;
+    }
+
+    match /quizzes/{chapterId} {
+      allow read, write: if true;
+    }
+
+    // 13. Exercises & Exercise Submissions
+    match /exercises/{chapterId} {
+      allow read, write: if true;
+    }
+
+    match /exercise_submissions/{subId} {
+      allow read, write: if true;
+    }
+
+    // 14. Audit Logs
+    match /audit_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // 15. Comments
+    match /comments/{commentId} {
+      allow read, write: if true;
+    }
+
+    // 16. Certificates
+    match /certificates/{certId} {
+      allow read, write: if true;
+    }
+
+    // 17. Connection test
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, DownloadableFile, ExternalLink, CustomPaymentButton } from '../types';
+import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, DownloadableFile, ExternalLink, CustomPaymentButton, CourseQuiz } from '../types';
 import { 
   BarChart3, BookOpen, Users, Settings, User as UserIcon, Plus, Trash2, Copy, 
   Share2, Edit3, Save, ArrowUp, ArrowDown, Check, CheckCircle2, AlertCircle, 
   HelpCircle, Eye, EyeOff, Play, FileText, ExternalLink as LinkIcon, Globe, Image, Video,
-  Mail, Phone, X, ChevronDown, ChevronRight, Folder, Menu, MessageSquare
+  Mail, Phone, X, ChevronDown, ChevronRight, Folder, Menu, MessageSquare,
+  Upload, Download, FileSpreadsheet, FileCode, Sparkles, Search, Award, FileQuestion, BarChart2
 } from 'lucide-react';
 import { showToast } from './Toast';
 import UserProfile from './UserProfile';
+import { db } from '../firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { cleanUndefined } from '../firebaseService';
+import { QuizEditorModal } from './QuizEditorModal';
+import { TrainerQuizStatsModal } from './TrainerQuizStatsModal';
 
 interface TrainerDashboardProps {
   currentUser: User;
@@ -84,12 +90,19 @@ export default function TrainerDashboard({
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
+  const [studentCourseFilter, setStudentCourseFilter] = useState<string>('all');
   const [toastMessage, setToastMessage] = useState('');
 
   // Course configuration states
   const [newCourseTitle, setNewCourseTitle] = useState('');
   const [newCourseType, setNewCourseType] = useState('Développement');
   const [showAddCourseForm, setShowAddCourseForm] = useState(false);
+
+  // Import course states
+  const [createCourseTab, setCreateCourseTab] = useState<'manual' | 'import'>('manual');
+  const [importedCourseData, setImportedCourseData] = useState<ParsedImportCourse | null>(null);
+  const [importFileError, setImportFileError] = useState<string | null>(null);
+  const [isParsingFile, setIsParsingFile] = useState(false);
 
   // Student enroll form states
   const [enrollEmail, setEnrollEmail] = useState('');
@@ -148,6 +161,46 @@ export default function TrainerDashboard({
     setModToRenameId(null);
     setModRenameTitle('');
   }, [selectedCourseId, allModules]);
+
+  // Quiz Management States
+  const [quizzes, setQuizzes] = useState<CourseQuiz[]>([]);
+  const [isQuizEditorOpen, setIsQuizEditorOpen] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState<CourseQuiz | null>(null);
+  const [quizDefaultAssoc, setQuizDefaultAssoc] = useState<'chapter' | 'module' | 'course_end'>('course_end');
+  const [quizDefaultTargetId, setQuizDefaultTargetId] = useState<string>('');
+  const [isQuizStatsOpen, setIsQuizStatsOpen] = useState(false);
+  const [selectedQuizForStats, setSelectedQuizForStats] = useState<CourseQuiz | null>(null);
+
+  // Realtime subscription to quizzes
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'quizzes'), (snap) => {
+      const list: CourseQuiz[] = [];
+      snap.forEach(docSnap => {
+        list.push({ id: docSnap.id, ...docSnap.data() } as CourseQuiz);
+      });
+      setQuizzes(list);
+    }, (err) => {
+      console.warn("Quiz list snapshot warning:", err.message);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleOpenQuizEditor = (quiz?: CourseQuiz | null, defaultType: 'chapter' | 'module' | 'course_end' = 'course_end', defaultTarget: string = '') => {
+    setEditingQuiz(quiz || null);
+    setQuizDefaultAssoc(defaultType);
+    setQuizDefaultTargetId(defaultTarget);
+    setIsQuizEditorOpen(true);
+  };
+
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce quiz ? Cette action est irréversible.")) return;
+    try {
+      await deleteDoc(doc(db, 'quizzes', quizId));
+      showToast("Quiz supprimé avec succès !", "info");
+    } catch (err: any) {
+      showToast(`Erreur lors de la suppression : ${err.message}`, "error");
+    }
+  };
 
   useEffect(() => {
     setProfileName(currentUser.name);
@@ -238,6 +291,497 @@ export default function TrainerDashboard({
         theme: profileTheme
       });
       triggerToast('Vos informations ont été mises à jour !');
+    });
+  };
+
+  // Parsed course structure state
+  interface ParsedImportCourse {
+    title: string;
+    type: string;
+    description?: string;
+    price?: number;
+    level?: 'Débutant' | 'Intermédiaire' | 'Avancé' | 'Tous niveaux';
+    duration?: string;
+    paymentInstructions?: string;
+    whatsappNumber?: string;
+    modules: {
+      title: string;
+      chapters: {
+        title: string;
+        videoSource?: 'youtube' | 'vimeo' | 'direct' | 'iframe';
+        videoUrl?: string;
+        richText?: string;
+        duration?: string;
+        freePreview?: boolean;
+      }[];
+    }[];
+  }
+
+  // Sample File Downloads
+  const handleDownloadJsonSample = () => {
+    const sampleData = {
+      title: "Formation Exemple : Mastery Web Design & Vidéos Multi-Sources",
+      type: categories[0] || "Design",
+      description: "Une formation complète pour maîtriser le Web Design, Figma, la théorie des couleurs et le prototypage UI/UX avec tous les types de vidéos pris en charge (YouTube, Vimeo, MP4 direct, iFrame).",
+      price: 125000,
+      level: "Tous niveaux",
+      duration: "10 heures",
+      paymentInstructions: "Paiement par Mobile Money (Orange Money, Wave ou MTN) puis envoyez le justificatif sur WhatsApp.",
+      whatsappNumber: "+221771234567",
+      modules: [
+        {
+          title: "Module 1 : Les Fondamentaux du Web Design",
+          chapters: [
+            {
+              title: "Chapitre 1 : Théorie des couleurs (Vidéo YouTube)",
+              videoSource: "youtube",
+              videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+              richText: "Dans ce chapitre, apprenez la théorie des couleurs, la hiérarchie visuelle et l'association des polices de caractères via une vidéo YouTube.",
+              duration: "15 min",
+              freePreview: true
+            },
+            {
+              title: "Chapitre 2 : Grilles de mise en page & Design System (Vidéo Vimeo)",
+              videoSource: "vimeo",
+              videoUrl: "https://vimeo.com/76979871",
+              richText: "Découvrez comment utiliser les grilles de 12 colonnes et structurer un Design System réutilisable grâce à ce tutoriel Vimeo.",
+              duration: "20 min",
+              freePreview: false
+            }
+          ]
+        },
+        {
+          title: "Module 2 : Ergonomie, Prototypage & Formats Vidéos Avancés",
+          chapters: [
+            {
+              title: "Chapitre 1 : Composants & Smart Animate (Fichier MP4 Direct)",
+              videoSource: "direct",
+              videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+              richText: "Créez des prototypes haute fidélité avec des animations fluides. Cette leçon utilise une vidéo MP4 hébergée en direct.",
+              duration: "25 min",
+              freePreview: false
+            },
+            {
+              title: "Chapitre 2 : Intégration iFrame / Embed Player (Loom, Wistia ou HTML iFrame)",
+              videoSource: "iframe",
+              videoUrl: '<iframe src="https://www.loom.com/embed/1234567890" width="100%" height="400" frameborder="0" allowfullscreen></iframe>',
+              richText: "Cette leçon montre comment intégrer n'importe quel lecteur vidéo via un code d'intégration HTML iFrame (Loom, Vdocipher, Bunny Stream...).",
+              duration: "18 min",
+              freePreview: false
+            }
+          ]
+        }
+      ]
+    };
+
+    const jsonStr = JSON.stringify(sampleData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'exemple_structure_formation.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    triggerToast('Fichier exemple JSON avec tous les types de vidéos (YouTube, Vimeo, MP4, iFrame) téléchargé !');
+  };
+
+  const handleDownloadCsvSample = () => {
+    const csvContent = 
+`Titre_Formation,Categorie,Description,Prix_XAF,Niveau,Duree,Titre_Module,Titre_Chapitre,Type_Video,URL_Video,Contenu_Texte,Gratuit
+"Formation Exemple : Mastery Web Design","Design","Apprenez le Web Design, la typographie et le prototypage UX avec tous types de vidéos.",125000,"Tous niveaux","10 heures","Module 1 : Les Fondamentaux","Chapitre 1 : Théorie des couleurs (YouTube)","youtube","https://www.youtube.com/watch?v=dQw4w9WgXcQ","Présentation des règles de couleur et typographie.","oui"
+"Formation Exemple : Mastery Web Design","Design","Apprenez le Web Design, la typographie et le prototypage UX avec tous types de vidéos.",125000,"Tous niveaux","10 heures","Module 1 : Les Fondamentaux","Chapitre 2 : Design System (Vimeo)","vimeo","https://vimeo.com/76979871","Comment utiliser les grilles responsive et le Design System.","non"
+"Formation Exemple : Mastery Web Design","Design","Apprenez le Web Design, la typographie et le prototypage UX avec tous types de vidéos.",125000,"Tous niveaux","10 heures","Module 2 : Prototypage","Chapitre 1 : Composants (Vidéo MP4 Direct)","direct","https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4","Animations fluides et réactives sur Figma via fichier vidéo MP4 direct.","non"
+"Formation Exemple : Mastery Web Design","Design","Apprenez le Web Design, la typographie et le prototypage UX avec tous types de vidéos.",125000,"Tous niveaux","10 heures","Module 2 : Prototypage","Chapitre 2 : Intégration iFrame Embed","iframe","<iframe src=""https://www.loom.com/embed/1234567890"" width=""100%"" height=""400"" frameborder=""0"" allowfullscreen></iframe>","Intégration d'un lecteur iFrame personnalisé (Loom, Wistia, Vdocipher).","non"`;
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'exemple_structure_formation.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    triggerToast('Fichier exemple CSV avec tous les types de vidéos (YouTube, Vimeo, MP4, iFrame) téléchargé !');
+  };
+
+  // Export Course Students to CSV
+  const handleExportCourseStudentsCSV = (targetCourse?: Course) => {
+    const courseToExport = targetCourse || selectedCourse;
+    if (!courseToExport) {
+      triggerToast('Veuillez sélectionner une formation à exporter.', 'warning');
+      return;
+    }
+
+    const courseEnrollments = allEnrollments.filter(e => e.courseId === courseToExport.id);
+    if (courseEnrollments.length === 0) {
+      triggerToast(`Aucun élève inscrit à la formation "${courseToExport.title}".`, 'info');
+      return;
+    }
+
+    const courseChapters = allChapters.filter(ch => {
+      const mod = allModules.find(m => m.id === ch.moduleId);
+      return mod?.courseId === courseToExport.id;
+    });
+    const totalChapters = courseChapters.length;
+
+    const headers = [
+      "ID Inscription",
+      "Nom Eleve",
+      "Prenom Eleve",
+      "Email Eleve",
+      "Titre Formation",
+      "Date Inscription",
+      "Statut Acces",
+      "Chapitres Completes",
+      "Total Chapitres",
+      "Pourcentage Progression",
+      "Formation Terminee"
+    ];
+
+    const rows = courseEnrollments.map(en => {
+      const matchedUser = allUsers.find(u => u.email.toLowerCase() === en.studentEmail.toLowerCase());
+      const progress = allProgress.find(p => p.studentEmail === en.studentEmail && p.courseId === courseToExport.id);
+      const completedCount = totalChapters > 0 
+        ? courseChapters.filter(ch => progress?.completedChapterIds.includes(ch.id)).length
+        : 0;
+      const pct = totalChapters > 0 ? Math.round((completedCount / totalChapters) * 100) : 0;
+      const isFinished = totalChapters > 0 && completedCount >= totalChapters ? "Oui" : "Non";
+
+      return [
+        `"${en.id}"`,
+        `"${(matchedUser?.name || en.studentEmail.split('@')[0]).replace(/"/g, '""')}"`,
+        `"${(matchedUser?.firstName || '').replace(/"/g, '""')}"`,
+        `"${en.studentEmail}"`,
+        `"${courseToExport.title.replace(/"/g, '""')}"`,
+        `"${new Date(en.enrolledAt).toLocaleDateString('fr-FR')}"`,
+        `"${en.status === 'active' ? 'Actif' : 'Suspendu'}"`,
+        completedCount,
+        totalChapters,
+        `"${pct}%"`,
+        `"${isFinished}"`
+      ].join(',');
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeTitle = courseToExport.title.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
+    a.download = `eleves_inscrits_${safeTitle}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    triggerToast(`Export CSV réussi pour "${courseToExport.title}" (${courseEnrollments.length} élèves) !`, 'success');
+  };
+
+  const handleExportFilteredStudentsCSV = (filterCourseId: string) => {
+    if (filterCourseId && filterCourseId !== 'all') {
+      const c = trainerCourses.find(course => course.id === filterCourseId);
+      if (c) {
+        handleExportCourseStudentsCSV(c);
+        return;
+      }
+    }
+
+    let enrollsToExport = activeEnrollments;
+    if (filterCourseId && filterCourseId !== 'all') {
+      enrollsToExport = activeEnrollments.filter(e => e.courseId === filterCourseId);
+    }
+
+    if (enrollsToExport.length === 0) {
+      triggerToast('Aucun élève inscrit à exporter.', 'info');
+      return;
+    }
+
+    const headers = [
+      "ID Inscription",
+      "Nom Eleve",
+      "Prenom Eleve",
+      "Email Eleve",
+      "ID Formation",
+      "Titre Formation",
+      "Date Inscription",
+      "Statut Acces",
+      "Chapitres Completes",
+      "Total Chapitres",
+      "Pourcentage Progression",
+      "Formation Terminee"
+    ];
+
+    const rows = enrollsToExport.map(en => {
+      const c = allCourses.find(crs => crs.id === en.courseId);
+      const matchedUser = allUsers.find(u => u.email.toLowerCase() === en.studentEmail.toLowerCase());
+      
+      const courseChapters = allChapters.filter(ch => {
+        const mod = allModules.find(m => m.id === ch.moduleId);
+        return mod?.courseId === en.courseId;
+      });
+      const totalChapters = courseChapters.length;
+
+      const progress = allProgress.find(p => p.studentEmail === en.studentEmail && p.courseId === en.courseId);
+      const completedCount = totalChapters > 0 
+        ? courseChapters.filter(ch => progress?.completedChapterIds.includes(ch.id)).length
+        : 0;
+      const pct = totalChapters > 0 ? Math.round((completedCount / totalChapters) * 100) : 0;
+      const isFinished = totalChapters > 0 && completedCount >= totalChapters ? "Oui" : "Non";
+
+      return [
+        `"${en.id}"`,
+        `"${(matchedUser?.name || en.studentEmail.split('@')[0]).replace(/"/g, '""')}"`,
+        `"${(matchedUser?.firstName || '').replace(/"/g, '""')}"`,
+        `"${en.studentEmail}"`,
+        `"${en.courseId}"`,
+        `"${(c?.title || 'Cours inconnu').replace(/"/g, '""')}"`,
+        `"${new Date(en.enrolledAt).toLocaleDateString('fr-FR')}"`,
+        `"${en.status === 'active' ? 'Actif' : 'Suspendu'}"`,
+        completedCount,
+        totalChapters,
+        `"${pct}%"`,
+        `"${isFinished}"`
+      ].join(',');
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `liste_etudiants_inscrits.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    triggerToast(`Export CSV réussi pour ${enrollsToExport.length} élève(s) !`, 'success');
+  };
+
+  // Import File Parsers
+  const parseJsonCourse = (text: string): ParsedImportCourse | null => {
+    try {
+      const data = JSON.parse(text);
+      const item = Array.isArray(data) ? data[0] : data;
+      if (!item || typeof item !== 'object') return null;
+
+      return {
+        title: item.title || item.titre || 'Formation importée',
+        type: item.type || item.categorie || item.category || categories[0] || 'Développement',
+        description: item.description || 'Description de la formation importée.',
+        price: typeof item.price === 'number' ? item.price : (typeof item.prix === 'number' ? item.prix : 125000),
+        level: item.level || item.niveau || 'Tous niveaux',
+        duration: item.duration || item.duree || '10 heures',
+        paymentInstructions: item.paymentInstructions || item.consignesPaiement,
+        whatsappNumber: item.whatsappNumber || item.numeroWhatsapp,
+        modules: Array.isArray(item.modules) ? item.modules.map((m: any, mIdx: number) => ({
+          title: m.title || m.titre || `Module ${mIdx + 1}`,
+          chapters: Array.isArray(m.chapters || m.chapitres) ? (m.chapters || m.chapitres).map((ch: any, cIdx: number) => ({
+            title: ch.title || ch.titre || `Chapitre ${cIdx + 1}`,
+            videoSource: ['youtube', 'vimeo', 'direct', 'iframe'].includes(ch.videoSource || ch.typeVideo) ? (ch.videoSource || ch.typeVideo) : 'youtube',
+            videoUrl: ch.videoUrl || ch.urlVideo || '',
+            richText: ch.richText || ch.content || ch.contenu || '',
+            duration: ch.duration || ch.duree || '15 min',
+            freePreview: Boolean(ch.freePreview || ch.gratuit)
+          })) : []
+        })) : []
+      };
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const parseCsvCourse = (text: string): ParsedImportCourse | null => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) return null;
+
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+
+    const parseRow = (rowStr: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < rowStr.length; i++) {
+        const char = rowStr[i];
+        if (char === '"' || char === "'") {
+          inQuotes = !inQuotes;
+        } else if (char === delimiter && !inQuotes) {
+          result.push(current.trim().replace(/^["']|["']$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim().replace(/^["']|["']$/g, ''));
+      return result;
+    };
+
+    const rows = lines.slice(1).map(parseRow);
+    if (rows.length === 0) return null;
+
+    const firstRow = rows[0];
+    const courseTitle = firstRow[0] || 'Formation importée CSV';
+    const courseType = firstRow[1] || categories[0] || 'Développement';
+    const courseDesc = firstRow[2] || 'Description de la formation importée';
+    const coursePrice = parseFloat(firstRow[3]) || 125000;
+    const courseLevel = (firstRow[4] as any) || 'Tous niveaux';
+    const courseDuration = firstRow[5] || '10 heures';
+
+    const modulesMap = new Map<string, any[]>();
+
+    for (const row of rows) {
+      if (!row[6] && !row[7]) continue;
+      const modTitle = row[6] || 'Module 1';
+      const chapTitle = row[7] || 'Chapitre';
+      const chapVideoType = (row[8] as any) || 'youtube';
+      const chapVideoUrl = row[9] || '';
+      const chapContent = row[10] || '';
+      const chapFree = (row[11] || '').toLowerCase() === 'oui' || (row[11] || '').toLowerCase() === 'true' || row[11] === '1';
+
+      if (!modulesMap.has(modTitle)) {
+        modulesMap.set(modTitle, []);
+      }
+      modulesMap.get(modTitle)!.push({
+        title: chapTitle,
+        videoSource: ['youtube', 'vimeo', 'direct', 'iframe'].includes(chapVideoType) ? chapVideoType : 'youtube',
+        videoUrl: chapVideoUrl,
+        richText: chapContent,
+        duration: '15 min',
+        freePreview: chapFree
+      });
+    }
+
+    const modules = Array.from(modulesMap.entries()).map(([mTitle, chapters]) => ({
+      title: mTitle,
+      chapters
+    }));
+
+    return {
+      title: courseTitle,
+      type: courseType,
+      description: courseDesc,
+      price: coursePrice,
+      level: courseLevel,
+      duration: courseDuration,
+      modules
+    };
+  };
+
+  const handleFileUpload = (file: File) => {
+    setImportFileError(null);
+    setIsParsingFile(true);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setIsParsingFile(false);
+      const content = e.target?.result as string;
+      if (!content) {
+        setImportFileError("Le fichier est vide.");
+        setImportedCourseData(null);
+        return;
+      }
+
+      let parsed: ParsedImportCourse | null = null;
+      if (file.name.toLowerCase().endsWith('.json')) {
+        parsed = parseJsonCourse(content);
+      } else if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.txt')) {
+        parsed = parseCsvCourse(content);
+      } else {
+        parsed = parseJsonCourse(content) || parseCsvCourse(content);
+      }
+
+      if (!parsed || !parsed.title) {
+        setImportFileError("Impossible d'analyser la structure du fichier. Assurez-vous d'utiliser le format JSON ou CSV recommandé (téléchargez un fichier exemple ci-dessus).");
+        setImportedCourseData(null);
+      } else {
+        setImportedCourseData(parsed);
+        setImportFileError(null);
+        triggerToast(`Fichier "${file.name}" analysé avec succès !`);
+      }
+    };
+
+    reader.onerror = () => {
+      setIsParsingFile(false);
+      setImportFileError("Erreur lors de la lecture du fichier.");
+      setImportedCourseData(null);
+    };
+
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const handleConfirmImportCourse = () => {
+    if (!importedCourseData) return;
+
+    handleAsyncAction('createCourse', async () => {
+      const newCourseId = `c-${Date.now()}`;
+      const newCourse: Course = {
+        id: newCourseId,
+        title: importedCourseData.title,
+        trainerId: currentUser.id,
+        trainerName: currentUser.name,
+        language: 'Français',
+        description: importedCourseData.description || 'Formation créée par importation de fichier.',
+        themeColor: 'indigo',
+        trainerPhoto: currentUser.avatarUrl,
+        logoUrl: 'https://images.unsplash.com/photo-1547082299-de196ea013d6?w=100',
+        coverImage: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800',
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        type: importedCourseData.type || categories[0] || 'Développement',
+        price: importedCourseData.price || 125000,
+        level: importedCourseData.level || 'Tous niveaux',
+        duration: importedCourseData.duration || '10 heures',
+        paymentInstructions: importedCourseData.paymentInstructions,
+        whatsappNumber: importedCourseData.whatsappNumber
+      };
+
+      await onAddCourse(newCourse);
+
+      let totalChaptersCount = 0;
+      if (importedCourseData.modules && importedCourseData.modules.length > 0) {
+        for (let mIdx = 0; mIdx < importedCourseData.modules.length; mIdx++) {
+          const modData = importedCourseData.modules[mIdx];
+          const newModId = `m-${Date.now()}-${mIdx}-${Math.random().toString(36).substr(2, 4)}`;
+          const newMod: Module = {
+            id: newModId,
+            courseId: newCourseId,
+            title: modData.title || `Module ${mIdx + 1}`,
+            order: mIdx + 1
+          };
+          await onAddModule(newMod);
+
+          if (modData.chapters && modData.chapters.length > 0) {
+            for (let cIdx = 0; cIdx < modData.chapters.length; cIdx++) {
+              const chData = modData.chapters[cIdx];
+              const newCh: Chapter = {
+                id: `ch-${Date.now()}-${mIdx}-${cIdx}-${Math.random().toString(36).substr(2, 4)}`,
+                moduleId: newModId,
+                courseId: newCourseId,
+                title: chData.title || `Chapitre ${cIdx + 1}`,
+                order: cIdx + 1,
+                videoSource: chData.videoSource || 'youtube',
+                videoUrl: chData.videoUrl || '',
+                richText: chData.richText || '',
+                duration: chData.duration || '15 min',
+                isFree: Boolean(chData.freePreview)
+              };
+              await onAddChapter(newCh);
+              totalChaptersCount++;
+            }
+          }
+        }
+      }
+
+      setImportedCourseData(null);
+      setImportFileError(null);
+      setShowAddCourseForm(false);
+      triggerToast(`Formation "${newCourse.title}" créée avec succès (${importedCourseData.modules.length} modules, ${totalChaptersCount} chapitres) !`);
+
+      setSelectedCourseId(newCourseId);
+      setActiveTab('course-editor');
     });
   };
 
@@ -445,6 +989,142 @@ export default function TrainerDashboard({
   const [editPaymentButtons, setEditPaymentButtons] = useState<CustomPaymentButton[]>([]);
   const [editShowPaymentInstructions, setEditShowPaymentInstructions] = useState(true);
   const [editPromoPrice, setEditPromoPrice] = useState<number | ''>('');
+
+  // Registered Database Webhooks & Modal states
+  const [registeredWebhooks, setRegisteredWebhooks] = useState<any[]>([]);
+  const [isCreatingWebhookModal, setIsCreatingWebhookModal] = useState(false);
+  const [newWhName, setNewWhName] = useState('');
+  const [newWhCourseId, setNewWhCourseId] = useState('all');
+  const [newWhUrl, setNewWhUrl] = useState('');
+  const [newWhEventType, setNewWhEventType] = useState('payment_success');
+  const [newWhSecretKey, setNewWhSecretKey] = useState('');
+
+  // Listen to custom webhooks in Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'webhooks'), (snap) => {
+      const list: any[] = [];
+      snap.forEach(docSnap => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setRegisteredWebhooks(list);
+    }, (err) => {
+      console.warn("Snapshot listener for webhooks warning:", err.message);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleCreateCustomWebhook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWhName.trim() || !newWhUrl.trim()) {
+      triggerToast('Veuillez saisir un nom et une URL valide pour le webhook.', 'warning');
+      return;
+    }
+    try {
+      const id = `wh-${Date.now()}`;
+      const whObj = {
+        id,
+        name: newWhName.trim(),
+        courseId: newWhCourseId,
+        url: newWhUrl.trim(),
+        eventType: newWhEventType,
+        secretKey: newWhSecretKey.trim(),
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser.email
+      };
+      await setDoc(doc(db, 'webhooks', id), cleanUndefined(whObj));
+      triggerToast('Webhook enregistré en base de données avec succès !', 'success');
+      setIsCreatingWebhookModal(false);
+      setNewWhName('');
+      setNewWhUrl('');
+      setNewWhSecretKey('');
+    } catch (err: any) {
+      triggerToast('Erreur lors de l\'enregistrement du webhook : ' + err.message, 'error');
+    }
+  };
+
+  const handleDeleteWebhookFromDb = async (whId: string, whName: string) => {
+    if (!confirm(`Voulez-vous vraiment supprimer le webhook "${whName}" de la base de données ?`)) return;
+    try {
+      await deleteDoc(doc(db, 'webhooks', whId));
+      setRegisteredWebhooks(prev => prev.filter(w => w.id !== whId));
+      triggerToast(`Le webhook "${whName}" a été supprimé de la plateforme et de la base de données.`, 'success');
+    } catch (err: any) {
+      triggerToast('Erreur lors de la suppression : ' + err.message, 'error');
+    }
+  };
+
+  const handleDeleteCourseWebhook = async (courseToClean: Course) => {
+    if (!confirm(`Voulez-vous vraiment supprimer le webhook pour la formation "${courseToClean.title}" ?`)) return;
+    try {
+      await deleteDoc(doc(db, 'webhooks', `wh-${courseToClean.id}`)).catch(() => {});
+      await deleteDoc(doc(db, 'webhooks', courseToClean.id)).catch(() => {});
+      
+      const updatedCourse: Course = {
+        ...courseToClean,
+        webhookEmailKey: 'email',
+        webhookNameKey: 'name',
+        webhookUrl: 'disabled',
+        webhookDisabled: true
+      };
+      await onUpdateCourse(updatedCourse);
+      setRegisteredWebhooks(prev => prev.filter(w => w.id !== courseToClean.id && w.id !== `wh-${courseToClean.id}` && w.courseId !== courseToClean.id));
+      triggerToast(`Le webhook pour "${courseToClean.title}" a été supprimé de la plateforme et de la base de données avec succès !`, 'success');
+    } catch (err: any) {
+      triggerToast('Erreur lors de la suppression du webhook : ' + err.message, 'error');
+    }
+  };
+
+  const handleReactivateCourseWebhook = async (courseToActivate: Course) => {
+    try {
+      const updatedCourse: Course = {
+        ...courseToActivate,
+        webhookDisabled: false,
+        webhookUrl: `${window.location.origin}/api/webhooks/payment/${courseToActivate.id}`
+      };
+      await onUpdateCourse(updatedCourse);
+      triggerToast(`Le webhook pour "${courseToActivate.title}" a été réactivé avec succès.`, 'success');
+    } catch (err: any) {
+      triggerToast('Erreur lors de la réactivation du webhook : ' + err.message, 'error');
+    }
+  };
+
+  const handleDeleteSingleWebhookLog = async (logId: string) => {
+    if (!confirm('Voulez-vous vraiment supprimer cet enregistrement du journal ?')) return;
+    try {
+      const res = await fetch(`/api/webhooks/log/${logId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setWebhookLogs(prev => prev.filter(l => l.id !== logId));
+        setGlobalWebhookLogs(prev => prev.filter(l => l.id !== logId));
+        triggerToast('Log de webhook supprimé avec succès.', 'success');
+      } else {
+        triggerToast('Erreur lors de la suppression du log.', 'error');
+      }
+    } catch (err) {
+      triggerToast('Erreur de connexion lors de la suppression.', 'error');
+    }
+  };
+
+  const handleResetCourseWebhookConfig = async () => {
+    if (!selectedCourse) return;
+    if (!confirm("Voulez-vous vraiment réinitialiser et désactiver la configuration du webhook pour cette formation ?")) return;
+
+    setEditWebhookEmailKey('email');
+    setEditWebhookNameKey('name');
+
+    const updatedCourse: Course = {
+      ...selectedCourse,
+      webhookEmailKey: 'email',
+      webhookNameKey: 'name',
+      webhookUrl: 'disabled',
+      webhookDisabled: true
+    };
+    await onUpdateCourse(updatedCourse);
+    await deleteDoc(doc(db, 'webhooks', `wh-${selectedCourse.id}`)).catch(() => {});
+    await deleteDoc(doc(db, 'webhooks', selectedCourse.id)).catch(() => {});
+    setRegisteredWebhooks(prev => prev.filter(w => w.id !== selectedCourse.id && w.id !== `wh-${selectedCourse.id}` && w.courseId !== selectedCourse.id));
+    triggerToast("Configuration du webhook réinitialisée et supprimée pour cette formation.", "info");
+  };
 
   // Webhook settings & tester states (Requirement 2)
   const [webhookLogs, setWebhookLogs] = useState<any[]>([]);
@@ -1174,13 +1854,20 @@ Le support Dekel.Formation`,
             <p className="text-xs text-slate-500">Gérez vos modules de formation, publiez des chapitres et suivez vos étudiants.</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => { setActiveTab('courses'); setShowAddCourseForm(true); }}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-50 cursor-pointer"
+            onClick={() => { setActiveTab('courses'); setCreateCourseTab('manual'); setShowAddCourseForm(true); }}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-50 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Nouvelle formation</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('courses'); setCreateCourseTab('import'); setShowAddCourseForm(true); }}
+            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-indigo-600" />
+            <span>Importer un fichier</span>
           </button>
         </div>
       </div>
@@ -1270,36 +1957,74 @@ Le support Dekel.Formation`,
 
           {/* Quick list of courses progress stats */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4">Statistiques par formation</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Statistiques & Complétion par formation</h3>
+                <p className="text-[11px] text-slate-400">Pourcentage d'élèves ayant complété 100% des chapitres de chaque cours.</p>
+              </div>
+            </div>
+
             <div className="space-y-4">
               {trainerCourses.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">Créez votre première formation pour commencer à suivre son évolution.</p>
               ) : (
                 trainerCourses.map(course => {
-                  const enrolledCount = allEnrollments.filter(e => e.courseId === course.id && e.status === 'active').length;
-                  const courseProgresses = allProgress.filter(p => p.courseId === course.id);
-                  const averageProgress = courseProgresses.length > 0 
-                    ? Math.round(courseProgresses.reduce((acc, curr) => acc + curr.completedChapterIds.length, 0) / courseProgresses.length)
-                    : 0;
+                  const courseEnrollments = allEnrollments.filter(e => e.courseId === course.id && e.status === 'active');
+                  const enrolledCount = courseEnrollments.length;
+
+                  const courseChapters = allChapters.filter(ch => {
+                    const mod = allModules.find(m => m.id === ch.moduleId);
+                    return mod?.courseId === course.id;
+                  });
+                  const totalChapters = courseChapters.length;
+
+                  let completedStudentsCount = 0;
+                  if (totalChapters > 0 && enrolledCount > 0) {
+                    courseEnrollments.forEach(en => {
+                      const p = allProgress.find(pr => pr.studentEmail === en.studentEmail && pr.courseId === course.id);
+                      const doneCount = courseChapters.filter(ch => p?.completedChapterIds.includes(ch.id)).length;
+                      if (doneCount >= totalChapters) {
+                        completedStudentsCount++;
+                      }
+                    });
+                  }
+
+                  const completionPercentage = enrolledCount > 0 ? Math.round((completedStudentsCount / enrolledCount) * 100) : 0;
 
                   return (
-                    <div key={course.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <div key={course.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3.5 last:border-0 last:pb-0 gap-3">
                       <div className="flex items-center gap-3">
-                        <img src={course.coverImage} className="w-10 h-7 rounded object-cover" />
+                        <img src={course.coverImage} className="w-12 h-8 rounded-lg object-cover border border-slate-200" />
                         <div>
                           <h4 className="text-xs font-bold text-slate-800">{course.title}</h4>
-                          <p className="text-[10px] text-slate-400">{course.status === 'published' ? 'Publiée' : 'Brouillon'} • {course.level}</p>
+                          <p className="text-[10px] text-slate-400">{course.status === 'published' ? 'Publiée' : 'Brouillon'} • {totalChapters} chapitre(s) • {enrolledCount} élève(s)</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6 mt-2 sm:mt-0">
-                        <div className="text-center">
-                          <p className="text-[10px] text-slate-400">Élèves</p>
-                          <p className="text-xs font-bold text-slate-800">{enrolledCount}</p>
+
+                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                        {/* Completion progress bar */}
+                        <div className="w-44 space-y-1">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-bold text-slate-600">Complétion (100%)</span>
+                            <span className="font-extrabold text-emerald-700">{completionPercentage}%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/60">
+                            <div 
+                              className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                              style={{ width: `${completionPercentage}%` }}
+                            />
+                          </div>
+                          <p className="text-[9px] text-slate-400 text-right">{completedStudentsCount} sur {enrolledCount} ont tout terminé</p>
                         </div>
-                        <div className="text-center">
-                          <p className="text-[10px] text-slate-400">Leçons moyennes suivies</p>
-                          <p className="text-xs font-bold text-indigo-600">{averageProgress} chap.</p>
-                        </div>
+
+                        <button
+                          onClick={() => handleExportCourseStudentsCSV(course)}
+                          className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0"
+                          title="Télécharger la liste des étudiants en CSV"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Export CSV</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -1320,70 +2045,294 @@ Le support Dekel.Formation`,
       {/* Tab 3: My Courses */}
       {activeTab === 'courses' && (
         <div className="space-y-6">
-          {/* Add Course Form */}
+          {/* Add / Import Course Form */}
           {showAddCourseForm && (
-            <form onSubmit={handleCreateCourse} className="p-5 bg-slate-50 border border-slate-150 rounded-2xl space-y-4 max-w-lg">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Créer une formation</h3>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Titre de la formation</label>
-                <input
-                  type="text"
-                  required
-                  value={newCourseTitle}
-                  onChange={(e) => setNewCourseTitle(e.target.value)}
-                  placeholder="Ex: Devenir Web Designer Pro"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1">Catégorie</label>
-                <select
-                  value={newCourseType}
-                  onChange={(e) => setNewCourseType(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
-                >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end gap-2">
+            <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl space-y-5 max-w-2xl shadow-sm animate-fade-in">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Créer ou importer une formation</h3>
+                  <p className="text-xs text-slate-500">Choisissez le mode de création de votre nouvelle formation.</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowAddCourseForm(false)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-600 hover:bg-slate-100"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-200 transition-colors cursor-pointer"
                 >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={loadingActions['createCourse']}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs shadow flex items-center gap-1.5"
-                >
-                  {loadingActions['createCourse'] ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Création...</span>
-                    </>
-                  ) : (
-                    <span>Continuer vers l'éditeur</span>
-                  )}
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </form>
+
+              {/* Mode Selector Tabs */}
+              <div className="grid grid-cols-2 gap-2 bg-slate-200/60 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setCreateCourseTab('manual')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    createCourseTab === 'manual'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Création manuelle</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCreateCourseTab('import')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    createCourseTab === 'import'
+                      ? 'bg-white text-indigo-600 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Importer un fichier (.json / .csv)</span>
+                </button>
+              </div>
+
+              {/* TAB 1: MANUAL CREATION */}
+              {createCourseTab === 'manual' && (
+                <form onSubmit={handleCreateCourse} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Titre de la formation</label>
+                    <input
+                      type="text"
+                      required
+                      value={newCourseTitle}
+                      onChange={(e) => setNewCourseTitle(e.target.value)}
+                      placeholder="Ex: Devenir Web Designer Pro"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Catégorie</label>
+                    <select
+                      value={newCourseType}
+                      onChange={(e) => setNewCourseType(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 outline-none focus:border-indigo-500"
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCourseForm(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loadingActions['createCourse']}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-all cursor-pointer shadow-indigo-100"
+                    >
+                      {loadingActions['createCourse'] ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Création...</span>
+                        </>
+                      ) : (
+                        <span>Continuer vers l'éditeur</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* TAB 2: FILE IMPORT */}
+              {createCourseTab === 'import' && (
+                <div className="space-y-4">
+                  {/* Download Template Banner */}
+                  <div className="p-4 bg-indigo-50 border border-indigo-150 rounded-2xl space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <Download className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-bold text-indigo-900">Modèles de fichier téléchargeables</h4>
+                        <p className="text-[11px] text-indigo-700 leading-relaxed mt-0.5">
+                          Téléchargez un fichier exemple prêt à l'emploi pour savoir comment structurer le titre, la catégorie, les modules et les leçons de votre formation :
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleDownloadJsonSample}
+                        className="bg-white border border-indigo-200 hover:border-indigo-400 text-indigo-700 hover:text-indigo-900 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      >
+                        <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Télécharger exemple JSON (.json)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadCsvSample}
+                        className="bg-white border border-indigo-200 hover:border-indigo-400 text-indigo-700 hover:text-indigo-900 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Télécharger exemple CSV (.csv)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Upload Box */}
+                  <div className="border-2 border-dashed border-slate-300 hover:border-indigo-400 bg-white rounded-2xl p-6 text-center transition-all">
+                    <input
+                      type="file"
+                      id="course-file-import"
+                      accept=".json,.csv,.txt"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="course-file-import"
+                      className="cursor-pointer flex flex-col items-center space-y-2"
+                    >
+                      <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-indigo-600 hover:underline">
+                          Cliquez pour sélectionner un fichier
+                        </span>
+                        <span className="text-xs text-slate-500"> ou glissez-déposez le fichier ici</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Formats pris en charge : JSON (.json) et CSV (.csv)</p>
+                    </label>
+                  </div>
+
+                  {/* Loading parsing state */}
+                  {isParsingFile && (
+                    <div className="p-4 bg-slate-100 rounded-2xl flex items-center gap-2 text-xs text-slate-600">
+                      <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Analyse du fichier en cours...</span>
+                    </div>
+                  )}
+
+                  {/* Parsing Error */}
+                  {importFileError && (
+                    <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                      <span>{importFileError}</span>
+                    </div>
+                  )}
+
+                  {/* Parsed Preview Card */}
+                  {importedCourseData && (
+                    <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-3 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-emerald-800">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider">Formation détectée</h4>
+                        </div>
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">Prêt à importer</span>
+                      </div>
+
+                      <div className="bg-white border border-emerald-150 rounded-xl p-3 space-y-2 text-xs">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-bold text-slate-900">{importedCourseData.title}</p>
+                            <p className="text-[11px] text-slate-500">{importedCourseData.description}</p>
+                          </div>
+                          <span className="font-extrabold text-indigo-600 whitespace-nowrap bg-indigo-50 px-2 py-1 rounded-lg">
+                            {(importedCourseData.price || 125000).toLocaleString('fr-FR')} XAF
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 text-[11px] text-slate-600">
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-md">Catégorie: <strong>{importedCourseData.type}</strong></span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-md">Niveau: <strong>{importedCourseData.level}</strong></span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-md">Modules: <strong>{importedCourseData.modules?.length || 0}</strong></span>
+                          <span className="bg-slate-100 px-2 py-0.5 rounded-md">Chapitres: <strong>{importedCourseData.modules?.reduce((acc, m) => acc + (m.chapters?.length || 0), 0) || 0}</strong></span>
+                        </div>
+
+                        {/* Modules Accordion/List preview */}
+                        {importedCourseData.modules && importedCourseData.modules.length > 0 && (
+                          <div className="pt-2 space-y-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase">Aperçu du contenu :</p>
+                            <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 text-[11px]">
+                              {importedCourseData.modules.map((m, idx) => (
+                                <div key={idx} className="p-2 bg-slate-50 rounded-lg border border-slate-200/80">
+                                  <p className="font-bold text-slate-800">{m.title}</p>
+                                  {m.chapters && m.chapters.length > 0 && (
+                                    <ul className="list-disc list-inside text-slate-500 pl-1 mt-0.5 space-y-0.5 text-[10px]">
+                                      {m.chapters.map((ch, cIdx) => (
+                                        <li key={cIdx}>{ch.title} {ch.freePreview ? '(Gratuit)' : ''}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImportedCourseData(null);
+                            setImportFileError(null);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                        >
+                          Réinitialiser
+                        </button>
+                        <button
+                          type="button"
+                          disabled={loadingActions['createCourse']}
+                          onClick={handleConfirmImportCourse}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs shadow flex items-center gap-1.5 transition-all cursor-pointer shadow-emerald-100"
+                        >
+                          {loadingActions['createCourse'] ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span>Importation...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>Valider et créer la formation</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCourseForm(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Courses Table (Section 6) */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[700px]">
+              <table className="w-full text-left border-collapse min-w-[850px]">
                 <thead>
                   <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-150">
                     <th className="px-4 py-3">Image / Nom</th>
                     <th className="px-4 py-3">Type</th>
                     <th className="px-4 py-3">Statut</th>
-                    <th className="px-4 py-3">Date Création</th>
-                    <th className="px-4 py-3">Élèves</th>
+                    <th className="px-4 py-3">Inscrits</th>
+                    <th className="px-4 py-3">Complétion (100%)</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1394,7 +2343,27 @@ Le support Dekel.Formation`,
                   </tr>
                 ) : (
                   trainerCourses.map(course => {
-                    const studentsCount = allEnrollments.filter(e => e.courseId === course.id && e.status === 'active').length;
+                    const courseEnrollments = allEnrollments.filter(e => e.courseId === course.id && e.status === 'active');
+                    const studentsCount = courseEnrollments.length;
+
+                    const courseChapters = allChapters.filter(ch => {
+                      const mod = allModules.find(m => m.id === ch.moduleId);
+                      return mod?.courseId === course.id;
+                    });
+                    const totalChapters = courseChapters.length;
+
+                    let completedStudentsCount = 0;
+                    if (totalChapters > 0 && studentsCount > 0) {
+                      courseEnrollments.forEach(en => {
+                        const p = allProgress.find(pr => pr.studentEmail === en.studentEmail && pr.courseId === course.id);
+                        const doneCount = courseChapters.filter(ch => p?.completedChapterIds.includes(ch.id)).length;
+                        if (doneCount >= totalChapters) {
+                          completedStudentsCount++;
+                        }
+                      });
+                    }
+
+                    const completionPercentage = studentsCount > 0 ? Math.round((completedStudentsCount / studentsCount) * 100) : 0;
                     
                     return (
                       <tr key={course.id} className="hover:bg-slate-50/50">
@@ -1402,10 +2371,10 @@ Le support Dekel.Formation`,
                           <img src={course.coverImage} className="w-12 h-8 rounded object-cover border border-slate-200" />
                           <div>
                             <p className="font-bold text-slate-800">{course.title}</p>
-                            <p className="text-[10px] text-slate-400">Prix : {course.price.toLocaleString('fr-FR')} XAF</p>
+                            <p className="text-[10px] text-slate-400">{course.price.toLocaleString('fr-FR')} XAF • Créé le {new Date(course.createdAt).toLocaleDateString('fr-FR')}</p>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-slate-500">
+                        <td className="px-4 py-3.5 text-slate-500 font-medium">
                           {course.type}
                         </td>
                         <td className="px-4 py-3.5">
@@ -1419,13 +2388,32 @@ Le support Dekel.Formation`,
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-slate-500">
-                          {new Date(course.createdAt).toLocaleDateString('fr-FR')}
-                        </td>
                         <td className="px-4 py-3.5 font-bold text-slate-700">
-                          {studentsCount}
+                          {studentsCount} élèves
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="w-32 space-y-1">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-bold text-emerald-700">{completionPercentage}%</span>
+                              <span className="text-[10px] text-slate-400">({completedStudentsCount}/{studentsCount})</span>
+                            </div>
+                            <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/60">
+                              <div 
+                                className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                                style={{ width: `${completionPercentage}%` }}
+                              />
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-right space-x-1.5">
+                          <button
+                            onClick={() => handleExportCourseStudentsCSV(course)}
+                            title="Exporter la liste des élèves au format CSV"
+                            className="text-[10px] font-semibold px-2 py-1 rounded border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                            <span>Export CSV</span>
+                          </button>
                           {onPreviewCourse && (
                             <button
                               onClick={() => onPreviewCourse(course)}
@@ -1970,6 +2958,15 @@ Le support Dekel.Formation`,
                         >
                           {webhookCopied ? "Copié !" : "Copier"}
                         </button>
+                        <button
+                          type="button"
+                          onClick={handleResetCourseWebhookConfig}
+                          className="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100 transition-all cursor-pointer flex items-center gap-1"
+                          title="Réinitialiser la configuration webhook de cette formation"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Réinitialiser</span>
+                        </button>
                       </div>
                     </div>
 
@@ -2114,6 +3111,7 @@ Le support Dekel.Formation`,
                                 <th className="px-3 py-2">Date / Heure</th>
                                 <th className="px-3 py-2">E-mail Détecté</th>
                                 <th className="px-3 py-2">Statut</th>
+                                <th className="px-3 py-2 text-right">Action</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -2135,6 +3133,16 @@ Le support Dekel.Formation`,
                                         Erreur
                                       </span>
                                     )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSingleWebhookLog(log.id)}
+                                      className="p-1 rounded text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                                      title="Supprimer ce log"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </td>
                                 </tr>
                               ))}
@@ -2247,16 +3255,50 @@ Le support Dekel.Formation`,
 
           {/* Student list */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Liste de vos élèves</h3>
-              <div className="relative w-64">
-                <input
-                  type="text"
-                  placeholder="Rechercher par e-mail..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 pl-8 text-xs text-slate-800 outline-none"
-                />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 border border-slate-200 rounded-2xl shadow-sm">
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Liste de vos élèves inscrits</h3>
+                <p className="text-[10px] text-slate-400">Filtrer par cours ou rechercher un élève, puis exporter au format CSV.</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter by course */}
+                <select
+                  value={studentCourseFilter}
+                  onChange={(e) => setStudentCourseFilter(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 font-medium"
+                >
+                  <option value="all">Toutes les formations ({activeEnrollments.length} inscrits)</option>
+                  {trainerCourses.map(c => {
+                    const count = activeEnrollments.filter(e => e.courseId === c.id).length;
+                    return (
+                      <option key={c.id} value={c.id}>{c.title} ({count} élèves)</option>
+                    );
+                  })}
+                </select>
+
+                {/* Search input */}
+                <div className="relative w-48 sm:w-56">
+                  <input
+                    type="text"
+                    placeholder="Rechercher e-mail / nom..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 pl-8 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                </div>
+
+                {/* Export CSV Button */}
+                <button
+                  type="button"
+                  onClick={() => handleExportFilteredStudentsCSV(studentCourseFilter)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shadow-emerald-100 shrink-0"
+                  title="Exporter au format CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Exporter CSV</span>
+                </button>
               </div>
             </div>
 
@@ -2280,7 +3322,16 @@ Le support Dekel.Formation`,
                     </tr>
                   ) : (
                     activeEnrollments
-                      .filter(en => en.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .filter(en => {
+                        const matchesCourse = studentCourseFilter === 'all' || en.courseId === studentCourseFilter;
+                        const matchedUser = allUsers.find(u => u.email.toLowerCase() === en.studentEmail.toLowerCase());
+                        const query = searchQuery.toLowerCase();
+                        const matchesSearch = !searchQuery || 
+                          en.studentEmail.toLowerCase().includes(query) ||
+                          (matchedUser?.name || '').toLowerCase().includes(query) ||
+                          (matchedUser?.firstName || '').toLowerCase().includes(query);
+                        return matchesCourse && matchesSearch;
+                      })
                       .map(enroll => {
                         const course = allCourses.find(c => c.id === enroll.courseId);
                         const progress = allProgress.find(p => p.studentEmail === enroll.studentEmail && p.courseId === enroll.courseId);
@@ -2675,6 +3726,162 @@ Le support Dekel.Formation`,
       {/* Tab: Webhook Journal */}
       {activeTab === 'webhooks' && (
         <div className="space-y-6 animate-fade-in">
+          {/* Section: Webhooks Enregistrés dans la Base de Données */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <span>⚡ Webhooks Enregistrés dans la BD ({registeredWebhooks.length + trainerCourses.length})</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Liste des points de terminaison Webhooks stockés en base de données. Vous pouvez enregistrer de nouveaux webhooks ou les supprimer à tout moment.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreatingWebhookModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Nouveau Webhook</span>
+              </button>
+            </div>
+
+            {/* List of Registered Webhooks */}
+            <div className="space-y-3">
+              {/* Course Automatic Webhooks */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Points de terminaison automatiques des formations (Actifs)</p>
+                {trainerCourses
+                  .filter(c => !c.webhookDisabled && c.webhookUrl !== 'disabled')
+                  .map(course => {
+                  const url = `${window.location.origin}/api/webhooks/payment/${course.id}`;
+                  return (
+                    <div key={course.id} className="flex flex-col md:flex-row md:items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl p-3 gap-3">
+                      <div className="flex items-center gap-3">
+                        <img src={course.coverImage} className="w-10 h-7 rounded object-cover border border-slate-200 shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-slate-800">{course.title}</h4>
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase">Enregistré BD</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-md">{url}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(url);
+                            triggerToast("URL du Webhook copiée !", "success");
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[10px] font-bold text-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Copy className="w-3 h-3 text-slate-500" />
+                          <span>Copier URL</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openCourseSettings(course)}
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-[10px] font-bold text-indigo-700 flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Settings className="w-3 h-3" />
+                          <span>Configurer</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCourseWebhook(course)}
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-[10px] font-bold text-rose-700 flex items-center gap-1 transition-all cursor-pointer"
+                          title="Supprimer ce webhook de la plateforme et de la base de données"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Supprimer</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {trainerCourses.filter(c => c.webhookDisabled || c.webhookUrl === 'disabled').length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Webhooks Supprimés / Désactivés ({trainerCourses.filter(c => c.webhookDisabled || c.webhookUrl === 'disabled').length})</p>
+                    {trainerCourses.filter(c => c.webhookDisabled || c.webhookUrl === 'disabled').map(course => (
+                      <div key={course.id} className="flex flex-col md:flex-row md:items-center justify-between bg-slate-100/70 border border-slate-200/60 rounded-xl p-3 gap-3 opacity-80">
+                        <div className="flex items-center gap-3">
+                          <img src={course.coverImage} className="w-10 h-7 rounded object-cover border border-slate-200 shrink-0 grayscale" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-slate-600 line-through">{course.title}</h4>
+                              <span className="bg-rose-100 text-rose-700 border border-rose-200 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase">Supprimé / Inactif BD</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">Webhook supprimé et inactif en BD</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleReactivateCourseWebhook(course)}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-[10px] font-bold text-emerald-700 flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <RefreshCw className="w-3 h-3 text-emerald-600" />
+                            <span>Réactiver Webhook</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Webhooks from Firestore Collection */}
+              {registeredWebhooks.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Webhooks Personnalisés en Base de Données ({registeredWebhooks.length})</p>
+                  {registeredWebhooks.map(wh => {
+                    const matchedCourse = trainerCourses.find(c => c.id === wh.courseId);
+                    return (
+                      <div key={wh.id} className="flex flex-col md:flex-row md:items-center justify-between bg-white border border-slate-200 rounded-xl p-3 gap-3 shadow-xs">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-800">{wh.name}</span>
+                            <span className="bg-sky-50 text-sky-700 border border-sky-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase">{wh.eventType || 'Custom'}</span>
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase">Stocké BD</span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-md">{wh.url}</p>
+                          <p className="text-[9px] text-slate-400 mt-0.5">Formation : {matchedCourse ? matchedCourse.title : (wh.courseId === 'all' ? 'Toutes les formations' : wh.courseId)}</p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(wh.url);
+                              triggerToast("URL copiée !", "success");
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-[10px] font-bold text-slate-700 flex items-center gap-1 transition-all cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3 text-slate-500" />
+                            <span>Copier URL</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWebhookFromDb(wh.id, wh.name)}
+                            className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-[10px] font-bold text-rose-700 flex items-center gap-1 transition-all cursor-pointer"
+                            title="Supprimer définitivement ce webhook de la base de données"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Supprimer</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Journal de Réception des Webhooks</h2>
@@ -2817,12 +4024,24 @@ Le support Dekel.Formation`,
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-slate-100 pt-2.5 md:pt-0">
+                          <div className="flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 border-slate-100 pt-2.5 md:pt-0">
                             <div className="text-left md:text-right">
                               <p className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-wider">{log.method} • HTTP {log.status === 'success' ? '200' : '400'}</p>
                               <p className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[280px]">{log.outcome || log.status}</p>
                             </div>
-                            <span className="text-slate-450 text-xs font-bold">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSingleWebhookLog(log.id);
+                              }}
+                              className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 border border-rose-200 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                              title="Supprimer cette entrée du journal"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Supprimer</span>
+                            </button>
+                            <span className="text-slate-450 text-xs font-bold shrink-0">
                               {isExpanded ? '▲ Réduire' : '▼ Détails'}
                             </span>
                           </div>
@@ -2928,8 +4147,17 @@ Le support Dekel.Formation`,
             >
               ← Retour à mes formations
             </button>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <h2 className="text-sm font-black text-slate-800 truncate max-w-xs sm:max-w-md">Contenu de : {selectedCourse.title}</h2>
+              <button
+                type="button"
+                onClick={() => handleExportCourseStudentsCSV(selectedCourse)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm shadow-emerald-100"
+                title="Exporter la liste des élèves au format CSV"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Exporter CSV Élèves</span>
+              </button>
               {onPreviewCourse && (
                 <button
                   type="button"
@@ -2988,6 +4216,84 @@ Le support Dekel.Formation`,
             {activeChMenuId && (
               <div className="fixed inset-0 z-20 bg-transparent" onClick={() => setActiveChMenuId(null)} />
             )}
+
+            {/* Quiz Final de la Formation (Certification) */}
+            {(() => {
+              const courseQuizzes = quizzes.filter(q => q.courseId === selectedCourse.id);
+              const finalQuiz = courseQuizzes.find(q => q.associationType === 'course_end' || (!q.moduleId && !q.chapterId));
+
+              return (
+                <div className="bg-slate-900 text-white rounded-2xl p-4.5 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black text-white uppercase tracking-wider">Quiz de Fin de Formation (Certification)</h4>
+                        {finalQuiz && (
+                          <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase ${
+                            finalQuiz.isPublished ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}>
+                            {finalQuiz.isPublished ? 'Publié' : 'Brouillon'}
+                          </span>
+                        )}
+                        {finalQuiz?.isRequired && (
+                          <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                            Obligatoire (Seuil {finalQuiz.passingScore}%)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        {finalQuiz 
+                          ? `${finalQuiz.title} • ${finalQuiz.questions.length} question(s) • Durée : ${finalQuiz.durationMinutes || 'Illimitée'} min`
+                          : 'Créez un quiz final type Google Forms pour évaluer automatiquement les élèves avant délivrance du certificat.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {finalQuiz ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedQuizForStats(finalQuiz); setIsQuizStatsOpen(true); }}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <BarChart2 className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Résultats</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenQuizEditor(finalQuiz, 'course_end', selectedCourse.id)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Éditer Quiz</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQuiz(finalQuiz.id)}
+                          className="bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          title="Supprimer ce quiz"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenQuizEditor(null, 'course_end', selectedCourse.id)}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Créer le Quiz Final</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Hierarchical modules list */}
             <div className="space-y-4">
@@ -3168,6 +4474,18 @@ Le support Dekel.Formation`,
                                   <Plus className="w-3.5 h-3.5 text-indigo-500" />
                                   <span className="text-slate-700">Ajouter un chapitre</span>
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const modQuiz = quizzes.find(q => q.associationType === 'module' && (q.targetId === mod.id || q.moduleId === mod.id));
+                                    handleOpenQuizEditor(modQuiz || null, 'module', mod.id);
+                                    setActiveModMenuId(null);
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-50 text-xs flex items-center gap-2.5 transition-colors font-semibold text-indigo-600"
+                                >
+                                  <FileQuestion className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>{quizzes.some(q => q.associationType === 'module' && (q.targetId === mod.id || q.moduleId === mod.id)) ? 'Gérer Quiz Module' : 'Ajouter Quiz au module'}</span>
+                                </button>
                                 <hr className="border-slate-100 my-1" />
                                 <button
                                   type="button"
@@ -3239,6 +4557,18 @@ Le support Dekel.Formation`,
                                               Masqué
                                             </span>
                                           )}
+
+                                          {/* Chapter Quiz badge */}
+                                          {(() => {
+                                            const chQuiz = quizzes.find(q => q.associationType === 'chapter' && (q.targetId === ch.id || q.chapterId === ch.id));
+                                            if (!chQuiz) return null;
+                                            return (
+                                              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full uppercase shrink-0 flex items-center gap-1">
+                                                <FileQuestion className="w-2.5 h-2.5 text-indigo-600" />
+                                                Quiz ({chQuiz.questions.length} Q)
+                                              </span>
+                                            );
+                                          })()}
                                         </div>
                                         <p className="text-[9.5px] text-slate-400 font-medium mt-0.5">
                                           Source : {ch.videoSource.toUpperCase()} • {(ch.richText || '').length} car.
@@ -3717,6 +5047,129 @@ Le support Dekel.Formation`,
             </button>
           </div>
         </div>
+      )}
+
+      {/* Modal: Enregistrer un Webhook dans la Base de Données */}
+      {isCreatingWebhookModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-150 pb-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-800">Enregistrer un Webhook dans la Base de Données</h3>
+                <p className="text-[11px] text-slate-400">Ajoutez une URL de webhook personnalisée stockée en BD.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreatingWebhookModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomWebhook} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Nom du Webhook *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Webhook Zapier Inscriptions, Wave Webhook"
+                  value={newWhName}
+                  onChange={(e) => setNewWhName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Formation associée</label>
+                <select
+                  value={newWhCourseId}
+                  onChange={(e) => setNewWhCourseId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="all">Toutes les formations</option>
+                  {trainerCourses.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">URL de destination / Endpoint *</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://hooks.zapier.com/hooks/catch/12345/abcde"
+                  value={newWhUrl}
+                  onChange={(e) => setNewWhUrl(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 font-mono text-[11px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Événement déclencheur</label>
+                <select
+                  value={newWhEventType}
+                  onChange={(e) => setNewWhEventType(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="payment_success">Paiement / Inscription Réussie</option>
+                  <option value="student_enrolled">Inscrit à la formation</option>
+                  <option value="course_completed">Formation Complétée à 100%</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Jeton / Clé secrète d'authentification (Optionnel)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: whsec_123456789"
+                  value={newWhSecretKey}
+                  onChange={(e) => setNewWhSecretKey(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 font-mono text-[11px]"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-150">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingWebhookModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm cursor-pointer"
+                >
+                  Enregistrer dans la BD
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quiz Editor Modal */}
+      {isQuizEditorOpen && selectedCourse && (
+        <QuizEditorModal
+          courseId={selectedCourse.id}
+          quiz={editingQuiz}
+          modules={courseModules}
+          chapters={allChapters.filter(ch => courseModules.some(m => m.id === ch.moduleId))}
+          defaultAssociationType={quizDefaultAssoc}
+          defaultTargetId={quizDefaultTargetId}
+          onClose={() => setIsQuizEditorOpen(false)}
+          onSaveSuccess={() => setIsQuizEditorOpen(false)}
+        />
+      )}
+
+      {/* Trainer Quiz Stats Modal */}
+      {isQuizStatsOpen && selectedQuizForStats && (
+        <TrainerQuizStatsModal
+          quiz={selectedQuizForStats}
+          onClose={() => setIsQuizStatsOpen(false)}
+        />
       )}
 
     </div>

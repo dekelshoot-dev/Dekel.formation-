@@ -3,22 +3,22 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-slate-50: #0f1115;
-  --color-slate-100: #0f1115;
+  --color-slate-50: #161a20;
+  --color-slate-100: #161a20;
   --color-slate-150: #161a20;
   --color-slate-200: #1b2028;
   --color-slate-250: #1b2028;
   --color-slate-300: #20262f;
-  --color-gray-50: #0f1115;
-  --color-gray-100: #0f1115;
+  --color-gray-50: #161a20;
+  --color-gray-100: #161a20;
   --color-gray-200: #1b2028;
-  --color-zinc-100: #0f1115;
+  --color-zinc-100: #161a20;
   --color-zinc-200: #1b2028;
 }
 
 /* Theme 1: Aura Cosmique (Option 1 - Thème Sombre Premium) */
 .theme-cosmic {
-  --bg-app: #0f172a;
+  --bg-app: #161a20;
   --text-app: #f1f5f9;
   --mesh-bg-image: radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
                      radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
@@ -45,21 +45,21 @@
   --color-indigo-950: #2e1065;
 }
 
-/* Theme 2: Ardoise Minimaliste (Option 2 - Thème Clair Moderne) */
+/* Theme 2: Ardoise Minimaliste (Option 2 - Thème Sombre Moderne) */
 :root, .theme-slate {
-  --bg-app: #f8fafc;
-  --text-app: #0f172a;
-  --mesh-bg-image: radial-gradient(at 0% 0%, #0f1115 0, transparent 70%), 
-                     radial-gradient(at 50% 0%, #e2e8f0 0, transparent 70%), 
-                     radial-gradient(at 100% 0%, #cbd5e1 0, transparent 70%);
-  --glass-bg: #ffffff;
+  --bg-app: #161a20;
+  --text-app: #f1f5f9;
+  --mesh-bg-image: radial-gradient(at 0% 0%, #161a20 0, transparent 70%), 
+                     radial-gradient(at 50% 0%, #1b2028 0, transparent 70%), 
+                     radial-gradient(at 100% 0%, #20262f 0, transparent 70%);
+  --glass-bg: #1b2028;
   --glass-border: rgba(148, 163, 184, 0.25);
-  --glass-light-bg: #ffffff;
+  --glass-light-bg: #1b2028;
   --glass-light-border: rgba(148, 163, 184, 0.2);
-  --brand-text: #0f172a;
-  --brand-logo-text: #475569;
-  --header-text: #334155;
-  --header-text-hover: #0f172a;
+  --brand-text: #f1f5f9;
+  --brand-logo-text: #94a3b8;
+  --header-text: #cbd5e1;
+  --header-text-hover: #ffffff;
 
   --color-indigo-50: #ffffff;
   --color-indigo-100: #ffffff;
@@ -74,21 +74,21 @@
   --color-indigo-950: #020617;
 }
 
-/* Theme 3: Sauge Chaleureuse (Option 3 - Thème Naturel & Organique) */
+/* Theme 3: Sauge Chaleureuse (Option 3 - Thème Sombre Naturel) */
 .theme-sage {
-  --bg-app: #f5f4ef;
-  --text-app: #1c281f;
-  --mesh-bg-image: radial-gradient(at 0% 0%, #ebede5 0, transparent 70%), 
-                     radial-gradient(at 50% 0%, #f1efe9 0, transparent 70%), 
-                     radial-gradient(at 100% 0%, #e8e6df 0, transparent 70%);
-  --glass-bg: rgba(253, 252, 249, 0.9);
-  --glass-border: rgba(40, 60, 45, 0.12);
-  --glass-light-bg: rgba(253, 252, 249, 0.95);
-  --glass-light-border: rgba(40, 60, 45, 0.15);
-  --brand-text: #1c281f;
-  --brand-logo-text: #2d4a34;
-  --header-text: #425745;
-  --header-text-hover: #1c281f;
+  --bg-app: #161a20;
+  --text-app: #f1f5f9;
+  --mesh-bg-image: radial-gradient(at 0% 0%, #161a20 0, transparent 70%), 
+                     radial-gradient(at 50% 0%, #1b2028 0, transparent 70%), 
+                     radial-gradient(at 100% 0%, #20262f 0, transparent 70%);
+  --glass-bg: #1b2028;
+  --glass-border: rgba(40, 60, 45, 0.2);
+  --glass-light-bg: #1b2028;
+  --glass-light-border: rgba(40, 60, 45, 0.25);
+  --brand-text: #f1f5f9;
+  --brand-logo-text: #517e65;
+  --header-text: #cbd5e1;
+  --header-text-hover: #ffffff;
 
   --color-indigo-50: #f4f7f5;
   --color-indigo-100: #e3ebe6;
@@ -103,18 +103,18 @@
   --color-indigo-950: #111c16;
 }
 
-/* Theme 4: Nature (Style Spotify – Thème Clair) */
+/* Theme 4: Nature (Style Spotify) */
 .theme-nature {
-  --bg-app: #FFFFFF;
-  --text-app: #121212;
-  --mesh-bg-image: none; /* No mesh background since it's a solid/minimalist clear theme */
-  --glass-bg: #FFFFFF;
-  --glass-border: #E5E7EB;
-  --glass-light-bg: rgba(255, 255, 255, 0.9);
-  --glass-light-border: #E5E7EB;
+  --bg-app: #161a20;
+  --text-app: #f1f5f9;
+  --mesh-bg-image: none;
+  --glass-bg: #1b2028;
+  --glass-border: #2D3748;
+  --glass-light-bg: #1b2028;
+  --glass-light-border: #2D3748;
   --brand-text: #1DB954;
   --brand-logo-text: #169C46;
-  --header-text: #374151;
+  --header-text: #9CA3AF;
   --header-text-hover: #1DB954;
 
   --color-indigo-50: #E8F8EE;
@@ -122,8 +122,8 @@
   --color-indigo-200: #8CE2A8;
   --color-indigo-300: #52D67A;
   --color-indigo-400: #2CBF60;
-  --color-indigo-500: #1DB954; /* Main Green */
-  --color-indigo-600: #169C46; /* Darker Green */
+  --color-indigo-500: #1DB954;
+  --color-indigo-600: #169C46;
   --color-indigo-700: #117B36;
   --color-indigo-800: #0D5D29;
   --color-indigo-900: #09411D;
@@ -132,12 +132,12 @@
 
 /* Theme 5: Nature Dark (Style Spotify – Thème Sombre Premium) */
 .theme-nature-dark {
-  --bg-app: #0F1115;
+  --bg-app: #161a20;
   --text-app: #E5E7EB;
-  --mesh-bg-image: none; /* Spotify style is solid/minimal dark */
+  --mesh-bg-image: none;
   --glass-bg: #1B2028;
   --glass-border: #2D3748;
-  --glass-light-bg: rgba(15, 17, 21, 0.9);
+  --glass-light-bg: #161a20;
   --glass-light-border: #2D3748;
   --brand-text: #FFFFFF;
   --brand-logo-text: #1DB954;
@@ -149,8 +149,8 @@
   --color-indigo-200: #20262F;
   --color-indigo-300: #252C36;
   --color-indigo-400: #1ED760;
-  --color-indigo-500: #1DB954; /* Main Green */
-  --color-indigo-600: #169C46; /* Darker Green */
+  --color-indigo-500: #1DB954;
+  --color-indigo-600: #169C46;
   --color-indigo-700: #117B36;
   --color-indigo-800: #0D5D29;
   --color-indigo-900: #09411D;
@@ -830,7 +830,7 @@ body {
 /* --- Theme 5: Nature Dark (Style Spotify – Thème Sombre Premium) Navigation & Overrides --- */
 .theme-nature-dark {
   color-scheme: dark;
-  background-color: #0F1115 !important;
+  background-color: #161a20 !important;
   color: #E5E7EB !important;
 }
 
@@ -838,7 +838,7 @@ body {
 .theme-nature-dark,
 body.theme-nature-dark,
 .theme-nature-dark .mesh-bg {
-  background-color: #0F1115 !important;
+  background-color: #161a20 !important;
   background-image: none !important;
 }
 
@@ -931,7 +931,7 @@ body.theme-nature-dark,
 
 /* Outer layout panel backgrounds */
 .theme-nature-dark .bg-slate-950 {
-  background-color: #0F1115 !important;
+  background-color: #161a20 !important;
   color: #E5E7EB !important;
   border-color: #2D3748 !important;
 }
@@ -966,7 +966,7 @@ body.theme-nature-dark,
 .theme-nature-dark .bg-slate-100,
 .theme-nature-dark .bg-slate-100/50,
 .theme-nature-dark .bg-slate-100\/50 {
-  background-color: #0f1115 !important;
+  background-color: #161a20 !important;
   color: #E5E7EB !important;
   border-color: #2D3748 !important;
 }
@@ -1414,9 +1414,32 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-
   background: rgba(15, 23, 42, 0.95) !important;
 }
 
-/* Strict Platform Background Rule: No light gray backgrounds */
-body, #root, .bg-slate-100, .bg-slate-200, .bg-slate-300, .bg-gray-100, .bg-gray-200, .bg-slate-50, [style*="background-color: #f1f5f9"], [style*="background-color: #8c9197"] {
-  background-color: #0f1115 !important;
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  background-color: #1a1e24 !important;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out !important;
+}
+
+div#root:nth-of-type(1) > div:nth-of-type(1) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(4) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1):hover {
+  transform: scale(1.015) !important;
+}
+
+/* Dashboard Cards & Panels styling with #1a1e24 background, smooth hover scale, responsive padding and text truncation */
+.dashboard-card,
+.bg-dashboard-card,
+[class*="bg-[#1a1e24]"] {
+  background-color: #1a1e24 !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+}
+
+.dashboard-card:hover,
+.bg-dashboard-card:hover {
+  transform: scale(1.015) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Strict Platform Background Rule: No gray backgrounds on platform - force #161a20 */
+html, body, #root, .mesh-bg, .bg-slate-100, .bg-slate-200, .bg-slate-300, .bg-gray-100, .bg-gray-200, .bg-slate-50, .bg-gray-50, .bg-zinc-100, .bg-zinc-200, [style*="background-color: #f1f5f9"], [style*="background-color: #8c9197"], [style*="background-color: #bebdb4"], [style*="background-color: #ebede5"], [style*="background-color: #e8e6df"], [style*="background-color: #f5f4ef"], [style*="background-color: #f8fafc"], [style*="background-color: #0f1115"] {
+  background-color: #161a20 !important;
 }
 
 /* Global Text Overflow Ellipsis & Popover on Hover */

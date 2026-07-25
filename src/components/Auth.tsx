@@ -315,7 +315,7 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mai
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-white/10"></div>
               </div>
-              <span className="relative bg-[#12162e] px-3 text-xs text-slate-400 font-medium">Ou continuer avec</span>
+              <span className="relative bg-[#161a20] px-3 text-xs text-slate-400 font-medium">Ou continuer avec</span>
             </div>
 
             <button

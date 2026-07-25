@@ -480,6 +480,14 @@ export default function App() {
             const courseId = record.courseId;
             const studentEmail = record.studentEmail.toLowerCase();
             
+            // Check if student is already enrolled in this course ("si un webhook est reçu et que le mail reçu est déja dans la formation, ne rien faire")
+            const alreadyEnrolled = allEnrollments.some(
+              e => e.studentEmail.toLowerCase() === studentEmail && e.courseId === courseId && e.status === 'active'
+            );
+            if (alreadyEnrolled) {
+              continue;
+            }
+
             // 1. Grant student enrollment
             const newEnroll: Enrollment = {
               id: `e-wh-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -621,6 +629,15 @@ Bon apprentissage.`,
   const handleEnrollStudent = async (email: string, courseId: string) => {
     const emailTrimmed = email.trim().toLowerCase();
     
+    // Check if student already enrolled in this specific course
+    const alreadyEnrolled = allEnrollments.some(
+      e => e.studentEmail.toLowerCase() === emailTrimmed && e.courseId === courseId && e.status === 'active'
+    );
+    if (alreadyEnrolled) {
+      showToast("L'étudiant a déjà la formation !", "error");
+      return;
+    }
+
     const newEnroll: Enrollment = {
       id: `e-${Date.now()}`,
       studentEmail: emailTrimmed,
@@ -696,7 +713,7 @@ Bon apprentissage.`,
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0b0f19] flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-[#161a20] flex flex-col items-center justify-center text-white">
         <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p className="text-sm text-slate-400 font-medium">Chargement de votre session...</p>
       </div>

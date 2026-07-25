@@ -122,6 +122,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // 18. Webhooks
+    match /webhooks/{webhookId} {
+      allow read, write: if true;
+    }
+
     // Catch-all safety net
     match /{document=**} {
       allow read, write: if false;

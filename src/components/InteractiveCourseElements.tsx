@@ -1287,7 +1287,7 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
   };
 
   return (
-    <div className="bg-[#0c1220] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6">
+    <div className="bg-[#1b2028] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-6">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex items-center gap-3">
           <div className="bg-indigo-500/10 text-indigo-400 p-2.5 rounded-2xl border border-indigo-500/25 shrink-0">

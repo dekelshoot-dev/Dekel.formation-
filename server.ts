@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { 
   queueTransactionalEmail, 
   processTransactionalEmailQueue, 
@@ -348,7 +348,69 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
     });
   }
 
-  // 5. Successful Processing - Register Enrollment & Log Success (200 OK)
+  // 5. Check if student is already enrolled in this course ("si un webhook est reçu et que le mail reçu est déja dans la formation, ne rien faire")
+  const targetEmailLower = detectedEmail.toLowerCase();
+  let alreadyEnrolledInCourse = false;
+
+  // Check local db.enrollments
+  if (db.enrollments && Array.isArray(db.enrollments)) {
+    alreadyEnrolledInCourse = db.enrollments.some(
+      (e: any) => e.studentEmail && e.studentEmail.toLowerCase() === targetEmailLower && e.courseId === courseId
+    );
+  }
+
+  // Check Firestore enrollments collection
+  if (!alreadyEnrolledInCourse) {
+    try {
+      const enrollmentsRef = collection(dbFirestore, "enrollments");
+      const q = query(
+        enrollmentsRef,
+        where("studentEmail", "==", targetEmailLower),
+        where("courseId", "==", courseId),
+        where("status", "==", "active")
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        alreadyEnrolledInCourse = true;
+      }
+    } catch (err) {
+      // Ignore query error
+    }
+  }
+
+  if (alreadyEnrolledInCourse) {
+    const ignoredOutcome = `L'étudiant '${detectedEmail}' a déjà la formation. Aucune action effectuée.`;
+    const logEntry = {
+      id: logId,
+      courseId,
+      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`,
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      query: req.query,
+      detectedEmail,
+      detectedName: detectedName || null,
+      receivedAt: new Date().toISOString(),
+      status: "ignored_already_enrolled",
+      errorMessage: "",
+      outcome: ignoredOutcome
+    };
+
+    db.logs.unshift(logEntry);
+    if (db.logs.length > 200) {
+      db.logs = db.logs.slice(0, 200);
+    }
+    writeDb(db);
+
+    return res.status(200).json({
+      status: "success",
+      message: `L'étudiant ${detectedEmail} a déjà la formation. Aucune action n'a été effectuée.`,
+      logId,
+      outcome: ignoredOutcome
+    });
+  }
+
+  // 6. Successful Processing - Register Enrollment & Log Success (200 OK)
   const finalOutcome = `Accès accordé avec succès pour la formation "${courseTitle}"`;
   const logEntry = {
     id: logId,

@@ -274,7 +274,7 @@ export default function CoursePlayer({
         )}
 
         {/* Left Sidebar (Fixed on Desktop, Drawer on Mobile) */}
-        <div className={`absolute lg:relative top-0 left-0 h-full w-80 lg:w-72 bg-[#090d16] lg:bg-transparent border-r border-white/10 flex flex-col justify-between shrink-0 z-50 lg:z-30 transition-transform duration-300 ${
+        <div className={`absolute lg:relative top-0 left-0 h-full w-80 lg:w-72 bg-[#161a20] lg:bg-transparent border-r border-white/10 flex flex-col justify-between shrink-0 z-50 lg:z-30 transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -662,7 +662,7 @@ export default function CoursePlayer({
       {/* Congratulations Modal when Course is Completed */}
       {showCongrats && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0b0f19] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-fade-in text-white">
+          <div className="bg-[#1b2028] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-fade-in text-white">
             <div className="w-20 h-20 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-lg">
               <Sparkles className="w-10 h-10 text-amber-400 animate-pulse" />
             </div>

@@ -3,6 +3,7 @@ import { User, UserRole, Course, Enrollment, SimulatedEmail } from '../types';
 import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag } from 'lucide-react';
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
+import { ConfirmModal } from './ConfirmModal';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -21,6 +22,7 @@ interface AdminDashboardProps {
   onUpdateUserRole: (userId: string, newRole: UserRole) => void;
   onUpdateUser: (user: User) => void;
   onPreviewCourse?: (course: Course) => void;
+  onEditCourse?: (course: Course) => void;
 }
 
 export default function AdminDashboard({
@@ -39,11 +41,31 @@ export default function AdminDashboard({
   onSendEmail,
   onUpdateUserRole,
   onUpdateUser,
-  onPreviewCourse
+  onPreviewCourse,
+  onEditCourse
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'settings' | 'profile'>('stats');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    itemName?: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+  };
   
   // Category input state for admin
   const [adminCatInput, setAdminCatInput] = useState('');
@@ -294,74 +316,74 @@ Bonnes formations !`,
       )}
 
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="bg-[#1a1e24] border border-white/10 rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Hamburger Menu on Mobile */}
           <button
             onClick={() => setIsMobileDrawerOpen(true)}
-            className="md:hidden p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-all cursor-pointer mr-1"
+            className="md:hidden p-2 text-slate-400 hover:text-slate-100 rounded-xl hover:bg-white/5 transition-all cursor-pointer mr-1 shrink-0"
             title="Ouvrir le menu"
           >
             <Menu className="w-5.5 h-5.5" />
           </button>
 
-          <div className="bg-red-50 text-red-600 p-2.5 rounded-2xl border border-red-100">
+          <div className="bg-red-500/15 text-red-400 p-2.5 rounded-2xl border border-red-500/25 shrink-0">
             <Shield className="w-6 h-6" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Espace Administrateur</h1>
-            <p className="text-xs text-slate-500">Gérez l'ensemble des formateurs, élèves, formations et paramètres système.</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-bold text-slate-100 truncate">Espace Administrateur</h1>
+            <p className="text-xs text-slate-400 truncate">Gérez l'ensemble des formateurs, élèves, formations et paramètres système.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 px-3.5 py-1.5 rounded-xl self-start text-xs text-slate-600 font-medium">
+        <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3.5 py-1.5 rounded-xl self-start text-xs text-slate-300 font-medium shrink-0">
           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
-          <span>Connecté en tant que: {currentUser.name}</span>
+          <span className="truncate">Connecté en tant que: {currentUser.name}</span>
         </div>
       </div>
 
       {/* Stats Quick Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+        <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center gap-3 hover:scale-[1.015] hover:border-indigo-500/30 transition-all duration-200 overflow-hidden">
+          <div className="p-2.5 bg-indigo-500/15 text-indigo-400 rounded-xl shrink-0">
             <BookOpen className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Formations totales</p>
-            <p className="text-lg font-black text-slate-900">{totalCourses}</p>
-            <p className="text-[10px] text-slate-500">{publishedCourses} publiées / {draftCourses} brouillons</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Formations totales</p>
+            <p className="text-lg font-black text-slate-100 truncate">{totalCourses}</p>
+            <p className="text-[10px] text-slate-400 truncate">{publishedCourses} publiées / {draftCourses} brouillons</p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-sky-50 text-sky-600 rounded-xl">
+        <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center gap-3 hover:scale-[1.015] hover:border-sky-500/30 transition-all duration-200 overflow-hidden">
+          <div className="p-2.5 bg-sky-500/15 text-sky-400 rounded-xl shrink-0">
             <Users className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Formateurs</p>
-            <p className="text-lg font-black text-slate-900">{totalTrainers}</p>
-            <p className="text-[10px] text-slate-500">Instructeurs indépendants</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Formateurs</p>
+            <p className="text-lg font-black text-slate-100 truncate">{totalTrainers}</p>
+            <p className="text-[10px] text-slate-400 truncate">Instructeurs indépendants</p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+        <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center gap-3 hover:scale-[1.015] hover:border-emerald-500/30 transition-all duration-200 overflow-hidden">
+          <div className="p-2.5 bg-emerald-500/15 text-emerald-400 rounded-xl shrink-0">
             <Star className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Étudiants totaux</p>
-            <p className="text-lg font-black text-slate-900">{totalStudents}</p>
-            <p className="text-[10px] text-slate-500">Inscrits à la plateforme</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Étudiants totaux</p>
+            <p className="text-lg font-black text-slate-100 truncate">{totalStudents}</p>
+            <p className="text-[10px] text-slate-400 truncate">Inscrits à la plateforme</p>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-3">
-          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl">
+        <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center gap-3 hover:scale-[1.015] hover:border-purple-500/30 transition-all duration-200 overflow-hidden">
+          <div className="p-2.5 bg-purple-500/15 text-purple-400 rounded-xl shrink-0">
             <BarChart3 className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-xs text-slate-400 font-medium">Inscriptions actives</p>
-            <p className="text-lg font-black text-slate-900">{totalInscriptions}</p>
-            <p className="text-[10px] text-slate-500">Moyenne: {(totalInscriptions / (totalCourses || 1)).toFixed(1)} / cours</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-slate-400 font-medium truncate">Inscriptions actives</p>
+            <p className="text-lg font-black text-slate-100 truncate">{totalInscriptions}</p>
+            <p className="text-[10px] text-slate-400 truncate">Moyenne: {(totalInscriptions / (totalCourses || 1)).toFixed(1)} / cours</p>
           </div>
         </div>
       </div>
@@ -644,9 +666,18 @@ Bonnes formations !`,
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      if (confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${u.name} ?`)) {
-                                        onDeleteUser(u.id);
-                                      }
+                                      setConfirmModal({
+                                        isOpen: true,
+                                        title: "Supprimer l'utilisateur",
+                                        message: "Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est définitive.",
+                                        itemName: `${u.name} (${u.email})`,
+                                        confirmText: "Supprimer l'utilisateur",
+                                        onConfirm: () => {
+                                          onDeleteUser(u.id);
+                                          showToast("Utilisateur supprimé !", "info");
+                                          closeConfirmModal();
+                                        }
+                                      });
                                     }}
                                     className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle cursor-pointer"
                                     title="Supprimer"
@@ -789,9 +820,22 @@ Bonnes formations !`,
                                 <Power className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => onDeleteUser(t.id)}
+                                onClick={() => {
+                                  setConfirmModal({
+                                    isOpen: true,
+                                    title: "Supprimer le formateur",
+                                    message: "Êtes-vous sûr de vouloir supprimer définitivement ce formateur ?",
+                                    itemName: `${t.name} (${t.email})`,
+                                    confirmText: "Supprimer le formateur",
+                                    onConfirm: () => {
+                                      onDeleteUser(t.id);
+                                      showToast("Formateur supprimé !", "info");
+                                      closeConfirmModal();
+                                    }
+                                  });
+                                }}
                                 title="Supprimer définitivement"
-                                className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -835,11 +879,20 @@ Bonnes formations !`,
                         const studentsCount = allEnrollments.filter(e => e.courseId === c.id && e.status === 'active').length;
                         return (
                           <tr key={c.id} className="hover:bg-slate-50/50">
-                            <td className="px-4 py-3.5 flex items-center gap-3">
-                              <img src={c.coverImage} className="w-12 h-8 rounded object-cover border border-slate-200" />
-                              <div>
-                                <p className="font-bold text-slate-800">{c.title}</p>
-                                <p className="text-[10px] text-slate-400">{c.type} • {c.price.toLocaleString('fr-FR')} XAF</p>
+                            <td className="px-4 py-3.5">
+                              <div 
+                                onClick={() => {
+                                  if (onEditCourse) onEditCourse(c);
+                                  else if (onPreviewCourse) onPreviewCourse(c);
+                                }}
+                                className="flex items-center gap-3 cursor-pointer group"
+                                title="Ouvrir la formation"
+                              >
+                                <img src={c.coverImage} className="w-12 h-8 rounded object-cover border border-slate-200 group-hover:opacity-85 transition-opacity shrink-0" />
+                                <div>
+                                  <p className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{c.title}</p>
+                                  <p className="text-[10px] text-slate-400">{c.type} • {c.price.toLocaleString('fr-FR')} XAF</p>
+                                </div>
                               </div>
                             </td>
                             <td className="px-4 py-3.5 text-slate-600 font-medium">
@@ -882,9 +935,22 @@ Bonnes formations !`,
                                 {c.status === 'published' ? 'Passer en Brouillon' : 'Publier'}
                               </button>
                               <button
-                                onClick={() => onDeleteCourse(c.id)}
+                                onClick={() => {
+                                  setConfirmModal({
+                                    isOpen: true,
+                                    title: "Supprimer la formation",
+                                    message: "Êtes-vous sûr de vouloir supprimer définitivement cette formation ?",
+                                    itemName: c.title,
+                                    confirmText: "Supprimer la formation",
+                                    onConfirm: () => {
+                                      onDeleteCourse(c.id);
+                                      showToast("Formation supprimée !", "info");
+                                      closeConfirmModal();
+                                    }
+                                  });
+                                }}
                                 title="Supprimer le cours"
-                                className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors inline-flex align-middle"
+                                className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors inline-flex align-middle cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -974,9 +1040,22 @@ Bonnes formations !`,
                                 <Power className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => onDeleteUser(s.id)}
+                                onClick={() => {
+                                  setConfirmModal({
+                                    isOpen: true,
+                                    title: "Supprimer l'étudiant",
+                                    message: "Êtes-vous sûr de vouloir supprimer définitivement la fiche de cet étudiant ?",
+                                    itemName: `${s.name} (${s.email})`,
+                                    confirmText: "Supprimer l'étudiant",
+                                    onConfirm: () => {
+                                      onDeleteUser(s.id);
+                                      showToast("Fiche étudiant supprimée !", "info");
+                                      closeConfirmModal();
+                                    }
+                                  });
+                                }}
                                 title="Supprimer définitivement"
-                                className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1101,7 +1180,20 @@ Bonnes formations !`,
                       {onDeleteCategory && (
                         <button
                           type="button"
-                          onClick={() => onDeleteCategory(cat)}
+                          onClick={() => {
+                            setConfirmModal({
+                              isOpen: true,
+                              title: "Supprimer la catégorie",
+                              message: "Êtes-vous sûr de vouloir supprimer cette catégorie ?",
+                              itemName: cat,
+                              confirmText: "Supprimer",
+                              onConfirm: () => {
+                                onDeleteCategory(cat);
+                                showToast("Catégorie supprimée !", "info");
+                                closeConfirmModal();
+                              }
+                            });
+                          }}
                           title={`Supprimer la catégorie ${cat}`}
                           className="text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
                         >
@@ -1305,6 +1397,17 @@ Bonnes formations !`,
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        itemName={confirmModal.itemName}
+        confirmText={confirmModal.confirmText}
+      />
 
     </div>
   );

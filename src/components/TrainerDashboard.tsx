@@ -5,7 +5,7 @@ import {
   Share2, Edit3, Save, ArrowUp, ArrowDown, Check, CheckCircle2, AlertCircle, 
   HelpCircle, Eye, EyeOff, Play, FileText, ExternalLink as LinkIcon, Globe, Image, Video,
   Mail, Phone, X, ChevronDown, ChevronRight, Folder, Menu, MessageSquare,
-  Upload, Download, FileSpreadsheet, FileCode, Sparkles, Search, Award, FileQuestion, BarChart2
+  Upload, Download, FileSpreadsheet, FileCode, Sparkles, Search, Award, FileQuestion, BarChart2, RefreshCw
 } from 'lucide-react';
 import { showToast } from './Toast';
 import UserProfile from './UserProfile';
@@ -14,6 +14,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firesto
 import { cleanUndefined } from '../firebaseService';
 import { QuizEditorModal } from './QuizEditorModal';
 import { TrainerQuizStatsModal } from './TrainerQuizStatsModal';
+import { ConfirmModal } from './ConfirmModal';
 
 interface TrainerDashboardProps {
   currentUser: User;
@@ -92,6 +93,25 @@ export default function TrainerDashboard({
   const [searchQuery, setSearchQuery] = useState('');
   const [studentCourseFilter, setStudentCourseFilter] = useState<string>('all');
   const [toastMessage, setToastMessage] = useState('');
+
+  // Delete Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    itemName?: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+  };
 
   // Course configuration states
   const [newCourseTitle, setNewCourseTitle] = useState('');
@@ -193,13 +213,24 @@ export default function TrainerDashboard({
   };
 
   const handleDeleteQuiz = async (quizId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce quiz ? Cette action est irréversible.")) return;
-    try {
-      await deleteDoc(doc(db, 'quizzes', quizId));
-      showToast("Quiz supprimé avec succès !", "info");
-    } catch (err: any) {
-      showToast(`Erreur lors de la suppression : ${err.message}`, "error");
-    }
+    const quiz = quizzes.find(q => q.id === quizId);
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer le quiz",
+      message: "Êtes-vous sûr de vouloir supprimer ce quiz ? Cette action est définitive.",
+      itemName: quiz ? quiz.title : `Quiz ID: ${quizId}`,
+      confirmText: "Supprimer le quiz",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'quizzes', quizId));
+          showToast("Quiz supprimé avec succès !", "info");
+        } catch (err: any) {
+          showToast(`Erreur lors de la suppression : ${err.message}`, "error");
+        } finally {
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -1044,35 +1075,55 @@ export default function TrainerDashboard({
   };
 
   const handleDeleteWebhookFromDb = async (whId: string, whName: string) => {
-    if (!confirm(`Voulez-vous vraiment supprimer le webhook "${whName}" de la base de données ?`)) return;
-    try {
-      await deleteDoc(doc(db, 'webhooks', whId));
-      setRegisteredWebhooks(prev => prev.filter(w => w.id !== whId));
-      triggerToast(`Le webhook "${whName}" a été supprimé de la plateforme et de la base de données.`, 'success');
-    } catch (err: any) {
-      triggerToast('Erreur lors de la suppression : ' + err.message, 'error');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer le webhook",
+      message: `Voulez-vous vraiment supprimer le webhook de la base de données ?`,
+      itemName: whName,
+      confirmText: "Supprimer le webhook",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'webhooks', whId));
+          setRegisteredWebhooks(prev => prev.filter(w => w.id !== whId));
+          triggerToast(`Le webhook "${whName}" a été supprimé de la plateforme et de la base de données.`, 'success');
+        } catch (err: any) {
+          triggerToast('Erreur lors de la suppression : ' + err.message, 'error');
+        } finally {
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   const handleDeleteCourseWebhook = async (courseToClean: Course) => {
-    if (!confirm(`Voulez-vous vraiment supprimer le webhook pour la formation "${courseToClean.title}" ?`)) return;
-    try {
-      await deleteDoc(doc(db, 'webhooks', `wh-${courseToClean.id}`)).catch(() => {});
-      await deleteDoc(doc(db, 'webhooks', courseToClean.id)).catch(() => {});
-      
-      const updatedCourse: Course = {
-        ...courseToClean,
-        webhookEmailKey: 'email',
-        webhookNameKey: 'name',
-        webhookUrl: 'disabled',
-        webhookDisabled: true
-      };
-      await onUpdateCourse(updatedCourse);
-      setRegisteredWebhooks(prev => prev.filter(w => w.id !== courseToClean.id && w.id !== `wh-${courseToClean.id}` && w.courseId !== courseToClean.id));
-      triggerToast(`Le webhook pour "${courseToClean.title}" a été supprimé de la plateforme et de la base de données avec succès !`, 'success');
-    } catch (err: any) {
-      triggerToast('Erreur lors de la suppression du webhook : ' + err.message, 'error');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer le webhook de la formation",
+      message: `Voulez-vous vraiment supprimer le webhook pour cette formation ?`,
+      itemName: courseToClean.title,
+      confirmText: "Supprimer le webhook",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'webhooks', `wh-${courseToClean.id}`)).catch(() => {});
+          await deleteDoc(doc(db, 'webhooks', courseToClean.id)).catch(() => {});
+          
+          const updatedCourse: Course = {
+            ...courseToClean,
+            webhookEmailKey: 'email',
+            webhookNameKey: 'name',
+            webhookUrl: 'disabled',
+            webhookDisabled: true
+          };
+          await onUpdateCourse(updatedCourse);
+          setRegisteredWebhooks(prev => prev.filter(w => w.id !== courseToClean.id && w.id !== `wh-${courseToClean.id}` && w.courseId !== courseToClean.id));
+          triggerToast(`Le webhook pour "${courseToClean.title}" a été supprimé de la plateforme et de la base de données avec succès !`, 'success');
+        } catch (err: any) {
+          triggerToast('Erreur lors de la suppression du webhook : ' + err.message, 'error');
+        } finally {
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   const handleReactivateCourseWebhook = async (courseToActivate: Course) => {
@@ -1090,40 +1141,57 @@ export default function TrainerDashboard({
   };
 
   const handleDeleteSingleWebhookLog = async (logId: string) => {
-    if (!confirm('Voulez-vous vraiment supprimer cet enregistrement du journal ?')) return;
-    try {
-      const res = await fetch(`/api/webhooks/log/${logId}`, { method: 'DELETE' });
-      if (res.ok) {
-        setWebhookLogs(prev => prev.filter(l => l.id !== logId));
-        setGlobalWebhookLogs(prev => prev.filter(l => l.id !== logId));
-        triggerToast('Log de webhook supprimé avec succès.', 'success');
-      } else {
-        triggerToast('Erreur lors de la suppression du log.', 'error');
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer l'enregistrement",
+      message: "Voulez-vous vraiment supprimer cet enregistrement du journal ?",
+      confirmText: "Supprimer",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/webhooks/log/${logId}`, { method: 'DELETE' });
+          if (res.ok) {
+            setWebhookLogs(prev => prev.filter(l => l.id !== logId));
+            setGlobalWebhookLogs(prev => prev.filter(l => l.id !== logId));
+            triggerToast('Log de webhook supprimé avec succès.', 'success');
+          } else {
+            triggerToast('Erreur lors de la suppression du log.', 'error');
+          }
+        } catch (err) {
+          triggerToast('Erreur de connexion lors de la suppression.', 'error');
+        } finally {
+          closeConfirmModal();
+        }
       }
-    } catch (err) {
-      triggerToast('Erreur de connexion lors de la suppression.', 'error');
-    }
+    });
   };
 
   const handleResetCourseWebhookConfig = async () => {
     if (!selectedCourse) return;
-    if (!confirm("Voulez-vous vraiment réinitialiser et désactiver la configuration du webhook pour cette formation ?")) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Réinitialiser la configuration Webhook",
+      message: "Voulez-vous vraiment réinitialiser et désactiver la configuration du webhook pour cette formation ?",
+      itemName: selectedCourse.title,
+      confirmText: "Réinitialiser",
+      onConfirm: async () => {
+        setEditWebhookEmailKey('email');
+        setEditWebhookNameKey('name');
 
-    setEditWebhookEmailKey('email');
-    setEditWebhookNameKey('name');
-
-    const updatedCourse: Course = {
-      ...selectedCourse,
-      webhookEmailKey: 'email',
-      webhookNameKey: 'name',
-      webhookUrl: 'disabled',
-      webhookDisabled: true
-    };
-    await onUpdateCourse(updatedCourse);
-    await deleteDoc(doc(db, 'webhooks', `wh-${selectedCourse.id}`)).catch(() => {});
-    await deleteDoc(doc(db, 'webhooks', selectedCourse.id)).catch(() => {});
-    setRegisteredWebhooks(prev => prev.filter(w => w.id !== selectedCourse.id && w.id !== `wh-${selectedCourse.id}` && w.courseId !== selectedCourse.id));
-    triggerToast("Configuration du webhook réinitialisée et supprimée pour cette formation.", "info");
+        const updatedCourse: Course = {
+          ...selectedCourse,
+          webhookEmailKey: 'email',
+          webhookNameKey: 'name',
+          webhookUrl: 'disabled',
+          webhookDisabled: true
+        };
+        await onUpdateCourse(updatedCourse);
+        await deleteDoc(doc(db, 'webhooks', `wh-${selectedCourse.id}`)).catch(() => {});
+        await deleteDoc(doc(db, 'webhooks', selectedCourse.id)).catch(() => {});
+        setRegisteredWebhooks(prev => prev.filter(w => w.id !== selectedCourse.id && w.id !== `wh-${selectedCourse.id}` && w.courseId !== selectedCourse.id));
+        triggerToast("Configuration du webhook réinitialisée et supprimée pour cette formation.", "info");
+        closeConfirmModal();
+      }
+    });
   };
 
   // Webhook settings & tester states (Requirement 2)
@@ -1158,14 +1226,24 @@ export default function TrainerDashboard({
   };
 
   const handleClearAllWebhookLogs = async () => {
-    if (!confirm("Voulez-vous vraiment effacer TOUS les journaux de Webhooks de l'application ? Cette action est irréversible.")) return;
-    try {
-      const res = await fetch('/api/webhooks/logs', { method: 'DELETE' });
-      if (res.ok) {
-        setGlobalWebhookLogs([]);
-        triggerToast("Tous les journaux ont été effacés.");
+    setConfirmModal({
+      isOpen: true,
+      title: "Vider tous les journaux Webhooks",
+      message: "Voulez-vous vraiment effacer TOUS les journaux de Webhooks de l'application ? Cette action est irréversible.",
+      confirmText: "Effacer les journaux",
+      onConfirm: async () => {
+        try {
+          const res = await fetch('/api/webhooks/logs', { method: 'DELETE' });
+          if (res.ok) {
+            setGlobalWebhookLogs([]);
+            triggerToast("Tous les journaux ont été effacés.");
+          }
+        } catch (err) {
+        } finally {
+          closeConfirmModal();
+        }
       }
-    } catch (err) {}
+    });
   };
 
   useEffect(() => {
@@ -1337,12 +1415,23 @@ export default function TrainerDashboard({
 
   const handleClearWebhookLogs = async () => {
     if (!selectedCourse) return;
-    if (!confirm("Voulez-vous vraiment effacer l'historique des webhooks pour cette formation ?")) return;
-    try {
-      await fetch(`/api/webhooks/logs/${selectedCourse.id}`, { method: 'DELETE' });
-      setWebhookLogs([]);
-      triggerToast("Historique des webhooks vidé.");
-    } catch (err) {}
+    setConfirmModal({
+      isOpen: true,
+      title: "Effacer l'historique des webhooks",
+      message: "Voulez-vous vraiment effacer l'historique des webhooks pour cette formation ?",
+      itemName: selectedCourse.title,
+      confirmText: "Effacer l'historique",
+      onConfirm: async () => {
+        try {
+          await fetch(`/api/webhooks/logs/${selectedCourse.id}`, { method: 'DELETE' });
+          setWebhookLogs([]);
+          triggerToast("Historique des webhooks vidé.");
+        } catch (err) {
+        } finally {
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   // Add module
@@ -1418,10 +1507,19 @@ export default function TrainerDashboard({
       triggerToast('Permission refusée : Vous n\'avez pas le droit de modifier les chapitres.');
       return;
     }
-    if (confirm("Voulez-vous vraiment supprimer ce module et tous les chapitres qu'il contient ?")) {
-      onDeleteModule(moduleId);
-      triggerToast("Module supprimé !");
-    }
+    const mod = allModules.find(m => m.id === moduleId);
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer le module",
+      message: "Êtes-vous sûr de vouloir supprimer ce module et tous les chapitres qu'il contient ? Cette action est définitive.",
+      itemName: mod ? mod.title : `Module ID: ${moduleId}`,
+      confirmText: "Supprimer le module",
+      onConfirm: () => {
+        onDeleteModule(moduleId);
+        triggerToast("Module supprimé !");
+        closeConfirmModal();
+      }
+    });
   };
 
   const handleDeleteChapterClick = (chapterId: string) => {
@@ -1429,10 +1527,19 @@ export default function TrainerDashboard({
       triggerToast('Permission refusée : Vous n\'avez pas le droit de modifier les chapitres.');
       return;
     }
-    if (confirm("Voulez-vous vraiment supprimer ce chapitre ?")) {
-      onDeleteChapter(chapterId);
-      triggerToast("Chapitre supprimé !");
-    }
+    const ch = allChapters.find(c => c.id === chapterId);
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer le chapitre",
+      message: "Êtes-vous sûr de vouloir supprimer définitivement ce chapitre ?",
+      itemName: ch ? ch.title : `Chapitre ID: ${chapterId}`,
+      confirmText: "Supprimer le chapitre",
+      onConfirm: () => {
+        onDeleteChapter(chapterId);
+        triggerToast("Chapitre supprimé !");
+        closeConfirmModal();
+      }
+    });
   };
 
   // Chapter editing form states
@@ -1625,7 +1732,8 @@ export default function TrainerDashboard({
         });
         return;
       }
-      alert('Cet élève est déjà inscrit à cette formation !');
+      triggerToast("L'étudiant a déjà la formation !", "error");
+      alert("L'étudiant a déjà la formation !");
       return;
     }
 
@@ -1936,27 +2044,27 @@ Le support Dekel.Formation`,
       {activeTab === 'dashboard' && (
         <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-50 border border-slate-250 p-5 rounded-2xl text-center">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total Étudiants inscrits</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{trainerStudents.length}</p>
-              <p className="text-[10px] text-slate-500 mt-1">Élèves uniques inscrits à vos cours</p>
+            <div className="bg-[#1a1e24] border border-white/10 p-3.5 sm:p-5 rounded-2xl text-center shadow-sm hover:scale-[1.015] hover:border-indigo-500/30 transition-all duration-200 overflow-hidden">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Total Étudiants inscrits</p>
+              <p className="text-3xl font-black text-slate-100 mt-1 truncate">{trainerStudents.length}</p>
+              <p className="text-[10px] text-slate-400 mt-1 truncate">Élèves uniques inscrits à vos cours</p>
             </div>
-            <div className="bg-slate-50 border border-slate-250 p-5 rounded-2xl text-center">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Formations Publiées</p>
-              <p className="text-3xl font-black text-indigo-600 mt-1">
+            <div className="bg-[#1a1e24] border border-white/10 p-3.5 sm:p-5 rounded-2xl text-center shadow-sm hover:scale-[1.015] hover:border-indigo-500/30 transition-all duration-200 overflow-hidden">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Formations Publiées</p>
+              <p className="text-3xl font-black text-indigo-400 mt-1 truncate">
                 {trainerCourses.filter(c => c.status === 'published').length}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">Sur {trainerCourses.length} cours créés au total</p>
+              <p className="text-[10px] text-slate-400 mt-1 truncate">Sur {trainerCourses.length} cours créés au total</p>
             </div>
-            <div className="bg-slate-50 border border-slate-250 p-5 rounded-2xl text-center">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Inscriptions globales actives</p>
-              <p className="text-3xl font-black text-emerald-600 mt-1">{activeEnrollments.length}</p>
-              <p className="text-[10px] text-slate-500 mt-1">Vérifications de paiement validées</p>
+            <div className="bg-[#1a1e24] border border-white/10 p-3.5 sm:p-5 rounded-2xl text-center shadow-sm hover:scale-[1.015] hover:border-emerald-500/30 transition-all duration-200 overflow-hidden">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Inscriptions globales actives</p>
+              <p className="text-3xl font-black text-emerald-400 mt-1 truncate">{activeEnrollments.length}</p>
+              <p className="text-[10px] text-slate-400 mt-1 truncate">Vérifications de paiement validées</p>
             </div>
           </div>
 
           {/* Quick list of courses progress stats */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+          <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-5 shadow-sm hover:scale-[1.005] transition-all duration-200 overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Statistiques & Complétion par formation</h3>
@@ -1993,10 +2101,14 @@ Le support Dekel.Formation`,
 
                   return (
                     <div key={course.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3.5 last:border-0 last:pb-0 gap-3">
-                      <div className="flex items-center gap-3">
-                        <img src={course.coverImage} className="w-12 h-8 rounded-lg object-cover border border-slate-200" />
+                      <div 
+                        onClick={() => { setSelectedCourseId(course.id); setActiveTab('course-editor'); }}
+                        className="flex items-center gap-3 cursor-pointer group"
+                        title="Ouvrir l'éditeur de cette formation"
+                      >
+                        <img src={course.coverImage} className="w-12 h-8 rounded-lg object-cover border border-slate-200 group-hover:opacity-85 transition-opacity" />
                         <div>
-                          <h4 className="text-xs font-bold text-slate-800">{course.title}</h4>
+                          <h4 className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{course.title}</h4>
                           <p className="text-[10px] text-slate-400">{course.status === 'published' ? 'Publiée' : 'Brouillon'} • {totalChapters} chapitre(s) • {enrolledCount} élève(s)</p>
                         </div>
                       </div>
@@ -2367,11 +2479,17 @@ Le support Dekel.Formation`,
                     
                     return (
                       <tr key={course.id} className="hover:bg-slate-50/50">
-                        <td className="px-4 py-3.5 flex items-center gap-3">
-                          <img src={course.coverImage} className="w-12 h-8 rounded object-cover border border-slate-200" />
-                          <div>
-                            <p className="font-bold text-slate-800">{course.title}</p>
-                            <p className="text-[10px] text-slate-400">{course.price.toLocaleString('fr-FR')} XAF • Créé le {new Date(course.createdAt).toLocaleDateString('fr-FR')}</p>
+                        <td className="px-4 py-3.5">
+                          <div 
+                            onClick={() => { setSelectedCourseId(course.id); setActiveTab('course-editor'); }}
+                            className="flex items-center gap-3 cursor-pointer group"
+                            title="Ouvrir l'éditeur de cette formation"
+                          >
+                            <img src={course.coverImage} className="w-12 h-8 rounded object-cover border border-slate-200 group-hover:opacity-85 transition-opacity shrink-0" />
+                            <div>
+                              <p className="font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{course.title}</p>
+                              <p className="text-[10px] text-slate-400">{course.price.toLocaleString('fr-FR')} XAF • Créé le {new Date(course.createdAt).toLocaleDateString('fr-FR')}</p>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-slate-500 font-medium">
@@ -2458,9 +2576,22 @@ Le support Dekel.Formation`,
                           </button>
                           {currentUser.role !== 'assistant' ? (
                             <button
-                              onClick={() => onDeleteCourse(course.id)}
+                              onClick={() => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: "Supprimer la formation",
+                                  message: "Êtes-vous sûr de vouloir supprimer définitivement cette formation et tout son contenu (modules, chapitres, ressources) ?",
+                                  itemName: course.title,
+                                  confirmText: "Supprimer la formation",
+                                  onConfirm: () => {
+                                    onDeleteCourse(course.id);
+                                    triggerToast("Formation supprimée avec succès !");
+                                    closeConfirmModal();
+                                  }
+                                });
+                              }}
                               title="Supprimer la formation"
-                              className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle"
+                              className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -3409,9 +3540,23 @@ Le support Dekel.Formation`,
                                 {enroll.status === 'active' ? 'Retirer accès' : 'Réactiver'}
                               </button>
                               <button
-                                onClick={() => onDeleteEnrollment(enroll.id)}
+                                onClick={() => {
+                                  const matchedCourse = allCourses.find(c => c.id === enroll.courseId);
+                                  setConfirmModal({
+                                    isOpen: true,
+                                    title: "Retirer l'étudiant de la formation",
+                                    message: "Êtes-vous sûr de vouloir supprimer cet étudiant de l'effectif de la formation ? Cette action est définitive.",
+                                    itemName: `${enroll.studentEmail} — ${matchedCourse ? matchedCourse.title : 'Formation'}`,
+                                    confirmText: "Supprimer l'étudiant",
+                                    onConfirm: () => {
+                                      onDeleteEnrollment(enroll.id);
+                                      triggerToast("Étudiant retiré de l'effectif avec succès !");
+                                      closeConfirmModal();
+                                    }
+                                  });
+                                }}
                                 title="Supprimer de l'effectif"
-                                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle"
+                                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -3758,11 +3903,15 @@ Le support Dekel.Formation`,
                   const url = `${window.location.origin}/api/webhooks/payment/${course.id}`;
                   return (
                     <div key={course.id} className="flex flex-col md:flex-row md:items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl p-3 gap-3">
-                      <div className="flex items-center gap-3">
-                        <img src={course.coverImage} className="w-10 h-7 rounded object-cover border border-slate-200 shrink-0" />
+                      <div 
+                        onClick={() => { setSelectedCourseId(course.id); setActiveTab('course-editor'); }}
+                        className="flex items-center gap-3 cursor-pointer group"
+                        title="Ouvrir l'éditeur de cette formation"
+                      >
+                        <img src={course.coverImage} className="w-10 h-7 rounded object-cover border border-slate-200 shrink-0 group-hover:opacity-85 transition-opacity" />
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="text-xs font-bold text-slate-800">{course.title}</h4>
+                            <h4 className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">{course.title}</h4>
                             <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase">Enregistré BD</span>
                           </div>
                           <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate max-w-md">{url}</p>
@@ -5171,6 +5320,17 @@ Le support Dekel.Formation`,
           onClose={() => setIsQuizStatsOpen(false)}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        itemName={confirmModal.itemName}
+        confirmText={confirmModal.confirmText}
+      />
 
     </div>
   );

@@ -31,6 +31,7 @@ import {
   Info
 } from 'lucide-react';
 import { showToast } from './Toast';
+import { ConfirmModal } from './ConfirmModal';
 
 export default function TransactionalEmailDashboard() {
   const [logs, setLogs] = useState<TransactionalEmailLog[]>([]);
@@ -56,6 +57,25 @@ export default function TransactionalEmailDashboard() {
 
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configForm, setConfigForm] = useState<Partial<EmailServerConfig>>({});
+
+  // Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    itemName?: string;
+    confirmText?: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+  };
 
   // Fetch email logs
   const fetchLogs = async () => {
@@ -119,26 +139,46 @@ export default function TransactionalEmailDashboard() {
 
   const handleDeleteEmail = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!confirm('Voulez-vous vraiment supprimer cet e-mail de l\'historique ?')) return;
-    try {
-      await fetch(`/api/emails/logs/${id}`, { method: 'DELETE' });
-      showToast('E-mail supprimé de l\'historique', 'info');
-      setLogs(prev => prev.filter(l => l.id !== id));
-      if (previewEmail?.id === id) setPreviewEmail(null);
-    } catch (err) {
-      showToast('Erreur lors de la suppression', 'error');
-    }
+    const logItem = logs.find(l => l.id === id);
+    setConfirmModal({
+      isOpen: true,
+      title: "Supprimer l'e-mail de l'historique",
+      message: "Voulez-vous vraiment supprimer cet e-mail de l'historique ?",
+      itemName: logItem ? `${logItem.subject} (à ${logItem.to})` : `E-mail ID: ${id}`,
+      confirmText: "Supprimer l'e-mail",
+      onConfirm: async () => {
+        try {
+          await fetch(`/api/emails/logs/${id}`, { method: 'DELETE' });
+          showToast('E-mail supprimé de l\'historique', 'info');
+          setLogs(prev => prev.filter(l => l.id !== id));
+          if (previewEmail?.id === id) setPreviewEmail(null);
+        } catch (err) {
+          showToast('Erreur lors de la suppression', 'error');
+        } finally {
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   const handleClearAllLogs = async () => {
-    if (!confirm('⚠️ Attention : Voulez-vous effacer TOUT l\'historique des e-mails transactionnels ?')) return;
-    try {
-      await fetch('/api/emails/logs', { method: 'DELETE' });
-      showToast('Historique des e-mails vidé avec succès', 'success');
-      setLogs([]);
-    } catch (err) {
-      showToast('Erreur lors du nettoyage de l\'historique', 'error');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Vider l'historique des e-mails",
+      message: "⚠️ Attention : Voulez-vous effacer TOUT l'historique des e-mails transactionnels ? Cette action est définitive.",
+      confirmText: "Vider tout l'historique",
+      onConfirm: async () => {
+        try {
+          await fetch('/api/emails/logs', { method: 'DELETE' });
+          showToast('Historique des e-mails vidé avec succès', 'success');
+          setLogs([]);
+        } catch (err) {
+          showToast('Erreur lors du nettoyage de l\'historique', 'error');
+        } finally {
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   const handleSendTestEmail = async (e: React.FormEvent) => {
@@ -888,6 +928,17 @@ export default function TransactionalEmailDashboard() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        itemName={confirmModal.itemName}
+        confirmText={confirmModal.confirmText}
+      />
 
     </div>
   );

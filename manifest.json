@@ -1,0 +1,16 @@
+{
+  "name": "Dekel.Formation",
+  "short_name": "DekelFormation",
+  "description": "Plateforme de formations en ligne",
+  "theme_color": "#1DB954",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

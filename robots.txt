@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://formation.dekel-dev.com/sitemap.xml

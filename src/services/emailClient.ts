@@ -1,34 +1,44 @@
 import { EmailType, EmailCategory } from '../types/email';
 
-export interface SendTransactionalEmailPayload {
+export interface SendEmailOptions {
   to: string;
   recipientName?: string;
   type: EmailType;
   category: EmailCategory;
-  renderData?: Record<string, any>;
   actionUrl?: string;
-  metadata?: Record<string, any>;
+  token?: string;
+  renderData?: Record<string, any>;
 }
 
-export async function sendTransactionalEmail(payload: SendTransactionalEmailPayload) {
+export async function sendTransactionalEmail(options: SendEmailOptions): Promise<boolean> {
   try {
-    const res = await fetch('/api/emails/send', {
+    const response = await fetch('/api/emails/queue', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        to: options.to,
+        recipientName: options.recipientName,
+        type: options.type,
+        category: options.category,
+        actionUrl: options.actionUrl,
+        token: options.token,
+        renderData: options.renderData
+      })
     });
-    return await res.json();
-  } catch (err: any) {
-    console.error('Error triggering transactional email:', err);
-    return { status: 'error', message: err.message };
+
+    const data = await response.json();
+    return data.status === 'success';
+  } catch (error) {
+    console.error('Failed to trigger transactional email client:', error);
+    return false;
   }
 }
 
-// Convenient helper dispatchers for app workflows
-export const emailClient = {
-  // Auth
+// Convenient helper methods for app components
+export const emailTriggers = {
+  // Authentication
   verifyEmail: (to: string, recipientName: string, actionUrl: string) =>
     sendTransactionalEmail({ to, recipientName, type: 'auth_verify_email', category: 'authentication', actionUrl }),
 
@@ -44,49 +54,48 @@ export const emailClient = {
   passwordChanged: (to: string, recipientName: string) =>
     sendTransactionalEmail({ to, recipientName, type: 'auth_password_changed', category: 'authentication' }),
 
-  // Courses
+  // User Management
+  userAdminCreated: (to: string, recipientName: string, roleName: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'user_admin_created', category: 'user_management', renderData: { roleName } }),
+
+  userPromotedTrainer: (to: string, recipientName: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'user_promoted_trainer', category: 'user_management' }),
+
+  userPromotedAdmin: (to: string, recipientName: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'user_promoted_admin', category: 'user_management' }),
+
+  // Enrollments
   courseEnrollment: (to: string, recipientName: string, courseTitle: string, trainerName?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'course_enrollment_confirm', category: 'courses', renderData: { courseTitle, trainerName } }),
+    sendTransactionalEmail({ to, recipientName, type: 'course_enrollment_confirm', category: 'enrollments', renderData: { courseTitle, trainerName } }),
 
   courseManualAdd: (to: string, recipientName: string, courseTitle: string, trainerName?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'course_manual_add', category: 'courses', renderData: { courseTitle, trainerName } }),
+    sendTransactionalEmail({ to, recipientName, type: 'course_manual_add', category: 'enrollments', renderData: { courseTitle, trainerName } }),
 
-  courseAccessGranted: (to: string, recipientName: string, courseTitle: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'course_access_granted', category: 'courses', renderData: { courseTitle } }),
-
-  courseAccessRevoked: (to: string, recipientName: string, courseTitle: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'course_access_revoked', category: 'courses', renderData: { courseTitle } }),
+  courseFreeAccess: (to: string, recipientName: string, courseTitle: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'course_free_access_granted', category: 'enrollments', renderData: { courseTitle } }),
 
   // Payments
-  paymentReceived: (to: string, recipientName: string, courseTitle: string, amount?: string, method?: string, transactionRef?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'payment_received', category: 'payments', renderData: { courseTitle, paymentAmount: amount, paymentMethod: method, transactionRef } }),
+  paymentInitiated: (to: string, recipientName: string, courseTitle: string, amount?: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'payment_initiated', category: 'payments', renderData: { courseTitle, paymentAmount: amount } }),
 
-  paymentValidated: (to: string, recipientName: string, courseTitle: string, amount?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'payment_validated', category: 'payments', renderData: { courseTitle, paymentAmount: amount } }),
+  paymentValidated: (to: string, recipientName: string, courseTitle: string, amount?: string, transactionRef?: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'payment_validated', category: 'payments', renderData: { courseTitle, paymentAmount: amount, transactionRef } }),
 
-  paymentFailed: (to: string, recipientName: string, courseTitle: string, amount?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'payment_failed', category: 'payments', renderData: { courseTitle, paymentAmount: amount } }),
+  // Courses & Chapters
+  newCoursePublished: (to: string, recipientName: string, courseTitle: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'course_new_published', category: 'courses', renderData: { courseTitle } }),
 
-  // Pedagogy
-  pedagogyWelcome: (to: string, recipientName: string, courseTitle: string, trainerName?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'pedagogy_course_welcome', category: 'pedagogy', renderData: { courseTitle, trainerName } }),
+  newChapterPublished: (to: string, recipientName: string, courseTitle: string, chapterTitle: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'chapter_new_published', category: 'modules_chapters', renderData: { courseTitle, chapterTitle } }),
 
-  newChapter: (to: string, recipientName: string, courseTitle: string, chapterTitle: string, moduleTitle?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'pedagogy_new_chapter', category: 'pedagogy', renderData: { courseTitle, chapterTitle, moduleTitle } }),
+  // Quizzes & Certificates
+  quizPassed: (to: string, recipientName: string, courseTitle: string, quizTitle: string, scorePercent: number) =>
+    sendTransactionalEmail({ to, recipientName, type: 'quiz_passed', category: 'quizzes', renderData: { courseTitle, quizTitle, scorePercent } }),
 
-  newModule: (to: string, recipientName: string, courseTitle: string, moduleTitle: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'pedagogy_new_module', category: 'pedagogy', renderData: { courseTitle, moduleTitle } }),
+  certificateEarned: (to: string, recipientName: string, courseTitle: string, certificateId?: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'certificate_earned', category: 'certificates', renderData: { courseTitle, certificateId } }),
 
-  courseUpdated: (to: string, recipientName: string, courseTitle: string, updateDetails?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'pedagogy_course_updated', category: 'pedagogy', renderData: { courseTitle, updateDetails } }),
-
-  // Administration
-  trainerInvitation: (to: string, recipientName: string, actionUrl: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'admin_trainer_invitation', category: 'administration', actionUrl }),
-
-  roleChanged: (to: string, recipientName: string, roleName: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'admin_role_changed', category: 'administration', renderData: { roleName } }),
-
-  accountStatus: (to: string, recipientName: string, accountStatus: string, customMessage?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'admin_account_status', category: 'administration', renderData: { accountStatus, customMessage } })
+  // Security
+  securityNewLogin: (to: string, recipientName: string, ipAddress?: string, deviceInfo?: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'security_new_login', category: 'security', renderData: { ipAddress, deviceInfo } })
 };

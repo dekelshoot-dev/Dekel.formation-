@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, UserRole, SimulatedEmail } from '../types';
 import { Mail, Key, User as UserIcon, BookOpen, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../firebase';
 import { showToast } from './Toast';
 import ResetPassword from './ResetPassword';
@@ -102,11 +102,21 @@ export default function Auth({ allUsers, onLogin, onAddUser, onSendEmail }: Auth
       // 1. Create the Firebase Auth account first
       const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
 
-      // 2. Set the display name in Auth
+      // 2. Set the display name in Auth and send email verification
       if (credential.user) {
         await updateProfile(credential.user, {
           displayName: name
         });
+
+        const actionCodeSettings = {
+          url: `${window.location.origin}?mode=verifyEmail`,
+          handleCodeInApp: true,
+        };
+        try {
+          await sendEmailVerification(credential.user, actionCodeSettings);
+        } catch (verifErr) {
+          console.warn('Firebase email verification auto-send warning:', verifErr);
+        }
       }
 
       // 3. Define complementary profile data (Default role is Student)
@@ -123,26 +133,52 @@ export default function Auth({ allUsers, onLogin, onAddUser, onSendEmail }: Auth
       // 4. Save to Firestore DB
       await onAddUser(newUser);
 
-      // Send Simulated Welcome Email
-      const welcomeEmail: SimulatedEmail = {
+      // Send Email via unified backend SMTP server (service@dekel-dev.com) & record in DB history
+      const verifyUrl = `${window.location.origin}?mode=verifyEmail&oobCode=verify_${Date.now()}&email=${encodeURIComponent(trimmedEmail)}`;
+      
+      try {
+        await fetch('/api/emails/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: trimmedEmail,
+            recipientName: name,
+            type: 'account_verification',
+            category: 'account_security',
+            renderData: {
+              recipientName: name,
+              recipientEmail: trimmedEmail,
+              actionUrl: verifyUrl
+            },
+            actionUrl: verifyUrl,
+            metadata: { userId: credential.user.uid, event: 'user_registration' }
+          })
+        });
+      } catch (smtpErr) {
+        console.warn('Backend SMTP email error:', smtpErr);
+      }
+
+      const verificationEmail: SimulatedEmail = {
         id: `em-${Date.now()}`,
         to: trimmedEmail,
-        subject: `Création de compte réussie - Plateforme Dekel.Formation`,
+        subject: `Activez votre compte - Dekel.Formation`,
         body: `Bonjour ${name},
 
-Bienvenue sur la plateforme de formation Dekel.Formation !
-Votre compte en tant qu'Étudiant a été créé avec succès.
+Bienvenue sur la plateforme Dekel.Formation !
 
-Identifiant : ${trimmedEmail}
-Vous pouvez dès à présent accéder à votre espace de travail.
+Pour activer définitivement votre compte et valider votre adresse e-mail, veuillez cliquer sur le lien d'activation ci-dessous :
+
+${verifyUrl}
+
+Si vous n'avez pas demandé la création de ce compte, vous pouvez ignorer cet e-mail.
 
 Cordialement,
 L'équipe Dekel.Formation`,
         sentAt: new Date().toISOString()
       };
-      onSendEmail(welcomeEmail);
+      onSendEmail(verificationEmail);
 
-      showToast('Compte créé avec succès !', 'success');
+      showToast('Compte créé ! Un e-mail de vérification a été envoyé par le serveur SMTP.', 'success');
       onLogin(newUser);
     } catch (err: any) {
       console.error(err);
@@ -177,39 +213,52 @@ L'équipe Dekel.Formation`,
     }
 
     const trimmedEmail = email.trim().toLowerCase();
+    const foundUser = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+    const recipientName = foundUser ? foundUser.name : trimmedEmail.split('@')[0];
 
     try {
-      // Send real reset email or simulate it for the demo system SMTP simulation
-      await sendPasswordResetEmail(auth, trimmedEmail);
-      showToast('E-mail de réinitialisation envoyé !', 'success');
-      setMessage('Un e-mail de réinitialisation de mot de passe a été envoyé par Firebase.');
-    } catch (err: any) {
-      console.error(err);
-      // Fallback email simulation if user doesn't exist yet but has database record
-      const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
-      if (found) {
-        const resetEmail: SimulatedEmail = {
-          id: `em-${Date.now()}`,
-          to: trimmedEmail,
-          subject: 'Réinitialisation de votre mot de passe (Simulation)',
-          body: `Bonjour ${found.name},
+      // Dispatch password reset via backend SMTP server (service@dekel-dev.com)
+      // Generates server-managed oobCode token & stores transaction log in DB
+      const res = await fetch('/api/auth/request-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          recipientName,
+          origin: window.location.origin
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.status === 'error') {
+        throw new Error(data.message || 'Échec de l\'envoi du lien par le serveur SMTP.');
+      }
+
+      const generatedResetUrl = data.resetUrl || `${window.location.origin}?mode=resetPassword&oobCode=${data.oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
+
+      const resetEmail: SimulatedEmail = {
+        id: `em-${Date.now()}`,
+        to: trimmedEmail,
+        subject: 'Réinitialisation de votre mot de passe - Dekel.Formation',
+        body: `Bonjour ${recipientName},
 
 Une demande de réinitialisation de mot de passe a été effectuée pour votre compte.
 Veuillez cliquer sur le lien ci-dessous pour configurer un nouveau mot de passe :
 
-https://dekel-formation.com/reset-password?token=simulated_token_${Date.now()}
+${generatedResetUrl}
 
 Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.`,
-          sentAt: new Date().toISOString()
-        };
-        onSendEmail(resetEmail);
-        setMessage('Un e-mail de réinitialisation a été simulé (voir l\'onglet "Logs Emails" en bas à gauche).');
-        showToast('E-mail de réinitialisation simulé.', 'info');
-      } else {
-        const errMsg = err.message || 'Adresse e-mail non reconnue.';
-        setError(errMsg);
-        showToast(errMsg, 'error');
-      }
+        sentAt: new Date().toISOString()
+      };
+      onSendEmail(resetEmail);
+
+      showToast('E-mail de réinitialisation avec jeton sécurisé envoyé par le serveur SMTP !', 'success');
+      setMessage('Lien de réinitialisation généré et envoyé via le serveur SMTP (enregistré en base de données).');
+    } catch (smtpErr: any) {
+      console.error(smtpErr);
+      const errMsg = smtpErr.message || 'Adresse e-mail non reconnue.';
+      setError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsLoading(false);
     }

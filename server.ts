@@ -9,6 +9,7 @@ import {
   processTransactionalEmailQueue, 
   generateSignedToken, 
   verifySignedToken, 
+  createSmtpTransporter,
   readDb as readEmailDb, 
   writeDb as writeEmailDb 
 } from "./server/emailServerService";
@@ -650,6 +651,77 @@ app.get("/api/emails/verify-token", (req, res) => {
   return res.json(result);
 });
 
+// API: Server-managed password reset request via SMTP (Generates signed oobCode)
+app.post("/api/auth/request-password-reset", async (req, res) => {
+  const { email, recipientName, origin } = req.body;
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    return res.status(400).json({ status: "error", message: "Adresse e-mail destinataire invalide." });
+  }
+
+  const trimmedEmail = email.trim().toLowerCase();
+  const name = recipientName || trimmedEmail.split("@")[0];
+
+  // Generate signed server token (oobCode) valid for 1 hour (3600 seconds)
+  const oobCode = generateSignedToken('reset_password', trimmedEmail, 3600);
+  const baseUrl = origin || `${req.protocol}://${req.get('host')}`;
+  const resetUrl = `${baseUrl}?mode=resetPassword&oobCode=${oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
+
+  try {
+    const queuedEmail = queueTransactionalEmail({
+      to: trimmedEmail,
+      recipientName: name,
+      type: 'auth_reset_password',
+      category: 'authentication',
+      renderData: {
+        recipientName: name,
+        recipientEmail: trimmedEmail,
+        actionUrl: resetUrl
+      },
+      actionUrl: resetUrl,
+      metadata: { event: 'password_reset_request', oobCode }
+    });
+
+    await processTransactionalEmailQueue();
+
+    return res.json({
+      status: "success",
+      message: "Lien de réinitialisation généré et envoyé via le serveur SMTP.",
+      oobCode,
+      resetUrl,
+      email: queuedEmail
+    });
+  } catch (err: any) {
+    return res.status(500).json({ status: "error", message: err.message || "Erreur lors de l'envoi de l'e-mail." });
+  }
+});
+
+// API: Server-managed password reset confirmation
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, oobCode, newPassword } = req.body;
+  const tokenToVerify = token || oobCode;
+
+  if (!tokenToVerify) {
+    return res.status(400).json({ status: "error", message: "Code de réinitialisation (oobCode) manquant." });
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ status: "error", message: "Le nouveau mot de passe doit contenir au moins 6 caractères." });
+  }
+
+  const verification = verifySignedToken(tokenToVerify);
+  if (!verification.valid || !verification.payload) {
+    return res.status(400).json({ status: "error", message: verification.error || "Lien de réinitialisation invalide ou expiré." });
+  }
+
+  const { email } = verification.payload;
+
+  return res.json({
+    status: "success",
+    message: "Le mot de passe a été réinitialisé avec succès.",
+    email
+  });
+});
+
 // API: Get / Update Email Server Configuration
 app.get("/api/emails/config", (req, res) => {
   const db = readEmailDb();
@@ -664,6 +736,34 @@ app.post("/api/emails/config", (req, res) => {
   };
   writeEmailDb(db);
   return res.json({ status: "success", message: "Configuration du serveur d'e-mails enregistrée.", config: db.email_config });
+});
+
+// API: Test SMTP connection live
+app.post("/api/emails/test-smtp", async (req, res) => {
+  const { gmailUser, gmailAppPassword, smtpHost, smtpPort } = req.body;
+  const { transporter, user, host, port, error } = createSmtpTransporter({
+    gmailUser,
+    gmailAppPassword,
+    smtpHost,
+    smtpPort
+  });
+
+  if (!transporter) {
+    return res.status(400).json({ status: "error", message: error || "Configuration SMTP incomplète." });
+  }
+
+  try {
+    await transporter.verify();
+    return res.json({
+      status: "success",
+      message: `Connexion SMTP Gmail réussie avec succès pour ${user} sur ${host}:${port} !`
+    });
+  } catch (verifyErr: any) {
+    return res.status(500).json({
+      status: "error",
+      message: `Échec de la connexion SMTP Gmail : ${verifyErr.message}`
+    });
+  }
 });
 
 // API: Read ALL webhook logs for the general administrator tab

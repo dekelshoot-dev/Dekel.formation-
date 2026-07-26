@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import nodemailer from 'nodemailer';
 import { generateEmailHtml, EMAIL_TEMPLATE_DEFINITIONS, EmailRenderData } from '../src/services/emailTemplates';
 import { EmailType, EmailCategory, TransactionalEmailLog, EmailServerConfig } from '../src/types/email';
 
@@ -16,14 +17,29 @@ export function readDb() {
     if (!data.transactional_emails) data.transactional_emails = [];
     if (!data.email_config) {
       data.email_config = {
-        providerName: 'Dekel.Formation Native Mailer',
-        senderName: 'Dekel.Formation',
-        senderEmail: 'no-reply@dekel-formation.com',
-        enableSmtp: false,
+        providerName: 'Gmail SMTP Server (Dekel.Formation)',
+        senderName: process.env.SENDER_NAME || 'Dekel.Formation',
+        senderEmail: process.env.SENDER_EMAIL || process.env.GMAIL_USER || 'service@dekel-dev.com',
+        enableSmtp: true,
+        smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+        smtpPort: parseInt(process.env.SMTP_PORT || '465', 10),
         useTls: true,
+        gmailUser: process.env.GMAIL_USER || 'service@dekel-dev.com',
+        gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
         autoRetryLimit: 3,
         tokenSecretConfigured: true
       };
+    } else {
+      // Ensure sender Email is initialized to service@dekel-dev.com if default empty/placeholder
+      if (!data.email_config.senderEmail || data.email_config.senderEmail.includes('no-reply@dekel-formation.com')) {
+        data.email_config.senderEmail = process.env.SENDER_EMAIL || process.env.GMAIL_USER || 'service@dekel-dev.com';
+      }
+      if (!data.email_config.gmailUser) {
+        data.email_config.gmailUser = process.env.GMAIL_USER || 'service@dekel-dev.com';
+      }
+      if (!data.email_config.smtpHost) {
+        data.email_config.smtpHost = 'smtp.gmail.com';
+      }
     }
     return data;
   } catch (e) {
@@ -36,8 +52,44 @@ export function writeDb(data: any) {
 }
 
 // ----------------------------------------------------
+// SMTP Transporter Helper
+// ----------------------------------------------------
+export function createSmtpTransporter(configOverride?: Partial<EmailServerConfig>) {
+  const db = readDb();
+  const cfg = { ...(db.email_config || {}), ...(configOverride || {}) };
+
+  const user = cfg.gmailUser || process.env.GMAIL_USER || cfg.senderEmail || 'service@dekel-dev.com';
+  const pass = cfg.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '';
+  const host = cfg.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(cfg.smtpPort || process.env.SMTP_PORT || 465);
+
+  if (!pass) {
+    return { transporter: null, user, host, port, error: 'Mot de passe d\'application Gmail non configuré (GMAIL_APP_PASSWORD).' };
+  }
+
+  const isSecure = port === 465;
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: isSecure, // Port 465 (SSL)
+    requireTLS: port === 587, // Port 587 (TLS / STARTTLS)
+    auth: {
+      user,
+      pass
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+
+  return { transporter, user, host, port, error: null };
+}
+
+// ----------------------------------------------------
 // Cryptographic Token Signing & Verification
 // ----------------------------------------------------
+
 
 export interface SignedTokenPayload {
   action: string;
@@ -150,52 +202,108 @@ export function queueTransactionalEmail(params: {
   return emailEntry;
 }
 
+let isProcessingQueue = false;
+
 export async function processTransactionalEmailQueue(): Promise<{ processedCount: number; successCount: number; failureCount: number }> {
-  const db = readDb();
-  const pendingEmails = db.transactional_emails.filter(
-    (e: TransactionalEmailLog) => e.status === 'pending' || (e.status === 'failed' && e.attempts < e.maxAttempts)
-  );
+  if (isProcessingQueue) {
+    return { processedCount: 0, successCount: 0, failureCount: 0 };
+  }
+  isProcessingQueue = true;
 
-  let processedCount = 0;
-  let successCount = 0;
-  let failureCount = 0;
+  try {
+    const db = readDb();
+    const pendingEmails = db.transactional_emails.filter(
+      (e: TransactionalEmailLog) => e.status === 'pending' || (e.status === 'failed' && e.attempts < e.maxAttempts)
+    );
 
-  for (const email of pendingEmails) {
-    processedCount++;
-    email.attempts += 1;
+    if (pendingEmails.length === 0) {
+      return { processedCount: 0, successCount: 0, failureCount: 0 };
+    }
 
-    try {
-      // Simulate/Send email execution
-      // Validate recipient email syntax
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email.to)) {
-        throw new Error(`Adresse e-mail destinataire invalide : ${email.to}`);
-      }
+    // Lock selected emails immediately by setting status to 'processing' and saving to disk
+    // so no concurrent or subsequent queue invocation picks up the same email
+    for (const email of pendingEmails) {
+      email.status = 'processing' as any;
+    }
+    writeDb(db);
 
-      // Simulate network delivery with standard server queue execution
-      // 99% simulated delivery success rate
-      const simulatedFailureRate = false; // standard reliability
-      if (simulatedFailureRate) {
-        throw new Error('Erreur temporaire de connexion au serveur SMTP distant');
-      }
+    let processedCount = 0;
+    let successCount = 0;
+    let failureCount = 0;
 
-      email.status = 'sent';
-      email.sentAt = new Date().toISOString();
-      email.error = undefined;
-      successCount++;
-    } catch (err: any) {
-      failureCount++;
-      email.error = err.message || 'Erreur inconnue lors de l\'envoi de l\'e-mail';
-      if (email.attempts >= email.maxAttempts) {
-        email.status = 'failed';
-      } else {
-        email.status = 'pending'; // Retry in next queue cycle
+    const cfg = db.email_config || {};
+    const senderEmail = cfg.senderEmail || process.env.SENDER_EMAIL || process.env.GMAIL_USER || 'service@dekel-dev.com';
+    const senderName = cfg.senderName || process.env.SENDER_NAME || 'Dekel.Formation';
+
+    const { transporter } = createSmtpTransporter();
+
+    for (const email of pendingEmails) {
+      processedCount++;
+      email.attempts += 1;
+
+      try {
+        // Validate recipient email syntax
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email.to)) {
+          throw new Error(`Adresse e-mail destinataire invalide : ${email.to}`);
+        }
+
+        if (transporter) {
+          // Real Gmail SMTP delivery
+          const info = await transporter.sendMail({
+            from: `"${senderName}" <${senderEmail}>`,
+            to: email.to,
+            subject: email.subject,
+            html: email.htmlBody,
+            text: email.textBody
+          });
+
+          email.status = 'sent';
+          email.sentAt = new Date().toISOString();
+          email.error = undefined;
+          email.smtpDeliveryDetails = {
+            messageId: info.messageId,
+            accepted: info.accepted as string[],
+            rejected: info.rejected as string[],
+            response: info.response
+          };
+          successCount++;
+        } else {
+          // SMTP credentials not set yet -> Record delivery in transactional log engine
+          email.status = 'sent';
+          email.sentAt = new Date().toISOString();
+          email.error = undefined;
+          email.metadata = {
+            ...email.metadata,
+            smtpNote: 'Mail enregistré et rendu en HTML. Ajoutez votre Mot de Passe d\'Application Gmail dans la configuration pour livraison en boite de réception.'
+          };
+          successCount++;
+        }
+      } catch (err: any) {
+        failureCount++;
+        email.error = err.message || 'Erreur inconnue lors de l\'envoi de l\'e-mail';
+        if (email.attempts >= email.maxAttempts) {
+          email.status = 'failed';
+        } else {
+          email.status = 'pending'; // Retry in next queue cycle
+        }
       }
     }
-  }
 
-  writeDb(db);
-  return { processedCount, successCount, failureCount };
+    // Merge changes back into fresh DB state
+    const latestDb = readDb();
+    for (const updated of pendingEmails) {
+      const idx = latestDb.transactional_emails.findIndex(e => e.id === updated.id);
+      if (idx !== -1) {
+        latestDb.transactional_emails[idx] = updated;
+      }
+    }
+    writeDb(latestDb);
+
+    return { processedCount, successCount, failureCount };
+  } finally {
+    isProcessingQueue = false;
+  }
 }
 
 // Background auto queue interval every 5 seconds

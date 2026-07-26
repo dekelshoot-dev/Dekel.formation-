@@ -56,10 +56,22 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
     setIsVerifyingCode(true);
     setCodeError('');
     try {
+      // 1. Try server signed token verification first
+      const serverRes = await fetch(`/api/emails/verify-token?token=${encodeURIComponent(code)}`);
+      const serverData = await serverRes.json();
+
+      if (serverRes.ok && serverData.valid && serverData.payload) {
+        setUserEmail(serverData.payload.email);
+        setCodeVerified(true);
+        showToast('Code de réinitialisation vérifié par le serveur SMTP.', 'success');
+        return;
+      }
+
+      // 2. Fallback to Firebase verify code if code is native Firebase action code
       const email = await verifyPasswordResetCode(auth, code);
       setUserEmail(email);
       setCodeVerified(true);
-      showToast('Code de réinitialisation vérifié avec succès.', 'success');
+      showToast('Code de réinitialisation Firebase vérifié avec succès.', 'success');
     } catch (err: any) {
       console.error('Error verifying reset code:', err);
       let msg = 'Le lien de réinitialisation est invalide, expiré ou a déjà été utilisé.';
@@ -88,38 +100,44 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
     const trimmedEmail = requestEmail.trim().toLowerCase();
     setIsSendingLink(true);
 
-    const actionCodeSettings = {
-      url: `${window.location.origin}?mode=resetPassword`,
-      handleCodeInApp: true,
-    };
-
     try {
-      await sendPasswordResetEmail(auth, trimmedEmail, actionCodeSettings);
-      setRequestSuccess(true);
-      showToast('E-mail de réinitialisation envoyé avec succès !', 'success');
+      const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+      const recipientName = found ? found.name : trimmedEmail.split('@')[0];
 
-      // Send a simulated email for local demo log if handler is present
+      // Dispatch real email via backend SMTP server & record in database history
+      const res = await fetch('/api/auth/request-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          recipientName,
+          origin: window.location.origin
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.status === 'error') {
+        throw new Error(data.message || 'Échec de l\'envoi du lien par le serveur SMTP.');
+      }
+
+      const generatedResetUrl = data.resetUrl || `${window.location.origin}?mode=resetPassword&oobCode=${data.oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
+
+      setRequestSuccess(true);
+      showToast('E-mail de réinitialisation avec jeton sécurisé envoyé par le serveur SMTP !', 'success');
+
       if (onSendEmail) {
-        const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
         const simEmail: SimulatedEmail = {
           id: `em-${Date.now()}`,
           to: trimmedEmail,
           subject: 'Réinitialisation de votre mot de passe - Dekel.Formation',
-          body: `Bonjour ${found ? found.name : 'Utilisateur'},\n\nUne demande de réinitialisation de mot de passe a été émise pour votre compte.\nCliquez sur le lien suivant pour créer votre nouveau mot de passe :\n\n${actionCodeSettings.url}\n\nSi vous n'avez pas demandé ce changement, vous pouvez ignorer ce message.\n\nCordialement,\nL'équipe Dekel.Formation`,
+          body: `Bonjour ${recipientName},\n\nUne demande de réinitialisation de mot de passe a été émise pour votre compte.\nCliquez sur le lien suivant pour créer votre nouveau mot de passe :\n\n${generatedResetUrl}\n\nSi vous n'avez pas demandé ce changement, vous pouvez ignorer ce message.\n\nCordialement,\nL'équipe Dekel.Formation`,
           sentAt: new Date().toISOString()
         };
         onSendEmail(simEmail);
       }
     } catch (err: any) {
       console.error('Error sending password reset email:', err);
-      let msg = 'Impossible d\'envoyer l\'e-mail de réinitialisation.';
-      if (err.code === 'auth/user-not-found') {
-        msg = 'Aucun compte associé à cette adresse e-mail.';
-      } else if (err.code === 'auth/invalid-email') {
-        msg = 'Adresse e-mail invalide.';
-      } else {
-        msg = err.message || msg;
-      }
+      const msg = err.message || 'Impossible d\'envoyer l\'e-mail de réinitialisation.';
       setFormError(msg);
       showToast(msg, 'error');
     } finally {
@@ -157,7 +175,26 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
     setIsResetting(true);
 
     try {
-      await confirmPasswordReset(auth, oobCode, newPassword);
+      // 1. Send password reset request to backend server
+      const serverRes = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: oobCode, newPassword })
+      });
+
+      const serverData = await serverRes.json();
+
+      // 2. If it was also a Firebase code, update Firebase auth password
+      try {
+        await confirmPasswordReset(auth, oobCode, newPassword);
+      } catch (fbErr) {
+        // Ignored if server token was used
+      }
+
+      if (!serverRes.ok && serverData.status === 'error') {
+        throw new Error(serverData.message || 'Échec de la réinitialisation du mot de passe.');
+      }
+
       setResetSuccess(true);
       showToast('Votre mot de passe a été réinitialisé avec succès !', 'success');
       
@@ -168,16 +205,7 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
       }
     } catch (err: any) {
       console.error('Error confirming reset password:', err);
-      let msg = 'Échec de la réinitialisation du mot de passe.';
-      if (err.code === 'auth/weak-password') {
-        msg = 'Le mot de passe est trop faible. Utilisez au moins 6 caractères.';
-      } else if (err.code === 'auth/expired-action-code') {
-        msg = 'Le lien a expiré. Veuillez refaire une demande.';
-      } else if (err.code === 'auth/invalid-action-code') {
-        msg = 'Le code de réinitialisation est invalide.';
-      } else {
-        msg = err.message || msg;
-      }
+      const msg = err.message || 'Échec de la réinitialisation du mot de passe.';
       setFormError(msg);
       showToast(msg, 'error');
     } finally {

@@ -9,6 +9,7 @@ import {
 // Modular Components
 import Auth from './components/Auth';
 import ResetPassword from './components/ResetPassword';
+import VerifyEmail from './components/VerifyEmail';
 import AdminDashboard from './components/AdminDashboard';
 import TrainerDashboard from './components/TrainerDashboard';
 import StudentDashboard from './components/StudentDashboard';
@@ -135,17 +136,22 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [activeCoursePlayer, setActiveCoursePlayer] = useState<Course | null>(null);
-  const [visitorTab, setVisitorTab] = useState<'catalog' | 'auth' | 'reset-password'>('catalog');
+  const [visitorTab, setVisitorTab] = useState<'catalog' | 'auth' | 'reset-password' | 'verify-email'>('catalog');
+  const [showVerifyEmailPage, setShowVerifyEmailPage] = useState<boolean>(false);
   const [studentTab, setStudentTab] = useState<'my-space' | 'catalog' | 'profile'>('my-space');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [autoOpenCourseSlug, setAutoOpenCourseSlug] = useState('');
 
-  // Auto-detect password reset query parameters from Firebase Auth link or direct route
+  // Auto-detect password reset or email verification query parameters from Firebase Auth link or direct route
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const code = searchParams.get('oobCode');
     const mode = searchParams.get('mode');
-    if (code || mode === 'resetPassword' || window.location.pathname.includes('reset-password')) {
+
+    if (mode === 'verifyEmail' || mode === 'verifyEmailCode' || mode === 'select' || (code && mode === 'verifyEmail') || window.location.pathname.includes('verify-email')) {
+      setShowVerifyEmailPage(true);
+      setVisitorTab('verify-email');
+    } else if (code || mode === 'resetPassword' || window.location.pathname.includes('reset-password')) {
       setVisitorTab('reset-password');
     }
   }, []);
@@ -876,6 +882,18 @@ Bon apprentissage.`,
               ) : false)
             }
           />
+        ) : showVerifyEmailPage ? (
+          <VerifyEmail
+            currentUser={currentUser}
+            onBackToLogin={() => {
+              setShowVerifyEmailPage(false);
+              setVisitorTab('auth');
+            }}
+            onGoToDashboard={() => {
+              setShowVerifyEmailPage(false);
+              if (!currentUser) setVisitorTab('auth');
+            }}
+          />
         ) : (
           <>
             {/* 1. VISITOR VIEW (Unauthenticated) */}
@@ -911,6 +929,13 @@ Bon apprentissage.`,
                     allUsers={allUsers}
                     onBackToLogin={() => setVisitorTab('auth')}
                     onSendEmail={handleSendEmail}
+                  />
+                )}
+                {visitorTab === 'verify-email' && (
+                  <VerifyEmail
+                    currentUser={currentUser}
+                    onBackToLogin={() => setVisitorTab('auth')}
+                    onGoToDashboard={() => setVisitorTab('auth')}
                   />
                 )}
               </div>

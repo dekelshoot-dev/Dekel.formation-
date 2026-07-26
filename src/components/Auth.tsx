@@ -4,6 +4,7 @@ import { Mail, Key, User as UserIcon, BookOpen, ChevronRight, AlertCircle, Spark
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import { showToast } from './Toast';
+import ResetPassword from './ResetPassword';
 
 interface AuthProps {
   allUsers: User[];
@@ -215,6 +216,16 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mai
   };
 
 
+  if (mode === 'forgot') {
+    return (
+      <ResetPassword
+        onBackToLogin={() => { setMode('login'); setError(''); setMessage(''); }}
+        onSendEmail={onSendEmail}
+        allUsers={allUsers}
+      />
+    );
+  }
+
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md glass border border-white/10 shadow-2xl rounded-3xl overflow-hidden p-8 relative text-white">
@@ -227,9 +238,7 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mai
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Dekel.<span className="text-indigo-400">Formation</span></h1>
           <p className="text-slate-400 mt-1 text-sm">
-            {mode === 'login' && 'Connexion à votre espace de formation'}
-            {mode === 'register' && 'Rejoindre la plateforme en ligne'}
-            {mode === 'forgot' && 'Récupérer l\'accès à votre compte'}
+            {mode === 'login' ? 'Connexion à votre espace de formation' : 'Rejoindre la plateforme en ligne'}
           </p>
         </div>
 
@@ -449,62 +458,6 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mai
                 className="text-indigo-400 font-bold hover:underline"
               >
                 Se connecter
-              </button>
-            </div>
-          </form>
-        )}
-
-        {mode === 'forgot' && (
-          <form onSubmit={handleForgot} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Saisissez votre e-mail</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-                  <Mail className="w-4 h-4" />
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="sophie.eleve@gmail.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-450 text-sm focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full accent-gradient hover:opacity-95 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
-            >
-              {isLoading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Envoi en cours...</span>
-                </>
-              ) : (
-                <>
-                  <span>Envoyer les instructions</span>
-                  <ChevronRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-
-            <div className="text-center pt-4 border-t border-white/10 text-sm text-slate-300 flex justify-between items-center">
-              <button
-                type="button"
-                onClick={() => { setMode('login'); setError(''); setMessage(''); }}
-                className="text-indigo-400 hover:underline font-bold"
-              >
-                Retour à la connexion
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode('register'); setError(''); setMessage(''); }}
-                className="text-slate-400 hover:underline"
-              >
-                Créer un compte
               </button>
             </div>
           </form>

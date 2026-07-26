@@ -8,6 +8,7 @@ import {
 
 // Modular Components
 import Auth from './components/Auth';
+import ResetPassword from './components/ResetPassword';
 import AdminDashboard from './components/AdminDashboard';
 import TrainerDashboard from './components/TrainerDashboard';
 import StudentDashboard from './components/StudentDashboard';
@@ -18,7 +19,7 @@ import { ToastContainer, showToast } from './components/Toast';
 import GlobalOverflowPopover from './components/GlobalOverflowPopover';
 
 // Icons
-import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Menu, X, User as UserIcon } from 'lucide-react';
+import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Menu, X, User as UserIcon, KeyRound } from 'lucide-react';
 
 // Firebase
 import { onSnapshot, collection, doc, getDoc, setDoc, collectionGroup } from 'firebase/firestore';
@@ -134,10 +135,20 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [activeCoursePlayer, setActiveCoursePlayer] = useState<Course | null>(null);
-  const [visitorTab, setVisitorTab] = useState<'catalog' | 'auth'>('catalog');
+  const [visitorTab, setVisitorTab] = useState<'catalog' | 'auth' | 'reset-password'>('catalog');
   const [studentTab, setStudentTab] = useState<'my-space' | 'catalog' | 'profile'>('my-space');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [autoOpenCourseSlug, setAutoOpenCourseSlug] = useState('');
+
+  // Auto-detect password reset query parameters from Firebase Auth link or direct route
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('oobCode');
+    const mode = searchParams.get('mode');
+    if (code || mode === 'resetPassword' || window.location.pathname.includes('reset-password')) {
+      setVisitorTab('reset-password');
+    }
+  }, []);
 
   // Dynamic SEO URL Router & Meta Tags Injector (Requirement 26)
   useEffect(() => {
@@ -870,7 +881,7 @@ Bon apprentissage.`,
             {/* 1. VISITOR VIEW (Unauthenticated) */}
             {!currentUser && (
               <div className="space-y-6">
-                {visitorTab === 'catalog' ? (
+                {visitorTab === 'catalog' && (
                   <Marketplace
                     allCourses={allCourses}
                     allModules={allModules}
@@ -886,11 +897,19 @@ Bon apprentissage.`,
                     autoOpenSlug={autoOpenCourseSlug}
                     onClearAutoOpen={() => setAutoOpenCourseSlug('')}
                   />
-                ) : (
+                )}
+                {visitorTab === 'auth' && (
                   <Auth
                     allUsers={allUsers}
                     onLogin={handleLogin}
                     onAddUser={handleAddUser}
+                    onSendEmail={handleSendEmail}
+                  />
+                )}
+                {visitorTab === 'reset-password' && (
+                  <ResetPassword
+                    allUsers={allUsers}
+                    onBackToLogin={() => setVisitorTab('auth')}
                     onSendEmail={handleSendEmail}
                   />
                 )}
@@ -1156,6 +1175,15 @@ Bon apprentissage.`,
                     >
                       <LogIn className="w-4 h-4" />
                       <span>Se connecter</span>
+                    </button>
+                    <button
+                      onClick={() => { setVisitorTab('reset-password'); setIsMobileDrawerOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                        visitorTab === 'reset-password' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      <span>Mot de passe oublié</span>
                     </button>
                   </>
                 )}

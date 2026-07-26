@@ -125,7 +125,7 @@ export default function Auth({ allUsers, onLogin, onAddUser, onSendEmail }: Auth
         email: trimmedEmail,
         name,
         role: 'student',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        avatarUrl: 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png',
         createdAt: new Date().toISOString(),
         status: 'active'
       };

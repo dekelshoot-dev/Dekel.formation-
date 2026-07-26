@@ -11,7 +11,7 @@ interface UserProfileProps {
 }
 
 export default function UserProfile({ currentUser, onUpdateUser }: UserProfileProps) {
-  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150');
+  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png');
   const [name, setName] = useState(currentUser.name || '');
   const [firstName, setFirstName] = useState(currentUser.firstName || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
@@ -121,7 +121,7 @@ export default function UserProfile({ currentUser, onUpdateUser }: UserProfilePr
             src={avatarUrl} 
             alt="Aperçu avatar" 
             className="w-16 h-16 rounded-full object-cover border-2 border-indigo-500/30 shadow-md"
-            onError={() => setAvatarUrl('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150')}
+            onError={() => setAvatarUrl('https://cdn-icons-png.flaticon.com/512/3177/3177465.png')}
           />
           <div className="flex-1 w-full space-y-1.5">
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">Photo de Profil (URL)</label>

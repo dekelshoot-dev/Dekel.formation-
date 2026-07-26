@@ -158,7 +158,7 @@ export default function AdminDashboard({
       email: emailTrimmed,
       name: newTrainerName,
       role: 'trainer',
-      avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+      avatarUrl: 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png',
       createdAt: new Date().toISOString(),
       status: 'active'
     };
@@ -1332,7 +1332,7 @@ Bonnes formations !`,
             
             <div className="text-center space-y-3">
               <img 
-                src={viewingUserProfile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                src={viewingUserProfile.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'} 
                 alt={viewingUserProfile.name} 
                 className="w-20 h-20 rounded-full object-cover border-4 border-red-500/20 shadow-md mx-auto"
               />

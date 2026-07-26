@@ -330,7 +330,7 @@ export default function App() {
               email: email,
               name: detectedName,
               role: role,
-              avatarUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+              avatarUrl: firebaseUser.photoURL || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png',
               createdAt: new Date().toISOString(),
               status: 'active'
             };
@@ -1147,7 +1147,7 @@ Bon apprentissage.`,
                 {currentUser ? (
                   <div className="flex items-center gap-2">
                     <img 
-                      src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                      src={currentUser.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'} 
                       alt={currentUser.name} 
                       className="w-9 h-9 rounded-full object-cover border border-slate-200" 
                     />

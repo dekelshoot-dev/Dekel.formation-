@@ -851,7 +851,7 @@ export function ChapterCommentsComponent({ currentUser, chapterId }: ChapterComm
                 {/* Parent comment */}
                 <div className="flex gap-2.5 items-start">
                   <img
-                    src={comment.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                    src={comment.userAvatar || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'}
                     alt={comment.userName}
                     className="w-7 h-7 rounded-full object-cover border border-white/10"
                   />
@@ -902,7 +902,7 @@ export function ChapterCommentsComponent({ currentUser, chapterId }: ChapterComm
                     {replies.map((reply) => (
                       <div key={reply.id} className="flex gap-2.5 items-start animate-fade-in">
                         <img
-                          src={reply.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                          src={reply.userAvatar || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'}
                           alt={reply.userName}
                           className="w-6 h-6 rounded-full object-cover border border-white/10"
                         />

@@ -3483,7 +3483,7 @@ Le support Dekel.Formation`,
                             <td className="px-4 py-3.5">
                               <div className="flex items-center gap-2">
                                 <img 
-                                  src={matchedStudent?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                                  src={matchedStudent?.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'} 
                                   alt="Avatar" 
                                   className="w-7 h-7 rounded-full object-cover border border-slate-200" 
                                 />
@@ -5132,7 +5132,7 @@ Le support Dekel.Formation`,
             
             <div className="text-center space-y-3">
               <img 
-                src={viewingUserProfile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                src={viewingUserProfile.avatarUrl || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'} 
                 alt={viewingUserProfile.name} 
                 className="w-20 h-20 rounded-full object-cover border-4 border-indigo-500/20 shadow-md mx-auto"
               />

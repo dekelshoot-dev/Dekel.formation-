@@ -123,16 +123,19 @@ export default function TransactionalEmailDashboard() {
   };
 
   // Fetch email logs
-  const fetchLogs = async () => {
+  const fetchLogs = async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const res = await fetch('/api/emails/logs');
+      if (!res.ok) return;
       const data = await res.json();
-      setLogs(data.logs || []);
+      if (data && Array.isArray(data.logs)) {
+        setLogs(data.logs);
+      }
     } catch (err) {
-      console.error('Failed to fetch email logs:', err);
+      // Ignore transient network errors during background polling
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
@@ -143,52 +146,56 @@ export default function TransactionalEmailDashboard() {
         fetch('/api/emails/templates'),
         fetch('/api/emails/config')
       ]);
-      const tplData = await tplRes.json();
-      const cfgData = await cfgRes.json();
       
-      const loadedTpls: EmailTemplateDefinition[] = tplData.templates || EMAIL_TEMPLATE_DEFINITIONS;
-      setTemplates(loadedTpls);
+      if (tplRes.ok) {
+        const tplData = await tplRes.json();
+        const loadedTpls: EmailTemplateDefinition[] = tplData.templates || EMAIL_TEMPLATE_DEFINITIONS;
+        setTemplates(loadedTpls);
+      }
 
-      const cfg: EmailServerConfig = cfgData.config || {};
-      setServerConfig(cfg);
+      if (cfgRes.ok) {
+        const cfgData = await cfgRes.json();
+        const cfg: EmailServerConfig = cfgData.config || {};
+        setServerConfig(cfg);
 
-      setSmtpForm({
-        senderName: cfg.senderName || 'Dekel.Formation',
-        senderEmail: cfg.senderEmail || 'service@dekel-dev.com',
-        gmailUser: cfg.gmailUser || 'service@dekel-dev.com',
-        gmailAppPassword: cfg.gmailAppPassword || '',
-        smtpHost: cfg.smtpHost || 'smtp.gmail.com',
-        smtpPort: cfg.smtpPort || 465,
-        autoRetryLimit: cfg.autoRetryLimit || 3
-      });
+        setSmtpForm({
+          senderName: cfg.senderName || 'Dekel.Formation',
+          senderEmail: cfg.senderEmail || 'service@dekel-dev.com',
+          gmailUser: cfg.gmailUser || 'service@dekel-dev.com',
+          gmailAppPassword: cfg.gmailAppPassword || '',
+          smtpHost: cfg.smtpHost || 'smtp.gmail.com',
+          smtpPort: cfg.smtpPort || 465,
+          autoRetryLimit: cfg.autoRetryLimit || 3
+        });
 
-      // Initialize default trigger rules if missing
-      const initialRules: Record<string, NotificationTriggerConfig> = cfg.triggerRules || {};
-      loadedTpls.forEach(t => {
-        if (!initialRules[t.type]) {
-          initialRules[t.type] = {
-            type: t.type,
-            category: t.category,
-            name: t.name,
-            enabled: true,
-            subject: t.defaultSubject,
-            recipients: t.defaultRecipients || ['student'],
-            delayMinutes: 0
-          };
-        }
-      });
-      setTriggerRules(initialRules);
+        // Initialize default trigger rules if missing
+        const initialRules: Record<string, NotificationTriggerConfig> = cfg.triggerRules || {};
+        EMAIL_TEMPLATE_DEFINITIONS.forEach(t => {
+          if (!initialRules[t.type]) {
+            initialRules[t.type] = {
+              type: t.type,
+              category: t.category,
+              name: t.name,
+              enabled: true,
+              subject: t.defaultSubject,
+              recipients: t.defaultRecipients || ['student'],
+              delayMinutes: 0
+            };
+          }
+        });
+        setTriggerRules(initialRules);
+      }
 
     } catch (err) {
-      console.error('Failed to fetch metadata:', err);
+      // Soft handling for metadata fetch
     }
   };
 
   useEffect(() => {
-    fetchLogs();
+    fetchLogs(true);
     fetchMetadata();
 
-    const interval = setInterval(fetchLogs, 4000);
+    const interval = setInterval(() => fetchLogs(false), 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -464,7 +471,7 @@ export default function TransactionalEmailDashboard() {
           </button>
 
           <button
-            onClick={fetchLogs}
+            onClick={() => fetchLogs(true)}
             className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all"
             title="Rafraîchir"
           >
@@ -1205,7 +1212,7 @@ export default function TransactionalEmailDashboard() {
                   {logs.length} journal(x) en base
                 </span>
                 <button
-                  onClick={fetchLogs}
+                  onClick={() => fetchLogs(true)}
                   className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all"
                   title="Rafraîchir les journaux"
                 >

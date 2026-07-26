@@ -401,49 +401,73 @@ export async function runSmtpDiagnostic(options?: {
     recommendations.push(`Impossible de résoudre l'hôte DNS ${host}. Vérifiez la connexion Internet et les résolveurs DNS.`);
   }
 
-  // 2. TCP Socket Connection Check
-  let tcpResult: { success: boolean; localAddress?: string; remoteAddress?: string; durationMs?: number; error?: string } = { success: false };
-  if (dnsResult.success) {
-    log(`🔌 Test de socket TCP brut vers ${host}:${port}...`);
-    const tcpStart = Date.now();
-    await new Promise<void>((resolve) => {
+  // Helper for TCP Port Testing
+  const checkPort = (testHost: string, testPort: number, timeoutMs = 5000) => {
+    return new Promise<{ success: boolean; durationMs?: number; error?: string; localAddress?: string; remoteAddress?: string }>((resolve) => {
+      const tcpStart = Date.now();
       const socket = new net.Socket();
-      socket.setTimeout(6000);
+      socket.setTimeout(timeoutMs);
 
-      socket.connect(port, host, () => {
+      socket.connect(testPort, testHost, () => {
         const durationMs = Date.now() - tcpStart;
-        tcpResult = {
+        const res = {
           success: true,
           localAddress: socket.localAddress,
           remoteAddress: socket.remoteAddress,
           durationMs
         };
-        log(`✅ Socket TCP connecté avec succès à ${socket.remoteAddress}:${port} (${durationMs}ms)`);
         socket.destroy();
-        resolve();
+        resolve(res);
       });
 
       socket.on('error', (err) => {
         const durationMs = Date.now() - tcpStart;
-        tcpResult = { success: false, error: err.message, durationMs };
-        log(`❌ ÉCHEC de la connexion TCP (${host}:${port}) : ${err.message}`);
         socket.destroy();
-        resolve();
+        resolve({ success: false, error: err.message, durationMs });
       });
 
       socket.on('timeout', () => {
         const durationMs = Date.now() - tcpStart;
-        tcpResult = { success: false, error: 'TIMEOUT (6000ms) - Port filtré ou bloqué.', durationMs };
-        log(`❌ TIMEOUT TCP vers ${host}:${port} après 6000ms.`);
         socket.destroy();
-        resolve();
+        resolve({ success: false, error: `TIMEOUT (${timeoutMs}ms) - Port bloqué ou filtré par l'hébergeur.`, durationMs });
       });
     });
+  };
 
-    if (!tcpResult.success && port === 587) {
-      recommendations.push("Le port 587 (TLS/STARTTLS) est souvent bloqué par les pare-feux des hébergeurs cloud. Basculez sur le port 465 (SSL direct).");
-    } else if (!tcpResult.success) {
-      recommendations.push(`Connexion TCP refusée ou bloquée vers ${host}:${port}. Vérifiez les règles d'Egress sur Render.`);
+  // 2. TCP Socket Connection Check
+  let tcpResult: { success: boolean; localAddress?: string; remoteAddress?: string; durationMs?: number; error?: string } = { success: false };
+  if (dnsResult.success) {
+    log(`🔌 Test de socket TCP brut vers ${host}:${port}...`);
+    tcpResult = await checkPort(host, port, 6000);
+
+    if (tcpResult.success) {
+      log(`✅ Socket TCP connecté avec succès à ${host}:${port} (${tcpResult.durationMs}ms)`);
+    } else {
+      log(`❌ ÉCHEC de la connexion TCP (${host}:${port}) : ${tcpResult.error || 'Refusée'}`);
+
+      // Test alternative ports if the main port failed
+      const altPorts = [587, 2525, 80].filter(p => p !== port);
+      log(`🔍 Test automatique des ports SMTP alternatifs (${altPorts.join(', ')})...`);
+
+      let workingAltPort: number | null = null;
+      for (const altPort of altPorts) {
+        const altRes = await checkPort(host, altPort, 4000);
+        if (altRes.success) {
+          log(`💡 PORT OUVERT DÉTECTÉ : Port ${altPort} sur ${host} réponds positivement !`);
+          workingAltPort = altPort;
+          recommendations.push(`Le port principal ${port} est bloqué par Render, mais le port ${altPort} est accessible ! Changez le port SMTP pour ${altPort} dans la configuration.`);
+          break;
+        } else {
+          log(`  - Port ${altPort} : Bloqué (${altRes.error})`);
+        }
+      }
+
+      if (isRender && !workingAltPort) {
+        log(`🚨 RESTRICTION DÉTECTÉE SUR RENDER : Render bloque les ports TCP SMTP sortants (25, 465, 587) par défaut sur ses services Web pour éviter le spam.`);
+        recommendations.push(`EXPLICATION RENDER : Render bloque le port SMTP TCP ${port} (et 587). SOLUTIONS : 1) Si vous avez un compte payant Render, soumettez un ticket support 'Enable Outbound SMTP'. 2) Utilisez un relais d'e-mail HTTP/REST (comme Brevo ou Resend) qui utilise le port HTTPS 443 (jamais bloqué sur Render). 3) Vous pouvez aussi tenter le port 2525 ou 8080 si disponible sur votre serveur SMTP.`);
+      } else if (!workingAltPort) {
+        recommendations.push(`Connexion TCP refusée ou bloquée vers ${host}:${port}. Vérifiez votre pare-feu ou vos paramètres réseau.`);
+      }
     }
   }
 

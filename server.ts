@@ -10,6 +10,7 @@ import {
   generateSignedToken, 
   verifySignedToken, 
   createSmtpTransporter,
+  runSmtpDiagnostic,
   readDb as readEmailDb, 
   writeDb as writeEmailDb 
 } from "./server/emailServerService";
@@ -23,6 +24,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const dbFirestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "webhook_db.json");
 
@@ -762,6 +764,26 @@ app.post("/api/emails/test-smtp", async (req, res) => {
     return res.status(500).json({
       status: "error",
       message: `Échec de la connexion SMTP Gmail : ${verifyErr.message}`
+    });
+  }
+});
+
+// API: Run Real-time SMTP Diagnostic Script with Detailed Logs
+app.post("/api/emails/diagnostic", async (req, res) => {
+  try {
+    const { sendTestEmailTo, configOverride } = req.body || {};
+    const diagnosticResult = await runSmtpDiagnostic({
+      sendTestEmailTo,
+      configOverride
+    });
+    return res.json({
+      status: "success",
+      diagnostic: diagnosticResult
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      status: "error",
+      message: err.message || "Erreur lors de l'exécution du diagnostic SMTP."
     });
   }
 });

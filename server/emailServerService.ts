@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import dns from 'dns';
+import net from 'net';
 import nodemailer from 'nodemailer';
 import { generateEmailHtml, EMAIL_TEMPLATE_DEFINITIONS, EmailRenderData } from '../src/services/emailTemplates';
 import { EmailType, EmailCategory, TransactionalEmailLog, EmailServerConfig } from '../src/types/email';
@@ -310,3 +312,260 @@ export async function processTransactionalEmailQueue(): Promise<{ processedCount
 setInterval(() => {
   processTransactionalEmailQueue().catch(err => console.error('Error in email queue worker:', err));
 }, 5000);
+
+// ----------------------------------------------------
+// Real-time SMTP Diagnostic Service
+// ----------------------------------------------------
+export interface SmtpDiagnosticResult {
+  timestamp: string;
+  isRender: boolean;
+  environment: {
+    nodeEnv: string;
+    gmailUser: string;
+    hasAppPassword: boolean;
+    appPasswordLength: number;
+    hasSpacesInPassword: boolean;
+    smtpHost: string;
+    smtpPort: number;
+    senderEmail: string;
+    senderName: string;
+  };
+  checks: {
+    dns: { success: boolean; ip?: string; error?: string; durationMs?: number };
+    tcp: { success: boolean; localAddress?: string; remoteAddress?: string; durationMs?: number; error?: string };
+    smtpVerify: { success: boolean; durationMs?: number; error?: string };
+    testEmailSend?: { success: boolean; messageId?: string; accepted?: string[]; error?: string };
+  };
+  logs: string[];
+  recommendations: string[];
+}
+
+export async function runSmtpDiagnostic(options?: {
+  sendTestEmailTo?: string;
+  configOverride?: Partial<EmailServerConfig>;
+}): Promise<SmtpDiagnosticResult> {
+  const logs: string[] = [];
+  const recommendations: string[] = [];
+  const log = (msg: string) => {
+    const timestamp = new Date().toISOString().substring(11, 19);
+    logs.push(`[${timestamp}] ${msg}`);
+  };
+
+  log("🚀 Démarrage du diagnostic SMTP en temps réel...");
+
+  const isRender = Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
+  if (isRender) {
+    log("ℹ️ Environnement détecté : Hébergement Cloud Render.");
+  } else {
+    log("ℹ️ Environnement détecté : Conteneur local / Applet AI Studio.");
+  }
+
+  const db = readDb();
+  const cfg = { ...(db.email_config || {}), ...(options?.configOverride || {}) };
+
+  const user = cfg.gmailUser || process.env.GMAIL_USER || cfg.senderEmail || 'service@dekel-dev.com';
+  const pass = cfg.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '';
+  const host = cfg.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(cfg.smtpPort || process.env.SMTP_PORT || 465);
+  const senderEmail = cfg.senderEmail || user;
+  const senderName = cfg.senderName || 'Dekel.Formation';
+
+  const cleanPass = pass.replace(/\s+/g, '');
+  const hasSpaces = pass.includes(' ');
+
+  log(`📋 Configuration active -> Host: ${host}:${port} | Compte: ${user} | Expéditeur: ${senderEmail}`);
+  log(`🔑 Clé d'application : ${pass ? `Définie (${pass.length} chars, nettoyée: ${cleanPass.length} chars)` : '❌ MANQUANTE'}`);
+
+  if (!pass) {
+    log("❌ ERREUR: Aucun mot de passe d'application Gmail n'est configuré !");
+    recommendations.push("Générez un Mot de Passe d'Application à 16 caractères sur votre compte Google (Sécurité > Validation en 2 étapes > Mots de passe d'application) et renseignez la variable d'environnement GMAIL_APP_PASSWORD sur Render.");
+  }
+
+  if (hasSpaces) {
+    log("⚠️ REMARQUE : Des espaces ont été détectés dans le mot de passe d'application. Ils sont nettoyés automatiquement.");
+  }
+
+  // 1. DNS Resolution Check
+  const dnsStart = Date.now();
+  let dnsResult: { success: boolean; ip?: string; error?: string; durationMs?: number } = { success: false };
+  try {
+    log(`🔍 Test de résolution DNS pour host=${host}...`);
+    const addresses = await dns.promises.lookup(host);
+    const durationMs = Date.now() - dnsStart;
+    dnsResult = { success: true, ip: addresses.address, durationMs };
+    log(`✅ Résolution DNS réussie : ${host} -> IP ${addresses.address} (${durationMs}ms)`);
+  } catch (dnsErr: any) {
+    const durationMs = Date.now() - dnsStart;
+    dnsResult = { success: false, error: dnsErr.message, durationMs };
+    log(`❌ ÉCHEC de la résolution DNS pour ${host} : ${dnsErr.message}`);
+    recommendations.push(`Impossible de résoudre l'hôte DNS ${host}. Vérifiez la connexion Internet et les résolveurs DNS.`);
+  }
+
+  // 2. TCP Socket Connection Check
+  let tcpResult: { success: boolean; localAddress?: string; remoteAddress?: string; durationMs?: number; error?: string } = { success: false };
+  if (dnsResult.success) {
+    log(`🔌 Test de socket TCP brut vers ${host}:${port}...`);
+    const tcpStart = Date.now();
+    await new Promise<void>((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(6000);
+
+      socket.connect(port, host, () => {
+        const durationMs = Date.now() - tcpStart;
+        tcpResult = {
+          success: true,
+          localAddress: socket.localAddress,
+          remoteAddress: socket.remoteAddress,
+          durationMs
+        };
+        log(`✅ Socket TCP connecté avec succès à ${socket.remoteAddress}:${port} (${durationMs}ms)`);
+        socket.destroy();
+        resolve();
+      });
+
+      socket.on('error', (err) => {
+        const durationMs = Date.now() - tcpStart;
+        tcpResult = { success: false, error: err.message, durationMs };
+        log(`❌ ÉCHEC de la connexion TCP (${host}:${port}) : ${err.message}`);
+        socket.destroy();
+        resolve();
+      });
+
+      socket.on('timeout', () => {
+        const durationMs = Date.now() - tcpStart;
+        tcpResult = { success: false, error: 'TIMEOUT (6000ms) - Port filtré ou bloqué.', durationMs };
+        log(`❌ TIMEOUT TCP vers ${host}:${port} après 6000ms.`);
+        socket.destroy();
+        resolve();
+      });
+    });
+
+    if (!tcpResult.success && port === 587) {
+      recommendations.push("Le port 587 (TLS/STARTTLS) est souvent bloqué par les pare-feux des hébergeurs cloud. Basculez sur le port 465 (SSL direct).");
+    } else if (!tcpResult.success) {
+      recommendations.push(`Connexion TCP refusée ou bloquée vers ${host}:${port}. Vérifiez les règles d'Egress sur Render.`);
+    }
+  }
+
+  // 3. SMTP Handshake & Authentication Check
+  let smtpVerify: { success: boolean; durationMs?: number; error?: string } = { success: false };
+  if (tcpResult.success && pass) {
+    log(`🔐 Authentification SMTP en cours via Nodemailer...`);
+    const verifyStart = Date.now();
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      requireTLS: port === 587,
+      auth: {
+        user,
+        pass: cleanPass
+      },
+      tls: {
+        rejectUnauthorized: false
+      },
+      logger: true,
+      debug: true
+    } as any);
+
+    try {
+      await transporter.verify();
+      const durationMs = Date.now() - verifyStart;
+      smtpVerify = { success: true, durationMs };
+      log(`🎉 VÉRIFICATION SMTP RÉUSSIE ! Le compte Gmail ${user} est pleinement autorisé (${durationMs}ms)`);
+    } catch (authErr: any) {
+      const durationMs = Date.now() - verifyStart;
+      smtpVerify = { success: false, error: authErr.message, durationMs };
+      log(`❌ ERREUR Authentification Gmail SMTP : ${authErr.message}`);
+
+      if (authErr.message.includes('535') || authErr.message.includes('Username and Password not accepted')) {
+        recommendations.push("Mot de passe d'application invalide : Générez un nouveau 'Mot de Passe d'Application' à 16 lettres sur Google (Sécurité > Validation en 2 étapes > Mots de passe d'application) et mettez à jour la variable GMAIL_APP_PASSWORD sur Render.");
+      } else if (authErr.message.includes('534') || authErr.message.includes('Check log in on web')) {
+        recommendations.push("Google requiert une validation web. Connectez-vous à votre compte Google et validez l'alerte de sécurité relative à la tentative de connexion depuis le serveur Render.");
+      } else {
+        recommendations.push(`Erreur SMTP : ${authErr.message}`);
+      }
+    }
+  }
+
+  // 4. Test Email Sending
+  let testEmailSend: { success: boolean; messageId?: string; accepted?: string[]; error?: string } | undefined = undefined;
+
+  if (smtpVerify.success && options?.sendTestEmailTo) {
+    const targetEmail = options.sendTestEmailTo.trim().toLowerCase();
+    log(`✉️ Envoi d'un e-mail de test réel à : ${targetEmail}...`);
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        requireTLS: port === 587,
+        auth: { user, pass: cleanPass },
+        tls: { rejectUnauthorized: false }
+      });
+
+      const info = await transporter.sendMail({
+        from: `"${senderName}" <${senderEmail}>`,
+        to: targetEmail,
+        subject: `[DIAGNOSTIC SMTP] Test de transmission Dekel.Formation - ${new Date().toLocaleTimeString()}`,
+        html: `
+          <div style="font-family: system-ui, sans-serif; padding: 24px; background-color: #0f172a; color: #f8fafc; border-radius: 12px; border: 1px solid #1e293b;">
+            <h2 style="color: #34d399; margin-top: 0;">✅ Test de Diagnostic SMTP Réussi !</h2>
+            <p>Cet e-mail confirme que le serveur de messagerie Dekel.Formation peut transmettre des messages en direct.</p>
+            <hr style="border-color: #334155; margin: 16px 0;" />
+            <ul style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+              <li><strong>Serveur expéditeur :</strong> ${host}:${port} (${isRender ? 'Hébergé sur Render' : 'Environnement Standalone'})</li>
+              <li><strong>Adresse d'envoi :</strong> ${senderEmail}</li>
+              <li><strong>Destinataire :</strong> ${targetEmail}</li>
+              <li><strong>Horodatage :</strong> ${new Date().toISOString()}</li>
+            </ul>
+          </div>
+        `,
+        text: `Test de Diagnostic SMTP Réussi pour ${targetEmail} à ${new Date().toISOString()}`
+      });
+
+      testEmailSend = {
+        success: true,
+        messageId: info.messageId,
+        accepted: info.accepted as string[]
+      };
+      log(`✅ E-mail de diagnostic transmis avec succès ! ID: ${info.messageId}`);
+    } catch (sendErr: any) {
+      testEmailSend = {
+        success: false,
+        error: sendErr.message
+      };
+      log(`❌ Échec de la livraison de l'e-mail de test : ${sendErr.message}`);
+      recommendations.push(`Erreur lors de la livraison du message : ${sendErr.message}`);
+    }
+  }
+
+  log("🏁 Diagnostic terminé.");
+
+  return {
+    timestamp: new Date().toISOString(),
+    isRender,
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      gmailUser: user,
+      hasAppPassword: Boolean(pass),
+      appPasswordLength: pass.length,
+      hasSpacesInPassword: hasSpaces,
+      smtpHost: host,
+      smtpPort: port,
+      senderEmail,
+      senderName
+    },
+    checks: {
+      dns: dnsResult,
+      tcp: tcpResult,
+      smtpVerify,
+      testEmailSend
+    },
+    logs,
+    recommendations
+  };
+}
+

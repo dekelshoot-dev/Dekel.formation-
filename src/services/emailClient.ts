@@ -12,7 +12,7 @@ export interface SendEmailOptions {
 
 export async function sendTransactionalEmail(options: SendEmailOptions): Promise<boolean> {
   try {
-    const response = await fetch('/api/emails/queue', {
+    const response = await fetch('/api/emails/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

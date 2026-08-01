@@ -4,6 +4,7 @@ import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCi
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
 import { ConfirmModal } from './ConfirmModal';
+import { emailTriggers } from '../services/emailClient';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -74,6 +75,10 @@ export default function AdminDashboard({
   const [newTrainerName, setNewTrainerName] = useState('');
   const [newTrainerEmail, setNewTrainerEmail] = useState('');
   const [showAddTrainerForm, setShowAddTrainerForm] = useState(false);
+
+  // Admin creation form state (email only)
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [showAddAdminForm, setShowAddAdminForm] = useState(false);
   
   // Global settings state
   const [platformName, setPlatformName] = useState('Dekel.Formation');
@@ -145,47 +150,168 @@ export default function AdminDashboard({
 
   const handleCreateTrainer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTrainerName || !newTrainerEmail) return;
-
     const emailTrimmed = newTrainerEmail.trim().toLowerCase();
-    if (allUsers.some(u => u.email.toLowerCase() === emailTrimmed)) {
-      showToast('Cet e-mail est déjà enregistré !', 'warning');
-      return;
-    }
+    if (!emailTrimmed) return;
 
-    const newTrainer: User = {
-      id: `u-${Date.now()}`,
-      email: emailTrimmed,
-      name: newTrainerName,
-      role: 'trainer',
-      avatarUrl: 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png',
-      createdAt: new Date().toISOString(),
-      status: 'active'
-    };
+    // Check if user already exists
+    const existingUser = allUsers.find(u => u.email.toLowerCase() === emailTrimmed);
 
-    onAddUser(newTrainer);
-    showToast('Compte formateur créé avec succès !', 'success');
-    
-    // Send welcome email simulation
-    const welEmail: SimulatedEmail = {
-      id: `em-${Date.now()}`,
-      to: emailTrimmed,
-      subject: `Bienvenue en tant que Formateur sur ${platformName}`,
-      body: `Bonjour ${newTrainerName},
+    if (existingUser) {
+      // 1. User ALREADY HAS AN ACCOUNT
+      if (existingUser.role !== 'trainer') {
+        onUpdateUserRole(existingUser.id, 'trainer');
+      }
 
-L'administrateur de ${platformName} vient de vous créer un compte Formateur.
-Vous pouvez vous connecter dès à présent avec votre adresse email pour créer vos modules et chapitres de cours.
+      // Send real transactional notifications
+      emailTriggers.userAdminCreated(emailTrimmed, existingUser.name || 'Formateur', 'Formateur');
+      emailTriggers.userPromotedTrainer(emailTrimmed, existingUser.name || 'Formateur');
+
+      // Send simulated notification email
+      const promoEmail: SimulatedEmail = {
+        id: `em-${Date.now()}`,
+        to: emailTrimmed,
+        subject: `Accès Formateur accordé sur ${platformName}`,
+        body: `Bonjour ${existingUser.name || 'Utilisateur'},
+
+Vos privilèges ont été mis à jour sur ${platformName}.
+Vous disposez désormais du rôle de Formateur avec la possibilité d'ajouter et de gérer vos formations.
 
 Email : ${emailTrimmed}
 
-Bonnes formations !`,
-      sentAt: new Date().toISOString()
-    };
-    onSendEmail(welEmail);
+Connectez-vous à votre espace pour accéder à votre tableau de bord Formateur.`,
+        sentAt: new Date().toISOString()
+      };
+      onSendEmail(promoEmail);
 
-    setNewTrainerName('');
+      showToast(`L'utilisateur possède déjà un compte. Son rôle a été mis à jour en Formateur et une notification par mail lui a été envoyée !`, 'success');
+    } else {
+      // 2. User DOES NOT HAVE AN ACCOUNT
+      const defaultName = emailTrimmed.split('@')[0];
+      const newTrainer: User = {
+        id: `u-${Date.now()}`,
+        email: emailTrimmed,
+        name: defaultName,
+        role: 'trainer',
+        avatarUrl: 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png',
+        createdAt: new Date().toISOString(),
+        status: 'active'
+      };
+
+      onAddUser(newTrainer);
+
+      // Send real transactional notifications with account creation link
+      const createAccountUrl = `${window.location.origin}?mode=signUp&email=${encodeURIComponent(emailTrimmed)}`;
+      emailTriggers.userAdminCreated(emailTrimmed, defaultName, 'Formateur');
+      emailTriggers.verifyEmail(emailTrimmed, defaultName, createAccountUrl);
+
+      // Send simulated notification email
+      const inviteEmail: SimulatedEmail = {
+        id: `em-${Date.now()}`,
+        to: emailTrimmed,
+        subject: `Invitation : Créez votre compte Formateur sur ${platformName}`,
+        body: `Bonjour,
+
+Vous avez été invité à devenir Formateur sur la plateforme ${platformName}.
+
+Comme vous n'avez pas encore de compte, veuillez cliquer sur le lien ci-dessous pour créer votre compte et définir votre mot de passe :
+
+${createAccountUrl}
+
+Adresse e-mail attribuée : ${emailTrimmed}
+
+À très bientôt sur ${platformName} !`,
+        sentAt: new Date().toISOString()
+      };
+      onSendEmail(inviteEmail);
+
+      showToast(`Invitation envoyée ! Un e-mail contenant le lien pour créer son compte formateur a été envoyé à ${emailTrimmed}.`, 'success');
+    }
+
     setNewTrainerEmail('');
     setShowAddTrainerForm(false);
+  };
+
+  const handleCreateAdmin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const emailTrimmed = newAdminEmail.trim().toLowerCase();
+    if (!emailTrimmed) return;
+
+    // Check if user already exists
+    const existingUser = allUsers.find(u => u.email.toLowerCase() === emailTrimmed);
+
+    if (existingUser) {
+      // 1. User ALREADY HAS AN ACCOUNT
+      if (existingUser.role !== 'admin') {
+        onUpdateUserRole(existingUser.id, 'admin');
+      }
+
+      // Send real transactional notifications
+      emailTriggers.userAdminCreated(emailTrimmed, existingUser.name || 'Administrateur', 'Administrateur');
+      emailTriggers.userPromotedAdmin(emailTrimmed, existingUser.name || 'Administrateur');
+
+      // Send simulated notification email
+      const promoEmail: SimulatedEmail = {
+        id: `em-${Date.now()}`,
+        to: emailTrimmed,
+        subject: `Accès Administrateur accordé sur ${platformName}`,
+        body: `Bonjour ${existingUser.name || 'Utilisateur'},
+
+Vos privilèges ont été mis à jour sur ${platformName}.
+Vous disposez désormais du rôle d'Administrateur avec un accès complet à la gestion de la plateforme.
+
+Email : ${emailTrimmed}
+
+Connectez-vous à votre espace pour accéder à votre tableau de bord d'administration.`,
+        sentAt: new Date().toISOString()
+      };
+      onSendEmail(promoEmail);
+
+      showToast(`L'utilisateur possède déjà un compte. Son rôle a été mis à jour en Administrateur et une notification par mail lui a été envoyée !`, 'success');
+    } else {
+      // 2. User DOES NOT HAVE AN ACCOUNT
+      const defaultName = emailTrimmed.split('@')[0];
+      const newAdmin: User = {
+        id: `u-${Date.now()}`,
+        email: emailTrimmed,
+        name: defaultName,
+        role: 'admin',
+        avatarUrl: 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png',
+        createdAt: new Date().toISOString(),
+        status: 'active'
+      };
+
+      onAddUser(newAdmin);
+
+      // Send real transactional notifications with account creation link
+      const createAccountUrl = `${window.location.origin}?mode=signUp&email=${encodeURIComponent(emailTrimmed)}`;
+      emailTriggers.userAdminCreated(emailTrimmed, defaultName, 'Administrateur');
+      emailTriggers.verifyEmail(emailTrimmed, defaultName, createAccountUrl);
+
+      // Send simulated notification email
+      const inviteEmail: SimulatedEmail = {
+        id: `em-${Date.now()}`,
+        to: emailTrimmed,
+        subject: `Invitation : Créez votre compte Administrateur sur ${platformName}`,
+        body: `Bonjour,
+
+Vous avez été invité à devenir Administrateur sur la plateforme ${platformName}.
+
+Comme vous n'avez pas encore de compte, veuillez cliquer sur le lien ci-dessous pour créer votre compte et définir votre mot de passe :
+
+${createAccountUrl}
+
+Adresse e-mail attribuée : ${emailTrimmed}
+
+À très bientôt sur ${platformName} !`,
+        sentAt: new Date().toISOString()
+      };
+      onSendEmail(inviteEmail);
+
+      showToast(`Invitation envoyée ! Un e-mail contenant le lien pour créer son compte administrateur a été envoyé à ${emailTrimmed}.`, 'success');
+    }
+
+    setNewAdminEmail('');
+    setShowAddAdminForm(false);
   };
 
   const saveSettings = () => {
@@ -483,10 +609,21 @@ Bonnes formations !`,
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 transition-all"
                 />
               </div>
+              {activeTab === 'users' && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddAdminForm(!showAddAdminForm)}
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-red-50 cursor-pointer shrink-0"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Créer un Administrateur</span>
+                </button>
+              )}
               {activeTab === 'trainers' && (
                 <button
+                  type="button"
                   onClick={() => setShowAddTrainerForm(!showAddTrainerForm)}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-red-50"
+                  className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-red-50 cursor-pointer shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Nouveau Formateur</span>
@@ -563,10 +700,80 @@ Bonnes formations !`,
           {/* Tab Content: Users Management (Section 2 & 3) */}
           {activeTab === 'users' && (
             <div className="space-y-4">
-              <div>
-                <h2 className="text-base font-black text-slate-900">Gestion des utilisateurs ({allUsers.length})</h2>
-                <p className="text-xs text-slate-400">Recherchez un utilisateur, consultez ses informations et modifiez son rôle.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Gestion des utilisateurs ({allUsers.length})</h2>
+                  <p className="text-xs text-slate-400">Recherchez un utilisateur, consultez ses informations, modifiez son rôle ou créez un compte administrateur.</p>
+                </div>
+                {!showAddAdminForm && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAdminForm(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-red-50 cursor-pointer shrink-0 self-start sm:self-auto"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Créer un Administrateur</span>
+                  </button>
+                )}
               </div>
+
+              {/* Form to create an administrator by email only */}
+              {showAddAdminForm && (
+                <form onSubmit={handleCreateAdmin} className="p-4 bg-red-50/70 border border-red-200/80 rounded-2xl space-y-3 shadow-sm animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-red-900">
+                      <div className="p-1.5 bg-red-600 text-white rounded-lg shadow-sm">
+                        <Shield className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider">Créer / Inviter un Administrateur</h3>
+                        <p className="text-[10px] text-red-700 font-medium">Saisissez uniquement son adresse e-mail</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddAdminForm(false); setNewAdminEmail(''); }}
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-red-100/50 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600 leading-relaxed bg-white/80 p-3 rounded-xl border border-red-100">
+                    💡 <strong>Fonctionnement :</strong> Renseignez uniquement son adresse e-mail. Si la personne possède déjà un compte, elle recevra une notification par mail pour l'informer qu'elle est désormais Administrateur. Si elle n'a pas encore de compte, elle recevra un mail d'invitation contenant un lien pour créer son compte administrateur.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <div className="flex-1 relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        required
+                        value={newAdminEmail}
+                        onChange={(e) => setNewAdminEmail(e.target.value)}
+                        placeholder="Adresse e-mail de l'administrateur (ex: admin@dekel-formation.com)"
+                        className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-red-200 focus:border-red-500 font-medium"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAddAdminForm(false); setNewAdminEmail(''); }}
+                        className="px-3.5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-xs font-semibold text-slate-600 cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      >
+                        <Mail className="w-4 h-4" />
+                        <span>Envoyer la notification</span>
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
 
               <div className="border border-slate-150 rounded-2xl overflow-hidden">
                 <table className="w-full text-left border-collapse">
@@ -708,46 +915,58 @@ Bonnes formations !`,
 
               {/* Add form */}
               {showAddTrainerForm && (
-                <form onSubmit={handleCreateTrainer} className="p-4 bg-slate-50 border border-slate-150 rounded-2xl space-y-3">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Créer une fiche Formateur</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Nom complet</label>
-                      <input
-                        type="text"
-                        required
-                        value={newTrainerName}
-                        onChange={(e) => setNewTrainerName(e.target.value)}
-                        placeholder="Ex: David Laroche"
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none"
-                      />
+                <form onSubmit={handleCreateTrainer} className="p-4 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl space-y-3 shadow-sm animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-indigo-900">
+                      <div className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-sm">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider">Créer / Inviter un Formateur</h3>
+                        <p className="text-[10px] text-indigo-700 font-medium">Saisissez uniquement son adresse e-mail</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-1">Adresse e-mail</label>
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddTrainerForm(false); setNewTrainerEmail(''); }}
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-indigo-100/50 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-white leading-relaxed p-3 rounded-xl border border-teal-800/50 shadow-inner" style={{ backgroundColor: '#0d584c' }}>
+                    💡 <strong>Fonctionnement :</strong> Renseignez uniquement son adresse e-mail. Si la personne possède déjà un compte, elle recevra une notification par mail pour l'informer qu'elle est désormais Formateur. Si elle n'a pas encore de compte, elle recevra un mail d'invitation contenant un lien pour créer son compte formateur.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <div className="flex-1 relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="email"
                         required
                         value={newTrainerEmail}
                         onChange={(e) => setNewTrainerEmail(e.target.value)}
-                        placeholder="david.formateur@gmail.com"
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none"
+                        placeholder="Adresse e-mail du formateur (ex: formateur@dekel-formation.com)"
+                        className="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 font-medium"
                       />
                     </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddTrainerForm(false)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-xs font-medium text-slate-600"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow"
-                    >
-                      Ajouter le formateur
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAddTrainerForm(false); setNewTrainerEmail(''); }}
+                        className="px-3.5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-xs font-semibold text-slate-600 cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                      >
+                        <Mail className="w-4 h-4" />
+                        <span>Envoyer la notification</span>
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}

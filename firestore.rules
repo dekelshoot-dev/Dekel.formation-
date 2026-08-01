@@ -2,23 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isSeeded() {
-      return exists(/databases/$(database)/documents/metadata/seeding_hierarchical);
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
     // --- MATCH BLOCKS ---
 
     // 1. Users

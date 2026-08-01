@@ -15,6 +15,7 @@ import { cleanUndefined } from '../firebaseService';
 import { QuizEditorModal } from './QuizEditorModal';
 import { TrainerQuizStatsModal } from './TrainerQuizStatsModal';
 import { ConfirmModal } from './ConfirmModal';
+import { emailTriggers } from '../services/emailClient';
 
 interface TrainerDashboardProps {
   currentUser: User;
@@ -1546,6 +1547,7 @@ export default function TrainerDashboard({
   const [chTitle, setChTitle] = useState('');
   const [chVideoSrc, setChVideoSrc] = useState<'youtube' | 'vimeo' | 'direct' | 'iframe'>('youtube');
   const [chVideoUrl, setChVideoUrl] = useState('');
+  const [chVideoOrientation, setChVideoOrientation] = useState<'16/9' | '9/16'>('16/9');
   const [chRichText, setChRichText] = useState('');
   const [chFiles, setChFiles] = useState<DownloadableFile[]>([]);
   const [chLinks, setChLinks] = useState<ExternalLink[]>([]);
@@ -1576,6 +1578,7 @@ export default function TrainerDashboard({
     setChTitle('');
     setChVideoSrc('youtube');
     setChVideoUrl('');
+    setChVideoOrientation('16/9');
     setChRichText('');
     setChFiles([]);
     setChLinks([]);
@@ -1591,6 +1594,7 @@ export default function TrainerDashboard({
     setChTitle(chapter.title || '');
     setChVideoSrc(chapter.videoSource || 'youtube');
     setChVideoUrl(chapter.videoUrl || '');
+    setChVideoOrientation(chapter.videoOrientation || '16/9');
     setChRichText(chapter.richText || '');
     setChFiles(chapter.downloadableFiles || []);
     setChLinks(chapter.externalLinks || []);
@@ -1621,6 +1625,7 @@ export default function TrainerDashboard({
             title: chTitle,
             videoSource: chVideoSrc,
             videoUrl: chVideoUrl,
+            videoOrientation: chVideoOrientation,
             richText: chRichText,
             downloadableFiles: chFiles,
             externalLinks: chLinks,
@@ -1646,6 +1651,7 @@ export default function TrainerDashboard({
           order: newOrder,
           videoSource: chVideoSrc,
           videoUrl: chVideoUrl,
+          videoOrientation: chVideoOrientation,
           richText: chRichText,
           downloadableFiles: chFiles,
           externalLinks: chLinks,
@@ -1741,23 +1747,30 @@ export default function TrainerDashboard({
       // Check if student has account in system
       const studentUser = allUsers.find(u => u.email.toLowerCase() === emailTrimmed && u.role === 'student');
 
-    if (studentUser) {
-      // Case 1: Student has account. Register Enrollment immediately.
-      const newEnroll: Enrollment = {
-        id: `e-${Date.now()}`,
-        studentEmail: emailTrimmed,
-        courseId: enrollCourseId,
-        status: 'active',
-        enrolledAt: new Date().toISOString()
-      };
-      onAddEnrollment(newEnroll);
+      if (studentUser) {
+        // Case 1: Student has account. Register Enrollment immediately.
+        const newEnroll: Enrollment = {
+          id: `e-${Date.now()}`,
+          studentEmail: emailTrimmed,
+          courseId: enrollCourseId,
+          status: 'active',
+          enrolledAt: new Date().toISOString()
+        };
+        onAddEnrollment(newEnroll);
 
-      // Send Instant Notification Email (Section 16)
-      const enrollEmailSim: SimulatedEmail = {
-        id: `em-${Date.now()}`,
-        to: emailTrimmed,
-        subject: `Nouveau cours ajouté : ${courseSelected.title}`,
-        body: `Bonjour ${studentUser.name},
+        // Send Instant Notification Email via transactional email engine & simulated log
+        emailTriggers.courseManualAdd(
+          emailTrimmed,
+          studentUser.name || emailTrimmed,
+          courseSelected.title,
+          currentUser.name || 'Votre Formateur'
+        );
+
+        const enrollEmailSim: SimulatedEmail = {
+          id: `em-${Date.now()}`,
+          to: emailTrimmed,
+          subject: `Nouveau cours ajouté : ${courseSelected.title}`,
+          body: `Bonjour ${studentUser.name},
 
 Bonne nouvelle ! Le formateur ${currentUser.name} vient de vous accorder l'accès au cours :
 "${courseSelected.title}"
@@ -1765,44 +1778,55 @@ Bonne nouvelle ! Le formateur ${currentUser.name} vient de vous accorder l'accè
 Connectez-vous à votre espace étudiant pour commencer les leçons immédiatement !
 
 Lien d'accès: ${courseSelected.title}`,
-        sentAt: new Date().toISOString()
-      };
-      onSendEmail(enrollEmailSim);
-      triggerToast(`Élève inscrit immédiatement ! Email de notification envoyé.`);
-    } else {
-      // Case 2: Student has no account yet. Register PreRegistration & Enrollment.
-      const newEnroll: Enrollment = {
-        id: `e-${Date.now()}`,
-        studentEmail: emailTrimmed,
-        courseId: enrollCourseId,
-        status: 'active',
-        enrolledAt: new Date().toISOString()
-      };
-      onAddEnrollment(newEnroll);
-
-      // Save Pre-registration list
-      const existingPre = preRegistered.find(p => p.email.toLowerCase() === emailTrimmed);
-      if (existingPre) {
-        if (!existingPre.courseIds.includes(enrollCourseId)) {
-          existingPre.courseIds.push(enrollCourseId);
-        }
-        if (enrollName.trim() && !existingPre.name) {
-          existingPre.name = enrollName.trim();
-        }
+          sentAt: new Date().toISOString()
+        };
+        onSendEmail(enrollEmailSim);
+        triggerToast(`Élève inscrit immédiatement ! Email de notification envoyé.`);
       } else {
-        onAddPreRegistered({
-          email: emailTrimmed,
-          name: enrollName.trim() || undefined,
-          courseIds: [enrollCourseId]
-        });
-      }
+        // Case 2: Student has no account yet. Register PreRegistration & Enrollment.
+        const newEnroll: Enrollment = {
+          id: `e-${Date.now()}`,
+          studentEmail: emailTrimmed,
+          courseId: enrollCourseId,
+          status: 'active',
+          enrolledAt: new Date().toISOString()
+        };
+        onAddEnrollment(newEnroll);
 
-      // Send Invitation notification email (Section 16)
-      const welcomeNoAccount: SimulatedEmail = {
-        id: `em-${Date.now()}`,
-        to: emailTrimmed,
-        subject: `Accès en attente : Créez votre compte sur Dekel.Formation`,
-        body: `Bonjour,
+        // Save Pre-registration list
+        const existingPre = preRegistered.find(p => p.email.toLowerCase() === emailTrimmed);
+        if (existingPre) {
+          if (!existingPre.courseIds.includes(enrollCourseId)) {
+            existingPre.courseIds.push(enrollCourseId);
+          }
+          if (enrollName.trim() && !existingPre.name) {
+            existingPre.name = enrollName.trim();
+          }
+        } else {
+          onAddPreRegistered({
+            email: emailTrimmed,
+            name: enrollName.trim() || undefined,
+            courseIds: [enrollCourseId]
+          });
+        }
+
+        // Send Instant Notification Email via transactional email engine & simulated log
+        emailTriggers.courseManualAdd(
+          emailTrimmed,
+          enrollName.trim() || emailTrimmed,
+          courseSelected.title,
+          currentUser.name || 'Votre Formateur'
+        );
+        emailTriggers.welcome(
+          emailTrimmed,
+          enrollName.trim() || emailTrimmed
+        );
+
+        const welcomeNoAccount: SimulatedEmail = {
+          id: `em-${Date.now()}`,
+          to: emailTrimmed,
+          subject: `Accès en attente : Créez votre compte sur Dekel.Formation`,
+          body: `Bonjour,
 
 Le formateur ${currentUser.name} vous a inscrit au cours :
 "${courseSelected.title}".
@@ -1814,11 +1838,11 @@ Une fois inscrit, votre formation sera automatiquement activée dans votre espac
 
 Cordialement,
 Le support Dekel.Formation`,
-        sentAt: new Date().toISOString()
-      };
-      onSendEmail(welcomeNoAccount);
-      triggerToast(`Cas 2 - Élève non enregistré : Invitation par email envoyée !`);
-    }
+          sentAt: new Date().toISOString()
+        };
+        onSendEmail(welcomeNoAccount);
+        triggerToast(`Cas 2 - Élève non enregistré : Invitation par email envoyée !`);
+      }
 
       setEnrollEmail('');
       setEnrollName('');
@@ -4927,6 +4951,34 @@ Le support Dekel.Formation`,
                           }
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
                         />
+                      </div>
+
+                      <div className="pt-1">
+                        <label className="block text-[10px] font-semibold text-slate-400 mb-1">Orientation / Format d'affichage de la vidéo</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setChVideoOrientation('16/9')}
+                            className={`py-1.5 px-3 rounded-lg border text-center text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              chVideoOrientation === '16/9' || !chVideoOrientation
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>📺 Horizontal (16/9)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setChVideoOrientation('9/16')}
+                            className={`py-1.5 px-3 rounded-lg border text-center text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                              chVideoOrientation === '9/16'
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>📱 Vertical (9/16 Shorts/Reels)</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 

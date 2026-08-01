@@ -5,6 +5,7 @@ import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, create
 import { auth } from '../firebase';
 import { showToast } from './Toast';
 import ResetPassword from './ResetPassword';
+import { emailTriggers } from '../services/emailClient';
 
 interface AuthProps {
   allUsers: User[];
@@ -137,6 +138,7 @@ export default function Auth({ allUsers, onLogin, onAddUser, onSendEmail }: Auth
       const verifyUrl = `${window.location.origin}?mode=verifyEmail&oobCode=verify_${Date.now()}&email=${encodeURIComponent(trimmedEmail)}`;
       
       try {
+        emailTriggers.welcome(trimmedEmail, name);
         await fetch('/api/emails/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

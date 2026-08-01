@@ -18,6 +18,7 @@ import Marketplace from './components/Marketplace';
 import UserProfile from './components/UserProfile';
 import { ToastContainer, showToast } from './components/Toast';
 import GlobalOverflowPopover from './components/GlobalOverflowPopover';
+import { emailTriggers } from './services/emailClient';
 
 // Icons
 import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Menu, X, User as UserIcon, KeyRound } from 'lucide-react';
@@ -526,9 +527,21 @@ export default function App() {
               await savePreRegistered(newPre);
             }
 
-            // 3. Send out Simulated Email confirmation
+            // 3. Send out Real Transactional Email & Simulated Email confirmation
             const courseObj = allCourses.find(c => c.id === courseId);
             const courseTitle = courseObj ? courseObj.title : 'votre formation';
+
+            emailTriggers.paymentValidated(
+              studentEmail,
+              record.studentName || studentEmail,
+              courseTitle,
+              record.amount ? `${record.amount} FCFA` : undefined
+            );
+            emailTriggers.courseEnrollment(
+              studentEmail,
+              record.studentName || studentEmail,
+              courseTitle
+            );
 
             const autoWebhookEmail: SimulatedEmail = {
               id: `em-wh-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -664,6 +677,18 @@ Bon apprentissage.`,
     };
     setAllEnrollments(prev => [...prev, newEnroll]);
     await saveEnrollment(newEnroll);
+
+    // Send transactional email
+    const courseObj = allCourses.find(c => c.id === courseId);
+    const studentUser = allUsers.find(u => u.email.toLowerCase() === emailTrimmed);
+    const recipientName = studentUser ? (studentUser.name || studentUser.firstName || emailTrimmed) : emailTrimmed;
+
+    emailTriggers.courseEnrollment(
+      emailTrimmed,
+      recipientName,
+      courseObj ? courseObj.title : 'Formation Dekel.Formation',
+      courseObj ? courseObj.trainerName : 'Formateur'
+    );
 
     const userExists = allUsers.some(u => u.email.toLowerCase() === emailTrimmed);
     if (!userExists) {

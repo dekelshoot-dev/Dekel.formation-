@@ -29,6 +29,8 @@ export interface EmailRenderData {
   customMessage?: string;
   discountCode?: string;
   discountPercent?: number;
+  origin?: string;
+  baseUrl?: string;
 }
 
 export const CATEGORY_LABELS: Record<EmailCategory, string> = {
@@ -347,11 +349,70 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
   }
 ];
 
+function resolveActionUrl(type: EmailType, data: EmailRenderData, baseUrl: string): string {
+  // 1. If explicit absolute actionUrl is supplied and is a valid HTTP/HTTPS URL
+  if (data.actionUrl && (data.actionUrl.startsWith('http://') || data.actionUrl.startsWith('https://'))) {
+    return data.actionUrl;
+  }
+
+  // 2. If relative path or query string is supplied in actionUrl
+  if (data.actionUrl && data.actionUrl !== '#') {
+    const rel = data.actionUrl.startsWith('/') ? data.actionUrl : `/${data.actionUrl}`;
+    return `${baseUrl}${rel}`;
+  }
+
+  // 3. Fallback routing based on email type
+  const encodedEmail = encodeURIComponent(data.recipientEmail || '');
+  const encodedCourse = encodeURIComponent(data.courseTitle || '');
+
+  switch (type) {
+    case 'auth_verify_email':
+      return `${baseUrl}?mode=verifyEmail${encodedEmail ? `&email=${encodedEmail}` : ''}`;
+    
+    case 'auth_reset_password':
+    case 'user_admin_created':
+      return `${baseUrl}?mode=resetPassword${encodedEmail ? `&email=${encodedEmail}` : ''}`;
+
+    case 'auth_welcome':
+    case 'auth_email_changed':
+    case 'auth_password_changed':
+    case 'security_new_login':
+      return `${baseUrl}?mode=login`;
+
+    case 'user_promoted_trainer':
+      return `${baseUrl}?view=trainer`;
+
+    case 'user_promoted_admin':
+      return `${baseUrl}?view=admin`;
+
+    case 'course_enrollment_confirm':
+    case 'course_manual_add':
+    case 'course_free_access_granted':
+    case 'payment_validated':
+    case 'payment_initiated':
+    case 'chapter_new_published':
+    case 'quiz_passed':
+    case 'certificate_earned':
+      return `${baseUrl}?view=student${encodedCourse ? `&course=${encodedCourse}` : ''}`;
+
+    case 'course_new_published':
+      return `${baseUrl}?view=catalog${encodedCourse ? `&course=${encodedCourse}` : ''}`;
+
+    default:
+      return baseUrl;
+  }
+}
+
 export function generateEmailHtml(type: EmailType, data: EmailRenderData): { subject: string; html: string; text: string } {
   const name = data.recipientName || 'Cher membre';
   const appName = 'Dekel.Formation';
   const senderEmail = process.env.SENDER_EMAIL || process.env.GMAIL_USER || 'service@dekel-dev.com';
   const currentYear = new Date().getFullYear();
+
+  const rawBaseUrl = data.origin || data.baseUrl || process.env.APP_URL || process.env.PUBLIC_URL || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : '');
+  const baseUrl = (rawBaseUrl && rawBaseUrl.startsWith('http')) 
+    ? rawBaseUrl.replace(/\/$/, '') 
+    : 'https://ais-dev-ncjptdvwzolepvgizaagu6-364041685083.europe-west3.run.app';
 
   let subject = '';
   let badgeTitle = 'Notification';
@@ -359,7 +420,7 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
   let title = '';
   let contentHtml = '';
   let callToActionText = '';
-  let callToActionUrl = data.actionUrl || '#';
+  const callToActionUrl = resolveActionUrl(type, data, baseUrl);
 
   switch (type) {
     // 1. AUTHENTICATION
@@ -399,6 +460,31 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
       callToActionText = 'Réinitialiser mon mot de passe';
       break;
 
+    case 'auth_email_changed':
+      subject = 'Mise à jour de votre adresse e-mail - Dekel.Formation';
+      badgeTitle = 'Sécurité';
+      iconEmoji = '📧';
+      title = 'Adresse e-mail mise à jour';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Votre adresse e-mail de connexion a été modifiée avec succès sur <strong>${appName}</strong>.</p>
+        ${data.customMessage ? `<p>${data.customMessage}</p>` : ''}
+      `;
+      callToActionText = 'Se connecter à mon compte';
+      break;
+
+    case 'auth_password_changed':
+      subject = 'Mot de passe modifié avec succès - Dekel.Formation';
+      badgeTitle = 'Sécurité';
+      iconEmoji = '🔐';
+      title = 'Mot de passe mis à jour';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Le mot de passe associé à votre compte a été modifié. Si vous n'êtes pas à l'origine de cette action, veuillez contacter le support immédiatement.</p>
+      `;
+      callToActionText = 'Se connecter';
+      break;
+
     // 2. USER MANAGEMENT
     case 'user_admin_created':
       subject = `Votre compte ${appName} a été créé par l'administration`;
@@ -419,9 +505,21 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
       title = 'Vous avez été promu Formateur !';
       contentHtml = `
         <p>Bonjour <strong>${name}</strong>,</p>
-        <p>Vous disposez désormais des privilèges de **Formateur**. Vous pouvez créer des cours, mettre en ligne des vidéos et suivre vos étudiants.</p>
+        <p>Vous disposez désormais des privilèges de <strong>Formateur</strong>. Vous pouvez créer des cours, mettre en ligne des leçons et suivre vos étudiants.</p>
       `;
       callToActionText = 'Accéder à l\'Espace Formateur';
+      break;
+
+    case 'user_promoted_admin':
+      subject = `Accès Administrateur accordé - ${appName}`;
+      badgeTitle = 'Administration';
+      iconEmoji = '🛡️';
+      title = 'Vous disposez désormais des privilèges Administrateur';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Votre compte a été promu au rôle d'<strong>Administrateur</strong> sur Dekel.Formation.</p>
+      `;
+      callToActionText = 'Accéder au Dashboard Admin';
       break;
 
     // 3. ENROLLMENTS & COURSES
@@ -437,7 +535,67 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
       callToActionText = 'Accéder à la formation';
       break;
 
+    case 'course_manual_add':
+      subject = `Accès accordé à la formation : ${data.courseTitle || 'Nouvelle formation'}`;
+      badgeTitle = 'Nouvel Accès';
+      iconEmoji = '🎁';
+      title = 'Un nouveau cours vous est ouvert !';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Le formateur <strong>${data.trainerName || 'Dekel.Formation'}</strong> vous a accordé l'accès au cours <strong>« ${data.courseTitle || 'Formation'} »</strong>.</p>
+      `;
+      callToActionText = 'Suivre le cours maintenant';
+      break;
+
+    case 'course_free_access_granted':
+      subject = `Accès offert : ${data.courseTitle || 'Formation Dekel'}`;
+      badgeTitle = 'Offre Spéciale';
+      iconEmoji = '✨';
+      title = 'Accès gratuit débloqué !';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Vous avez obtenu un accès gratuit à la formation <strong>« ${data.courseTitle || 'Formation'} »</strong>.</p>
+      `;
+      callToActionText = 'Consulter ma formation';
+      break;
+
+    case 'course_new_published':
+      subject = `Nouveau cours disponible : ${data.courseTitle || 'Catalogue Dekel'}`;
+      badgeTitle = 'Nouveau Cours';
+      iconEmoji = '🌟';
+      title = 'Découvrez notre nouvelle formation !';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>La formation <strong>« ${data.courseTitle || 'Nouvelle formation'} »</strong> est disponible sur le catalogue.</p>
+      `;
+      callToActionText = 'Découvrir la formation';
+      break;
+
+    case 'chapter_new_published':
+      subject = `Nouveau chapitre : ${data.chapterTitle || 'Leçon publiée'}`;
+      badgeTitle = 'Nouveau Contenu';
+      iconEmoji = '📹';
+      title = 'Une nouvelle leçon a été mise en ligne !';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Le chapitre <strong>« ${data.chapterTitle || 'Nouveau chapitre'} »</strong> est désormais disponible dans le cours <strong>« ${data.courseTitle || 'Votre formation'} »</strong>.</p>
+      `;
+      callToActionText = 'Visionner la leçon';
+      break;
+
     // 4. PAYMENTS
+    case 'payment_initiated':
+      subject = `Paiement en cours pour ${data.courseTitle || 'votre formation'}`;
+      badgeTitle = 'Paiement Initié';
+      iconEmoji = '💳';
+      title = 'Votre commande est en cours de traitement';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Nous avons bien pris en compte votre intention de règlement pour <strong>« ${data.courseTitle || 'Formation'} »</strong>${data.paymentAmount ? ` d'un montant de <strong>${data.paymentAmount}</strong>` : ''}.</p>
+      `;
+      callToActionText = 'Voir mon espace étudiant';
+      break;
+
     case 'payment_validated':
       subject = `Paiement validé - Reçu officiel ${appName}`;
       badgeTitle = 'Paiement Validé';
@@ -474,6 +632,19 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData): { sub
         <p>Félicitations ! Ayant complété 100% de la formation <strong>« ${data.courseTitle || 'Formation'} »</strong>, votre certificat officiel est dès à présent disponible au téléchargement.</p>
       `;
       callToActionText = 'Télécharger mon certificat';
+      break;
+
+    // 9. SECURITY
+    case 'security_new_login':
+      subject = `Alerte Sécurité : Nouvelle connexion à votre compte Dekel.Formation`;
+      badgeTitle = 'Sécurité';
+      iconEmoji = '🛡️';
+      title = 'Nouvelle connexion enregistrée';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Une nouvelle connexion s'est produite sur votre compte (${data.ipAddress || 'IP masquée'} - ${data.deviceInfo || 'Appareil navigateur'}).</p>
+      `;
+      callToActionText = 'Sécuriser mon compte';
       break;
 
     // DEFAULT FALLBACK

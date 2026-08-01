@@ -9,6 +9,8 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist webhook_db.json",
     "lint": "tsc --noEmit",
+    "build:functions": "cd functions && npm run build",
+    "deploy:firebase": "npm run build && npm run build:functions && firebase deploy",
     "test:e2e": "tsx test-e2e.ts"
   },
   "dependencies": {

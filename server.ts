@@ -482,7 +482,7 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
 // ==========================================
 
 // API: Queue a transactional email (Non-blocking async)
-app.post("/api/emails/send", (req, res) => {
+app.post(["/api/emails/send", "/api/emails/queue"], (req, res) => {
   const { to, recipientName, type, category, renderData, actionUrl, metadata } = req.body;
 
   if (!to || typeof to !== "string" || !to.includes("@")) {
@@ -493,13 +493,23 @@ app.post("/api/emails/send", (req, res) => {
     return res.status(400).json({ status: "error", message: "Le type d'e-mail est requis." });
   }
 
+  const requestOrigin = req.headers.origin 
+    || (req.headers.referer ? new URL(req.headers.referer as string).origin : null)
+    || `${req.protocol}://${req.get('host')}`;
+
+  const mergedRenderData = {
+    origin: requestOrigin,
+    baseUrl: requestOrigin,
+    ...(renderData || {})
+  };
+
   try {
     const queuedEmail = queueTransactionalEmail({
       to,
       recipientName,
       type,
       category: category || 'authentication',
-      renderData: renderData || {},
+      renderData: mergedRenderData,
       actionUrl,
       metadata: metadata || {}
     });

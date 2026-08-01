@@ -109,6 +109,7 @@ export interface Chapter {
   order: number;
   videoSource: 'youtube' | 'vimeo' | 'direct' | 'iframe';
   videoUrl: string;
+  videoOrientation?: '16/9' | '9/16';
   richText: string;
   imageUrl?: string;
   pdfUrl?: string;

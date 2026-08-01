@@ -227,10 +227,10 @@ export default function CoursePlayer({
   };
 
   return (
-    <div className="lg:h-[calc(100vh-140px)] lg:overflow-hidden glass flex flex-col rounded-3xl border border-white/10 shadow-2xl relative text-white">
+    <div className="glass rounded-3xl border border-white/10 shadow-2xl relative text-white">
       
       {/* Top Navbar */}
-      <div className="glass-light border-b border-white/10 py-3.5 px-6 flex items-center justify-between gap-4 z-10 shrink-0 text-white">
+      <div className="glass-light border-b border-white/10 py-3.5 px-6 flex items-center justify-between gap-4 z-20 shrink-0 text-white sticky top-[60px] md:top-[72px] rounded-t-3xl backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -263,7 +263,7 @@ export default function CoursePlayer({
       </div>
 
       {/* Primary Layout */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-col lg:flex-row relative items-start">
         
         {/* Mobile Backdrop Overlay */}
         {sidebarOpen && (
@@ -273,12 +273,21 @@ export default function CoursePlayer({
           ></div>
         )}
 
-        {/* Left Sidebar (Fixed on Desktop, Drawer on Mobile) */}
-        <div className={`absolute lg:relative top-0 left-0 h-full w-80 lg:w-72 bg-[#161a20] lg:bg-transparent border-r border-white/10 flex flex-col justify-between shrink-0 z-50 lg:z-30 transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}>
+        {/* Left Sidebar (Sticky + Fixed Height + Overflow Scrollable on Desktop, Off-canvas Drawer on Mobile/Tablet) */}
+        <aside className={`
+          fixed lg:sticky
+          top-0 lg:top-[128px] md:lg:top-[136px]
+          left-0 z-50 lg:z-10
+          h-full lg:h-[calc(100vh-150px)] lg:max-h-[calc(100vh-150px)]
+          w-80 lg:w-72
+          bg-[#161a20] lg:bg-[#161a20]/80 lg:backdrop-blur-md
+          border-r border-white/10
+          flex flex-col justify-between shrink-0
+          transition-transform duration-300
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 text-white">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 text-white sticky top-0 bg-[#161a20] lg:bg-[#161a20]/90 backdrop-blur-sm z-10 py-1">
               <div className="flex items-center gap-1.5">
                 <GraduationCap className="w-4 h-4 text-indigo-400 animate-pulse" />
                 <span className="text-xs font-bold text-white font-sans uppercase tracking-wide">Programme</span>
@@ -303,7 +312,7 @@ export default function CoursePlayer({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-1.5 pl-8 pr-3 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans"
               />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2 top-2.5" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             </div>
 
             <div className="space-y-3">
@@ -391,10 +400,10 @@ export default function CoursePlayer({
               <span className="bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded text-[8px] font-extrabold border border-indigo-500/30">INSCRIT</span>
             )}
           </div>
-        </div>
+        </aside>
 
         {/* Content View Pane */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 glass-light z-10 text-white">
+        <div className="flex-1 w-full min-w-0 p-4 sm:p-6 space-y-6 glass-light z-10 text-white rounded-b-3xl lg:rounded-bl-none">
           {activeChapter ? (
             !isEnrolled && !activeChapter.isFree ? (
               <div className="max-w-xl mx-auto space-y-6 py-8">
@@ -466,7 +475,11 @@ export default function CoursePlayer({
                 
                 {/* Responsive Video Container */}
                 {activeChapter.videoUrl ? (
-                  <div className="aspect-video bg-black rounded-3xl overflow-hidden shadow-xl border border-white/10 relative group">
+                  <div className={`mx-auto bg-black rounded-3xl overflow-hidden shadow-xl border border-white/10 relative group transition-all ${
+                    activeChapter.videoOrientation === '9/16'
+                      ? 'aspect-[9/16] max-w-sm sm:max-w-md w-full'
+                      : 'aspect-video w-full'
+                  }`}>
                     {activeChapter.videoSource === 'youtube' || activeChapter.videoSource === 'vimeo' || activeChapter.videoSource === 'iframe' ? (
                       <iframe
                         src={getEmbedUrl(activeChapter.videoUrl, activeChapter.videoSource)}
@@ -479,7 +492,7 @@ export default function CoursePlayer({
                       <video
                         src={activeChapter.videoUrl}
                         controls
-                        className="w-full h-full"
+                        className="w-full h-full object-contain"
                       ></video>
                     )}
                   </div>

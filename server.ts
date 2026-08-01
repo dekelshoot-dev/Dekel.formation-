@@ -16,16 +16,27 @@ import {
 } from "./server/emailServerService";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "./src/services/emailTemplates";
 
-// Read Firebase config from json file
-const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+// Read Firebase config safely from json file or environment
+let firebaseConfig: any = {};
+try {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(firebaseConfigPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+  } else if (process.env.FIREBASE_WEBAPP_CONFIG) {
+    firebaseConfig = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
+  } else if (process.env.FIREBASE_CONFIG) {
+    firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
+  }
+} catch (err) {
+  console.warn("Warning: Could not parse Firebase configuration:", err);
+}
 
 const firebaseApp = initializeApp(firebaseConfig);
-const dbFirestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+const dbFirestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
 
 const app = express();
 app.set("trust proxy", 1);
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const DB_FILE = path.join(process.cwd(), "webhook_db.json");
 
 // Parse payloads

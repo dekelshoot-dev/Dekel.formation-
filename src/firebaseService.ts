@@ -3,11 +3,11 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { 
-  User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent 
+  User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage 
 } from './types';
 import { 
   INITIAL_USERS, INITIAL_COURSES, INITIAL_MODULES, INITIAL_CHAPTERS, 
-  INITIAL_ENROLLMENTS, INITIAL_PROGRESS, INITIAL_EMAILS, INITIAL_PRE_REGISTERED 
+  INITIAL_ENROLLMENTS, INITIAL_PROGRESS, INITIAL_EMAILS, INITIAL_PRE_REGISTERED, INITIAL_CUSTOM_PAGES 
 } from './mockData';
 
 // Helper to sanitize strings for document IDs if necessary
@@ -311,3 +311,25 @@ export async function deletePreRegistered(email: string) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
+
+/**
+  * Custom HTML Pages Mutations
+  */
+export async function saveCustomPage(page: CustomHtmlPage) {
+  const path = `custom_pages/${page.id}`;
+  try {
+    await setDoc(doc(db, 'custom_pages', page.id), cleanUndefined(page));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function deleteCustomPage(pageId: string) {
+  const path = `custom_pages/${pageId}`;
+  try {
+    await deleteDoc(doc(db, 'custom_pages', pageId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+

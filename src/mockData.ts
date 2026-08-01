@@ -1,4 +1,4 @@
-import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent } from './types';
+import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage } from './types';
 
 export const INITIAL_USERS: User[] = [
   {
@@ -487,3 +487,311 @@ export const INITIAL_CATEGORIES: string[] = [
   'Miniatures',
   'Flyers'
 ];
+
+export const INITIAL_CUSTOM_PAGES: CustomHtmlPage[] = [
+  {
+    id: 'page-offre-speciale',
+    title: 'Offre Spéciale Lancement',
+    slug: 'offre-speciale',
+    status: 'published',
+    seoTitle: 'Offre Spéciale Lancement - Dekel.Formation',
+    seoDescription: 'Profitez de -50% sur toutes nos formations certifiantes pendant une durée limitée !',
+    ogImage: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200',
+    createdAt: '2026-07-01T10:00:00Z',
+    updatedAt: '2026-07-15T14:20:00Z',
+    viewsCount: 342,
+    html: `<div class="hero-container">
+  <div class="badge">🔥 Offre Exclusive Limitée</div>
+  <h1>Accélérez Votre Carrière avec nos Formations Certifiantes</h1>
+  <p class="subtitle">Bénéficiez de <strong>-50% de réduction immédiate</strong> sur tout le catalogue jusqu'à ce soir minuit.</p>
+  
+  <div class="timer-card">
+    <span class="timer-label">L'offre se termine dans :</span>
+    <div id="countdown" class="countdown-display">00h 45m 30s</div>
+  </div>
+
+  <div class="actions">
+    <a href="/#catalog" class="cta-button" id="claimBtn">Profiter de l'offre (-50%)</a>
+    <p class="guarantee">Accès à vie • Certificat inclus • Garantie 14 jours</p>
+  </div>
+</div>`,
+    css: `body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-container {
+  max-width: 680px;
+  margin: 40px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 48px 36px;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.badge {
+  display: inline-block;
+  background: linear-gradient(90deg, #e11d48, #f43f5e);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 999px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0 0 16px 0;
+  background: linear-gradient(to right, #ffffff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+
+.timer-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(225, 29, 72, 0.3);
+  padding: 18px;
+  border-radius: 16px;
+  margin-bottom: 32px;
+}
+
+.timer-label {
+  display: block;
+  font-size: 12px;
+  color: #f43f5e;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.countdown-display {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ffffff;
+}
+
+.cta-button {
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  background: #e11d48;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 16px 32px;
+  border-radius: 14px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 10px 25px -5px rgba(225, 29, 72, 0.4);
+}
+
+.cta-button:hover {
+  background: #f43f5e;
+  transform: translateY(-2px);
+  box-shadow: 0 15px 30px -5px rgba(225, 29, 72, 0.6);
+}
+
+.guarantee {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 14px;
+}`,
+    js: `// Compte à rebours dynamique de test
+let totalSeconds = 2730; // 45m 30s
+const timerEl = document.getElementById('countdown');
+
+function updateTimer() {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  
+  const formatted = [
+    h.toString().padStart(2, '0') + 'h',
+    m.toString().padStart(2, '0') + 'm',
+    s.toString().padStart(2, '0') + 's'
+  ].join(' ');
+
+  if (timerEl) timerEl.textContent = formatted;
+  if (totalSeconds > 0) totalSeconds--;
+}
+
+setInterval(updateTimer, 1000);
+updateTimer();
+
+document.getElementById('claimBtn')?.addEventListener('click', function(e) {
+  console.log('Offre cliquée par le prospect!');
+});`
+  },
+  {
+    id: 'page-masterclass-ia',
+    title: 'Masterclass Gratuite - IA & Automatisation',
+    slug: 'masterclass',
+    status: 'published',
+    seoTitle: 'Masterclass Gratuite : Maîtriser l\'IA en 2026',
+    seoDescription: 'Inscrivez-vous gratuitement à notre session en direct pour automatiser vos tâches et créer vos formations avec l\'IA.',
+    ogImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200',
+    createdAt: '2026-07-20T11:00:00Z',
+    updatedAt: '2026-07-22T09:15:00Z',
+    viewsCount: 189,
+    html: `<div class="wrapper">
+  <div class="card">
+    <div class="header">
+      <span class="live-pill">LIVE WEBINAR</span>
+      <h2>Masterclass IA & Automatisation 2026</h2>
+      <p>Comment multiplier par 5 votre productivité avec les derniers modèles d'IA.</p>
+    </div>
+    
+    <div class="form-group">
+      <label for="userName">Votre Prénom</label>
+      <input type="text" id="userName" placeholder="Ex: Alex" />
+    </div>
+
+    <div class="form-group">
+      <label for="userEmail">Votre Adresse E-mail</label>
+      <input type="email" id="userEmail" placeholder="votre.email@exemple.com" />
+    </div>
+
+    <button id="registerBtn" class="btn">Réserver ma place gratuite</button>
+    <div id="statusMsg" class="status-message"></div>
+  </div>
+</div>`,
+    css: `body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #0d1117;
+  color: #e6edf3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.wrapper {
+  width: 100%;
+  max-width: 480px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.live-pill {
+  background: #238636;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 1px;
+}
+
+h2 {
+  font-size: 22px;
+  margin: 16px 0 8px 0;
+  color: #ffffff;
+}
+
+p {
+  font-size: 14px;
+  color: #8b949e;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9d1d9;
+  margin-bottom: 6px;
+}
+
+input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+
+input:focus {
+  border-color: #58a6ff;
+}
+
+.btn {
+  width: 100%;
+  background: #1f6beb;
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background 0.2s;
+}
+
+.btn:hover {
+  background: #388bfd;
+}
+
+.status-message {
+  margin-top: 16px;
+  font-size: 13px;
+  text-align: center;
+}`,
+    js: `document.getElementById('registerBtn')?.addEventListener('click', function() {
+  const name = document.getElementById('userName').value.trim();
+  const email = document.getElementById('userEmail').value.trim();
+  const status = document.getElementById('statusMsg');
+
+  if (!email) {
+    status.style.color = '#f85149';
+    status.textContent = 'Veuillez saisir une adresse e-mail valide.';
+    return;
+  }
+
+  status.style.color = '#3fb950';
+  status.textContent = '🎉 Félicitations ' + (name || '') + ' ! Votre place a été réservée avec succès.';
+});`
+  }
+];
+

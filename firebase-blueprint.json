@@ -120,6 +120,28 @@
         "courseIds": { "type": "array", "description": "Pre-authorized course IDs" }
       },
       "required": ["email", "courseIds"]
+    },
+    "CustomHtmlPage": {
+      "title": "CustomHtmlPage",
+      "description": "Custom standalone HTML pages with CSS and JS.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique page ID" },
+        "title": { "type": "string", "description": "Page title" },
+        "slug": { "type": "string", "description": "Custom route slug" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"], "description": "Publication status" },
+        "html": { "type": "string", "description": "HTML content" },
+        "css": { "type": "string", "description": "CSS styles" },
+        "js": { "type": "string", "description": "JavaScript code" },
+        "seoTitle": { "type": "string", "description": "SEO title" },
+        "seoDescription": { "type": "string", "description": "SEO description" },
+        "ogImage": { "type": "string", "description": "Open Graph image URL" },
+        "customHeadTags": { "type": "string", "description": "Custom head tags" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" },
+        "viewsCount": { "type": "number", "description": "Views counter" }
+      },
+      "required": ["id", "title", "slug", "status", "html", "css", "js", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -154,6 +176,10 @@
     "/preregistered/{preregId}": {
       "schema": "PreRegisteredStudent",
       "description": "Pre-registered student authorization entries."
+    },
+    "/custom_pages/{pageId}": {
+      "schema": "CustomHtmlPage",
+      "description": "Custom standalone HTML pages with CSS and JS."
     }
   }
 }

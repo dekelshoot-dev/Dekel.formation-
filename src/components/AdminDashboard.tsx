@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { User, UserRole, Course, Enrollment, SimulatedEmail } from '../types';
-import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag } from 'lucide-react';
+import { User, UserRole, Course, Enrollment, SimulatedEmail, CustomHtmlPage } from '../types';
+import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag, FileCode, Globe } from 'lucide-react';
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
+import CustomPagesManager from './CustomPagesManager';
 import { ConfirmModal } from './ConfirmModal';
 import { emailTriggers } from '../services/emailClient';
 
@@ -12,6 +13,7 @@ interface AdminDashboardProps {
   allCourses: Course[];
   allEnrollments: Enrollment[];
   categories?: string[];
+  customPages?: CustomHtmlPage[];
   onAddCategory?: (cat: string) => void;
   onDeleteCategory?: (cat: string) => void;
   onToggleCourseStatus: (courseId: string) => void;
@@ -24,6 +26,9 @@ interface AdminDashboardProps {
   onUpdateUser: (user: User) => void;
   onPreviewCourse?: (course: Course) => void;
   onEditCourse?: (course: Course) => void;
+  onSaveCustomPage?: (page: CustomHtmlPage) => void;
+  onDeleteCustomPage?: (pageId: string) => void;
+  onPreviewCustomPage?: (page: CustomHtmlPage) => void;
 }
 
 export default function AdminDashboard({
@@ -32,6 +37,7 @@ export default function AdminDashboard({
   allCourses,
   allEnrollments,
   categories = ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'],
+  customPages = [],
   onAddCategory,
   onDeleteCategory,
   onToggleCourseStatus,
@@ -43,9 +49,12 @@ export default function AdminDashboard({
   onUpdateUserRole,
   onUpdateUser,
   onPreviewCourse,
-  onEditCourse
+  onEditCourse,
+  onSaveCustomPage,
+  onDeleteCustomPage,
+  onPreviewCustomPage
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'settings' | 'profile'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile'>('stats');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -413,6 +422,16 @@ Adresse e-mail attribuée : ${emailTrimmed}
                 </button>
 
                 <button
+                  onClick={() => { setActiveTab('custom-pages'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'custom-pages' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileCode className="w-4 h-4 text-indigo-600" />
+                  <span>Pages HTML Personnalisées</span>
+                </button>
+
+                <button
                   onClick={() => { setActiveTab('settings'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                     activeTab === 'settings' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
@@ -572,6 +591,16 @@ Adresse e-mail attribuée : ${emailTrimmed}
           >
             <Mail className="w-4 h-4 text-emerald-600" />
             <span>E-mails Transactionnels</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('custom-pages'); setSearchQuery(''); }}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all ${
+              activeTab === 'custom-pages' ? 'bg-red-50 text-red-900 font-bold border border-red-100' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <FileCode className="w-4 h-4 text-indigo-600" />
+            <span>Pages HTML Personnalisées</span>
           </button>
           <button
             onClick={() => { setActiveTab('settings'); setSearchQuery(''); }}
@@ -1292,6 +1321,16 @@ Adresse e-mail attribuée : ${emailTrimmed}
           {/* Tab Content: Transactional Emails */}
           {activeTab === 'emails' && (
             <TransactionalEmailDashboard />
+          )}
+
+          {/* Tab Content: Custom HTML Pages */}
+          {activeTab === 'custom-pages' && (
+            <CustomPagesManager
+              customPages={customPages}
+              onSavePage={(page) => onSaveCustomPage && onSaveCustomPage(page)}
+              onDeletePage={(pageId) => onDeleteCustomPage && onDeleteCustomPage(pageId)}
+              onPreviewPage={(page) => onPreviewCustomPage && onPreviewCustomPage(page)}
+            />
           )}
 
           {/* Tab Content: Settings */}

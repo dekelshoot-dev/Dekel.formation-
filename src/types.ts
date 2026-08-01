@@ -319,3 +319,25 @@ export interface MediaFile {
   uploadedAt: string;
   uploadedBy: string;
 }
+
+export type CustomPageStatus = 'published' | 'draft' | 'archived';
+
+export interface CustomHtmlPage {
+  id: string;
+  title: string;
+  slug: string; // e.g. "offre-speciale" or "/offre-speciale"
+  status: CustomPageStatus; // 'published' | 'draft' | 'archived'
+  html: string;
+  css: string;
+  js: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  ogImage?: string;
+  customHeadTags?: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId?: string;
+  authorName?: string;
+  viewsCount?: number;
+}
+

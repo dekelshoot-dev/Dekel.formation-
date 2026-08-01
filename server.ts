@@ -36,7 +36,7 @@ const dbFirestore = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId
 
 const app = express();
 app.set("trust proxy", 1);
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 const DB_FILE = path.join(process.cwd(), "webhook_db.json");
 
 // Parse payloads

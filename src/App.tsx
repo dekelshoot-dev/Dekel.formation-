@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent } from './types';
+import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage } from './types';
 import { 
   INITIAL_USERS, INITIAL_COURSES, INITIAL_MODULES, INITIAL_CHAPTERS, 
   INITIAL_ENROLLMENTS, INITIAL_PROGRESS, INITIAL_EMAILS, INITIAL_PRE_REGISTERED,
-  INITIAL_CATEGORIES
+  INITIAL_CATEGORIES, INITIAL_CUSTOM_PAGES
 } from './mockData';
 
 // Modular Components
@@ -16,6 +16,7 @@ import StudentDashboard from './components/StudentDashboard';
 import CoursePlayer from './components/CoursePlayer';
 import Marketplace from './components/Marketplace';
 import UserProfile from './components/UserProfile';
+import CustomPageViewer from './components/CustomPageViewer';
 import { ToastContainer, showToast } from './components/Toast';
 import GlobalOverflowPopover from './components/GlobalOverflowPopover';
 import { emailTriggers } from './services/emailClient';
@@ -31,7 +32,8 @@ import {
   seedDatabaseIfEmpty, saveUserProfile, deleteUserProfile, saveCourse, deleteCourse, 
   saveModule, saveModuleList, deleteModule, saveChapter, saveChapterList, 
   deleteChapter, saveEnrollment, deleteEnrollment, saveStudentProgress, 
-  saveSimulatedEmail, clearSimulatedEmails, savePreRegistered, deletePreRegistered 
+  saveSimulatedEmail, clearSimulatedEmails, savePreRegistered, deletePreRegistered,
+  saveCustomPage, deleteCustomPage
 } from './firebaseService';
 
 export default function App() {
@@ -135,6 +137,117 @@ export default function App() {
   // Active session and view management
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // --- Custom HTML Pages State & Firestore Sync ---
+  const [allCustomPages, setAllCustomPages] = useState<CustomHtmlPage[]>(() => {
+    const saved = localStorage.getItem('sio_custom_pages');
+    return saved ? JSON.parse(saved) : INITIAL_CUSTOM_PAGES;
+  });
+
+  const [previewingCustomPage, setPreviewingCustomPage] = useState<CustomHtmlPage | null>(null);
+  const [activeCustomPageRoute, setActiveCustomPageRoute] = useState<CustomHtmlPage | null>(null);
+
+  // Sync Custom Pages with Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'custom_pages'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list: CustomHtmlPage[] = [];
+        snapshot.forEach(docSnap => {
+          list.push(docSnap.data() as CustomHtmlPage);
+        });
+        setAllCustomPages(list);
+        localStorage.setItem('sio_custom_pages', JSON.stringify(list));
+      }
+    }, (err) => {
+      console.warn('Custom pages snapshot warning:', err.message);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSaveCustomPage = async (page: CustomHtmlPage) => {
+    const exists = allCustomPages.some(p => p.id === page.id);
+    const updated = exists
+      ? allCustomPages.map(p => p.id === page.id ? page : p)
+      : [page, ...allCustomPages];
+    setAllCustomPages(updated);
+    localStorage.setItem('sio_custom_pages', JSON.stringify(updated));
+    try {
+      await saveCustomPage(page);
+    } catch (err) {
+      console.error('Error saving custom page to Firestore:', err);
+    }
+  };
+
+  const handleDeleteCustomPage = async (pageId: string) => {
+    const pageToDelete = allCustomPages.find(p => p.id === pageId);
+    const updated = allCustomPages.filter(p => p.id !== pageId);
+    setAllCustomPages(updated);
+    localStorage.setItem('sio_custom_pages', JSON.stringify(updated));
+    try {
+      await deleteCustomPage(pageId);
+    } catch (err) {
+      console.error('Error deleting custom page from Firestore:', err);
+    }
+    if (pageToDelete) {
+      showToast(`Page "${pageToDelete.title}" supprimée.`, 'info');
+    }
+  };
+
+  // Intercept Custom Page routes (e.g. /p/offre-speciale, /offre-speciale, /masterclass, or ?p=offre-speciale)
+  useEffect(() => {
+    if (allCustomPages.length === 0) return;
+
+    const checkCustomPageRoute = () => {
+      let slug = '';
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      
+      // 1. Pathname check (e.g. /p/offre-speciale or /offre-speciale)
+      if (pathParts.length >= 2 && pathParts[0] === 'p') {
+        slug = pathParts[1];
+      } else if (pathParts.length === 1 && !['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'reset-password'].includes(pathParts[0])) {
+        slug = pathParts[0];
+      }
+
+      // 2. Query parameter check (e.g. ?p=offre-speciale or ?page=offre-speciale)
+      if (!slug) {
+        const params = new URLSearchParams(window.location.search);
+        slug = params.get('p') || params.get('page') || '';
+      }
+
+      // 3. Hash check (e.g. #/p/offre-speciale or #/offre-speciale)
+      if (!slug && window.location.hash) {
+        const hash = window.location.hash.replace('#', '').replace(/^\/+/, '');
+        const hashParts = hash.split('/');
+        if (hashParts[0] === 'p' && hashParts[1]) {
+          slug = hashParts[1];
+        } else if (hashParts.length === 1 && !hashParts[0].includes('=')) {
+          slug = hashParts[0];
+        }
+      }
+
+      if (slug) {
+        const matchedPage = allCustomPages.find(p => p.slug === slug || p.id === slug);
+        if (matchedPage) {
+          // Check if page is published, or if current user is admin
+          const isAdmin = currentUser?.role === 'admin';
+          if (matchedPage.status === 'published' || isAdmin) {
+            setActiveCustomPageRoute(matchedPage);
+            return;
+          }
+        }
+      }
+      setActiveCustomPageRoute(null);
+    };
+
+    checkCustomPageRoute();
+
+    window.addEventListener('popstate', checkCustomPageRoute);
+    window.addEventListener('hashchange', checkCustomPageRoute);
+    return () => {
+      window.removeEventListener('popstate', checkCustomPageRoute);
+      window.removeEventListener('hashchange', checkCustomPageRoute);
+    };
+  }, [allCustomPages, currentUser]);
 
   const [activeCoursePlayer, setActiveCoursePlayer] = useState<Course | null>(null);
   const [visitorTab, setVisitorTab] = useState<'catalog' | 'auth' | 'reset-password' | 'verify-email'>('catalog');
@@ -753,6 +866,17 @@ Bon apprentissage.`,
     await saveStudentProgress(updatedProgress);
   };
 
+  // Standalone Fullscreen Custom Page View (no platform header/footer/layout)
+  if (activeCustomPageRoute || previewingCustomPage) {
+    return (
+      <CustomPageViewer
+        page={activeCustomPageRoute || previewingCustomPage!}
+        isPreviewMode={!!previewingCustomPage}
+        onClosePreview={() => setPreviewingCustomPage(null)}
+      />
+    );
+  }
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#161a20] flex flex-col items-center justify-center text-white">
@@ -1015,6 +1139,10 @@ Bon apprentissage.`,
                 categories={categories}
                 onAddCategory={handleAddCategory}
                 onDeleteCategory={handleDeleteCategory}
+                customPages={allCustomPages}
+                onSaveCustomPage={handleSaveCustomPage}
+                onDeleteCustomPage={handleDeleteCustomPage}
+                onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
               />
             )}
 

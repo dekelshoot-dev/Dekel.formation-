@@ -115,6 +115,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // 20. Custom Email Templates
+    match /custom_email_templates/{templateId} {
+      allow read, write: if true;
+    }
+
     // Catch-all safety net
     match /{document=**} {
       allow read, write: if false;

@@ -138,6 +138,47 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  // Helper to extract custom page route synchronously on initial load
+  const matchCustomPageRoute = (pages: CustomHtmlPage[], isAdmin = false): CustomHtmlPage | null => {
+    if (!pages || pages.length === 0) return null;
+    let slug = '';
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    
+    // 1. Pathname check (e.g. /p/offre-speciale or /offre-speciale)
+    if (pathParts.length >= 2 && pathParts[0] === 'p') {
+      slug = pathParts[1];
+    } else if (pathParts.length === 1 && !['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'reset-password', 'api'].includes(pathParts[0])) {
+      slug = pathParts[0];
+    }
+
+    // 2. Query parameter check (e.g. ?p=offre-speciale or ?page=offre-speciale)
+    if (!slug) {
+      const params = new URLSearchParams(window.location.search);
+      slug = params.get('p') || params.get('page') || '';
+    }
+
+    // 3. Hash check (e.g. #/p/offre-speciale or #/offre-speciale)
+    if (!slug && window.location.hash) {
+      const hash = window.location.hash.replace('#', '').replace(/^\/+/, '');
+      const hashParts = hash.split('/');
+      if (hashParts[0] === 'p' && hashParts[1]) {
+        slug = hashParts[1];
+      } else if (hashParts.length === 1 && !hashParts[0].includes('=')) {
+        slug = hashParts[0];
+      }
+    }
+
+    if (slug) {
+      const matchedPage = pages.find(p => p.slug === slug || p.id === slug);
+      if (matchedPage) {
+        if (matchedPage.status === 'published' || isAdmin) {
+          return matchedPage;
+        }
+      }
+    }
+    return null;
+  };
+
   // --- Custom HTML Pages State & Firestore Sync ---
   const [allCustomPages, setAllCustomPages] = useState<CustomHtmlPage[]>(() => {
     const saved = localStorage.getItem('sio_custom_pages');
@@ -145,7 +186,37 @@ export default function App() {
   });
 
   const [previewingCustomPage, setPreviewingCustomPage] = useState<CustomHtmlPage | null>(null);
-  const [activeCustomPageRoute, setActiveCustomPageRoute] = useState<CustomHtmlPage | null>(null);
+  
+  // Synchronous initial route detection (zero delay / no home page flash)
+  const [activeCustomPageRoute, setActiveCustomPageRoute] = useState<CustomHtmlPage | null>(() => {
+    const saved = localStorage.getItem('sio_custom_pages');
+    const pages: CustomHtmlPage[] = saved ? JSON.parse(saved) : INITIAL_CUSTOM_PAGES;
+    let slug = '';
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    if (pathParts.length >= 2 && pathParts[0] === 'p') {
+      slug = pathParts[1];
+    } else if (pathParts.length === 1 && !['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'reset-password', 'api'].includes(pathParts[0])) {
+      slug = pathParts[0];
+    }
+    if (!slug) {
+      const params = new URLSearchParams(window.location.search);
+      slug = params.get('p') || params.get('page') || '';
+    }
+    if (!slug && window.location.hash) {
+      const hash = window.location.hash.replace('#', '').replace(/^\/+/, '');
+      const hashParts = hash.split('/');
+      if (hashParts[0] === 'p' && hashParts[1]) {
+        slug = hashParts[1];
+      } else if (hashParts.length === 1 && !hashParts[0].includes('=')) {
+        slug = hashParts[0];
+      }
+    }
+    if (slug) {
+      const matched = pages.find(p => p.slug === slug || p.id === slug);
+      if (matched) return matched;
+    }
+    return null;
+  });
 
   // Sync Custom Pages with Firestore
   useEffect(() => {
@@ -193,50 +264,13 @@ export default function App() {
     }
   };
 
-  // Intercept Custom Page routes (e.g. /p/offre-speciale, /offre-speciale, /masterclass, or ?p=offre-speciale)
+  // Intercept Custom Page routes dynamically on navigation / updates
   useEffect(() => {
     if (allCustomPages.length === 0) return;
 
     const checkCustomPageRoute = () => {
-      let slug = '';
-      const pathParts = window.location.pathname.split('/').filter(Boolean);
-      
-      // 1. Pathname check (e.g. /p/offre-speciale or /offre-speciale)
-      if (pathParts.length >= 2 && pathParts[0] === 'p') {
-        slug = pathParts[1];
-      } else if (pathParts.length === 1 && !['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'reset-password'].includes(pathParts[0])) {
-        slug = pathParts[0];
-      }
-
-      // 2. Query parameter check (e.g. ?p=offre-speciale or ?page=offre-speciale)
-      if (!slug) {
-        const params = new URLSearchParams(window.location.search);
-        slug = params.get('p') || params.get('page') || '';
-      }
-
-      // 3. Hash check (e.g. #/p/offre-speciale or #/offre-speciale)
-      if (!slug && window.location.hash) {
-        const hash = window.location.hash.replace('#', '').replace(/^\/+/, '');
-        const hashParts = hash.split('/');
-        if (hashParts[0] === 'p' && hashParts[1]) {
-          slug = hashParts[1];
-        } else if (hashParts.length === 1 && !hashParts[0].includes('=')) {
-          slug = hashParts[0];
-        }
-      }
-
-      if (slug) {
-        const matchedPage = allCustomPages.find(p => p.slug === slug || p.id === slug);
-        if (matchedPage) {
-          // Check if page is published, or if current user is admin
-          const isAdmin = currentUser?.role === 'admin';
-          if (matchedPage.status === 'published' || isAdmin) {
-            setActiveCustomPageRoute(matchedPage);
-            return;
-          }
-        }
-      }
-      setActiveCustomPageRoute(null);
+      const matchedPage = matchCustomPageRoute(allCustomPages, currentUser?.role === 'admin');
+      setActiveCustomPageRoute(matchedPage);
     };
 
     checkCustomPageRoute();
@@ -1233,6 +1267,10 @@ Bon apprentissage.`,
                 }}
                 onPreviewCourse={setActiveCoursePlayer}
                 onAddUser={handleAddUser}
+                customPages={allCustomPages}
+                onSaveCustomPage={handleSaveCustomPage}
+                onDeleteCustomPage={handleDeleteCustomPage}
+                onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
               />
             )}
 

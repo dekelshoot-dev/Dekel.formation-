@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { User, SimulatedEmail } from '../types';
 import { 
   TransactionalEmailLog, 
   EmailCategory, 
@@ -44,13 +45,25 @@ import {
   AlertCircle,
   Play,
   Database,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import { showToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
+import EmailBroadcastManager from './EmailBroadcastManager';
 
-export default function TransactionalEmailDashboard() {
-  const [activeTab, setActiveTab] = useState<'logs' | 'center' | 'smtp' | 'diagnostic'>('logs');
+interface TransactionalEmailDashboardProps {
+  allUsers?: User[];
+  currentUser?: User;
+  onSendEmail?: (email: SimulatedEmail) => void;
+}
+
+export default function TransactionalEmailDashboard({
+  allUsers = [],
+  currentUser,
+  onSendEmail
+}: TransactionalEmailDashboardProps = {}) {
+  const [activeTab, setActiveTab] = useState<'broadcast' | 'logs' | 'center' | 'smtp' | 'diagnostic'>('broadcast');
 
   const [logs, setLogs] = useState<TransactionalEmailLog[]>([]);
   const [templates, setTemplates] = useState<EmailTemplateDefinition[]>([]);
@@ -481,17 +494,29 @@ export default function TransactionalEmailDashboard() {
       </div>
 
       {/* Main Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('broadcast')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === 'broadcast'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>Templates &amp; Diffusion de Mails</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('logs')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all ${
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
             activeTab === 'logs'
               ? 'bg-emerald-500 text-slate-950 shadow-md'
               : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
           }`}
         >
           <Mail className="w-4 h-4" />
-          <span>Journal d'Envoi & Historique</span>
+          <span>Journal d'Envoi &amp; Historique</span>
           <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-950/50 text-emerald-200">
             {logs.length}
           </span>
@@ -538,6 +563,17 @@ export default function TransactionalEmailDashboard() {
           <span>Diagnostic SMTP & Logs (Render)</span>
         </button>
       </div>
+
+      {/* TAB 0: TEMPLATES & BROADCAST */}
+      {activeTab === 'broadcast' && (
+        <div className="space-y-6">
+          <EmailBroadcastManager
+            allUsers={allUsers}
+            currentUser={currentUser || { id: 'admin', name: 'Administrateur', email: 'service@dekel-dev.com', role: 'admin', createdAt: new Date().toISOString() }}
+            onSendEmail={onSendEmail}
+          />
+        </div>
+      )}
 
       {/* TAB 1: LOGS & HISTORY */}
       {activeTab === 'logs' && (

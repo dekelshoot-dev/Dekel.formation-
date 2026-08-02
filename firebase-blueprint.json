@@ -142,6 +142,22 @@
         "viewsCount": { "type": "number", "description": "Views counter" }
       },
       "required": ["id", "title", "slug", "status", "html", "css", "js", "createdAt", "updatedAt"]
+    },
+    "CustomEmailTemplate": {
+      "title": "CustomEmailTemplate",
+      "description": "Custom administrator email template.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Template ID" },
+        "title": { "type": "string", "description": "Template name" },
+        "subject": { "type": "string", "description": "Default email subject" },
+        "category": { "type": "string", "description": "Template category" },
+        "htmlBody": { "type": "string", "description": "HTML content" },
+        "description": { "type": "string", "description": "Short description" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "subject", "category", "htmlBody", "createdAt"]
     }
   },
   "firestore": {
@@ -180,6 +196,10 @@
     "/custom_pages/{pageId}": {
       "schema": "CustomHtmlPage",
       "description": "Custom standalone HTML pages with CSS and JS."
+    },
+    "/custom_email_templates/{templateId}": {
+      "schema": "CustomEmailTemplate",
+      "description": "Custom email template definitions."
     }
   }
 }

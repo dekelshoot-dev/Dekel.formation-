@@ -403,11 +403,35 @@ function resolveActionUrl(type: EmailType, data: EmailRenderData, baseUrl: strin
   }
 }
 
-export function generateEmailHtml(type: EmailType, data: EmailRenderData): { subject: string; html: string; text: string } {
+export function generateEmailHtml(type: EmailType, data: EmailRenderData & { customSubject?: string; customHtml?: string }): { subject: string; html: string; text: string } {
   const name = data.recipientName || 'Cher membre';
   const appName = 'Dekel.Formation';
   const senderEmail = process.env.SENDER_EMAIL || process.env.GMAIL_USER || 'service@dekel-dev.com';
   const currentYear = new Date().getFullYear();
+
+  // If custom HTML and/or subject is explicitly passed, use it directly
+  if (data.customHtml) {
+    const customSubject = data.customSubject || `Message de ${appName}`;
+    const htmlBody = data.customHtml;
+    const isFullDoc = htmlBody.trim().toLowerCase().startsWith('<!doctype') || htmlBody.trim().toLowerCase().startsWith('<html');
+    const finalHtml = isFullDoc ? htmlBody : `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${customSubject}</title>
+</head>
+<body style="margin: 0; padding: 16px; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  ${htmlBody}
+</body>
+</html>`;
+
+    return {
+      subject: customSubject,
+      html: finalHtml,
+      text: htmlBody.replace(/<[^>]+>/g, '')
+    };
+  }
 
   const rawBaseUrl = data.origin || data.baseUrl || process.env.APP_URL || process.env.PUBLIC_URL || (typeof window !== 'undefined' && window.location.origin ? window.location.origin : '');
   const baseUrl = (rawBaseUrl && rawBaseUrl.startsWith('http')) 

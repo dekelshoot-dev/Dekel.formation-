@@ -154,6 +154,18 @@ export interface SimulatedEmail {
   htmlBody?: string;
 }
 
+export interface CustomEmailTemplate {
+  id: string;
+  title: string;
+  subject: string;
+  category: 'fete' | 'bienvenue' | 'annonce' | 'relance' | 'offre' | 'autre';
+  htmlBody: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  isPredefined?: boolean;
+}
+
 export interface PreRegisteredStudent {
   email: string;
   courseIds: string[];

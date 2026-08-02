@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, DownloadableFile, ExternalLink, CustomPaymentButton, CourseQuiz } from '../types';
+import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, DownloadableFile, ExternalLink, CustomPaymentButton, CourseQuiz, CustomHtmlPage } from '../types';
 import { 
   BarChart3, BookOpen, Users, Settings, User as UserIcon, Plus, Trash2, Copy, 
   Share2, Edit3, Save, ArrowUp, ArrowDown, Check, CheckCircle2, AlertCircle, 
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { showToast } from './Toast';
 import UserProfile from './UserProfile';
+import CustomPagesManager from './CustomPagesManager';
+import EmailBroadcastManager from './EmailBroadcastManager';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { cleanUndefined } from '../firebaseService';
@@ -27,8 +29,12 @@ interface TrainerDashboardProps {
   allProgress: StudentProgress[];
   preRegistered: PreRegisteredStudent[];
   categories?: string[];
+  customPages?: CustomHtmlPage[];
   onAddCategory?: (cat: string) => void;
   onDeleteCategory?: (cat: string) => void;
+  onSaveCustomPage?: (page: CustomHtmlPage) => void;
+  onDeleteCustomPage?: (pageId: string) => void;
+  onPreviewCustomPage?: (page: CustomHtmlPage) => void;
   
   // State changers
   onAddCourse: (course: Course) => void;
@@ -60,8 +66,12 @@ export default function TrainerDashboard({
   allProgress,
   preRegistered,
   categories = ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'],
+  customPages = [],
   onAddCategory,
   onDeleteCategory,
+  onSaveCustomPage,
+  onDeleteCustomPage,
+  onPreviewCustomPage,
   onAddCourse,
   onUpdateCourse,
   onDeleteCourse,
@@ -81,7 +91,7 @@ export default function TrainerDashboard({
   onAddUser,
 }: TrainerDashboardProps) {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants' | 'custom-pages' | 'emails'>('dashboard');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   
   // Selection states
@@ -1935,6 +1945,26 @@ Le support Dekel.Formation`,
                   <span>Journal des Webhooks</span>
                 </button>
 
+                <button
+                  onClick={() => { setActiveTab('custom-pages'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'custom-pages' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileCode className="w-4 h-4 text-amber-500" />
+                  <span>Pages HTML ({customPages.length})</span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('emails'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'emails' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Mail className="w-4 h-4 text-purple-500" />
+                  <span>E-mails &amp; Diffusion</span>
+                </button>
+
                 {(currentUser.role === 'trainer' || currentUser.role === 'admin') && (
                   <button
                     onClick={() => { setActiveTab('assistants'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
@@ -2041,6 +2071,24 @@ Le support Dekel.Formation`,
         >
           <Globe className="w-4 h-4 text-indigo-500" />
           <span>Journal des Webhooks</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('custom-pages'); setSelectedCourseId(null); }}
+          className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'custom-pages' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <FileCode className="w-4 h-4 text-amber-500" />
+          <span>Pages HTML ({customPages.length})</span>
+        </button>
+        <button
+          onClick={() => { setActiveTab('emails'); setSelectedCourseId(null); }}
+          className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'emails' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Mail className="w-4 h-4 text-purple-500" />
+          <span>E-mails &amp; Diffusion</span>
         </button>
         {(currentUser.role === 'trainer' || currentUser.role === 'admin') && (
           <button
@@ -5168,6 +5216,30 @@ Le support Dekel.Formation`,
               </form>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Tab: Custom HTML Pages */}
+      {activeTab === 'custom-pages' && (
+        <div className="space-y-6 animate-fade-in">
+          <CustomPagesManager
+            customPages={customPages}
+            currentUser={currentUser}
+            onSavePage={onSaveCustomPage || (() => {})}
+            onDeletePage={onDeleteCustomPage || (() => {})}
+            onPreviewPage={onPreviewCustomPage || (() => {})}
+          />
+        </div>
+      )}
+
+      {/* Tab: Emails & Broadcast */}
+      {activeTab === 'emails' && (
+        <div className="space-y-6 animate-fade-in">
+          <EmailBroadcastManager
+            allUsers={allUsers}
+            currentUser={currentUser}
+            onSendEmail={onSendEmail}
+          />
         </div>
       )}
 

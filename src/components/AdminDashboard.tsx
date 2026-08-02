@@ -1320,13 +1320,18 @@ Adresse e-mail attribuée : ${emailTrimmed}
 
           {/* Tab Content: Transactional Emails */}
           {activeTab === 'emails' && (
-            <TransactionalEmailDashboard />
+            <TransactionalEmailDashboard 
+              allUsers={allUsers}
+              currentUser={currentUser}
+              onSendEmail={onSendEmail}
+            />
           )}
 
           {/* Tab Content: Custom HTML Pages */}
           {activeTab === 'custom-pages' && (
             <CustomPagesManager
               customPages={customPages}
+              currentUser={currentUser}
               onSavePage={(page) => onSaveCustomPage && onSaveCustomPage(page)}
               onDeletePage={(pageId) => onDeleteCustomPage && onDeleteCustomPage(pageId)}
               onPreviewPage={(page) => onPreviewCustomPage && onPreviewCustomPage(page)}

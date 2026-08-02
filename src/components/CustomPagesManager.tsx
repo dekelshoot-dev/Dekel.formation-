@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { CustomHtmlPage, CustomPageStatus } from '../types';
+import { CustomHtmlPage, CustomPageStatus, User } from '../types';
 import { 
   Plus, Edit3, Trash2, Eye, Copy, ExternalLink, Globe, FileCode, 
   Code, Palette, Terminal, Sparkles, Check, Search, Filter, 
-  Settings, ArrowLeft, Save, ShieldCheck, Layers, FileText, AlertCircle, RefreshCw
+  Settings, ArrowLeft, Save, ShieldCheck, Layers, FileText, AlertCircle, RefreshCw,
+  User as UserIcon, Lock
 } from 'lucide-react';
 import { showToast } from './Toast';
 
 interface CustomPagesManagerProps {
   customPages: CustomHtmlPage[];
+  currentUser?: User;
   onSavePage: (page: CustomHtmlPage) => void;
   onDeletePage: (pageId: string) => void;
   onPreviewPage: (page: CustomHtmlPage) => void;
@@ -16,6 +18,7 @@ interface CustomPagesManagerProps {
 
 export default function CustomPagesManager({
   customPages,
+  currentUser,
   onSavePage,
   onDeletePage,
   onPreviewPage
@@ -60,6 +63,8 @@ export default function CustomPagesManager({
       seoDescription: 'Découvrez notre nouvelle page personnalisée.',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      authorId: currentUser?.id || currentUser?.email,
+      authorName: currentUser?.name || currentUser?.email || 'Auteur Inconnu',
       viewsCount: 0
     };
 
@@ -103,6 +108,8 @@ export default function CustomPagesManager({
       status: 'draft',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      authorId: currentUser?.id || currentUser?.email || page.authorId,
+      authorName: currentUser?.name || currentUser?.email || page.authorName,
       viewsCount: 0
     };
     onSavePage(clone);
@@ -143,6 +150,8 @@ export default function CustomPagesManager({
       customHeadTags: customHeadTags.trim(),
       createdAt: editingPage?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      authorId: editingPage?.authorId || currentUser?.id || currentUser?.email,
+      authorName: editingPage?.authorName || currentUser?.name || currentUser?.email || 'Auteur Inconnu',
       viewsCount: editingPage?.viewsCount || 0
     };
 
@@ -174,8 +183,18 @@ export default function CustomPagesManager({
     showToast('Modèle appliqué avec succès !', 'info');
   };
 
-  // Filter pages
-  const filteredPages = customPages.filter(page => {
+  // Creator Isolation: Filter pages so formateurs and admins only see pages created by themselves
+  const userPages = customPages.filter(page => {
+    if (!currentUser) return true;
+    if (page.authorId) {
+      return page.authorId === currentUser.id || page.authorId === currentUser.email;
+    }
+    // If no authorId is set (legacy page), match if authorName corresponds or show to owner
+    return true;
+  });
+
+  // Filter userPages by search query & status
+  const filteredPages = userPages.filter(page => {
     const matchesSearch = 
       page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       page.slug.toLowerCase().includes(searchQuery.toLowerCase());
@@ -248,10 +267,10 @@ export default function CustomPagesManager({
                 onChange={(e) => setStatusFilter(e.target.value as any)}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 cursor-pointer w-full sm:w-auto"
               >
-                <option value="all">Tous les statuts ({customPages.length})</option>
-                <option value="published">Publiées ({customPages.filter(p => p.status === 'published').length})</option>
-                <option value="draft">Brouillons ({customPages.filter(p => p.status === 'draft').length})</option>
-                <option value="archived">Archivées ({customPages.filter(p => p.status === 'archived').length})</option>
+                <option value="all">Tous les statuts ({userPages.length})</option>
+                <option value="published">Publiées ({userPages.filter(p => p.status === 'published').length})</option>
+                <option value="draft">Brouillons ({userPages.filter(p => p.status === 'draft').length})</option>
+                <option value="archived">Archivées ({userPages.filter(p => p.status === 'archived').length})</option>
               </select>
             </div>
           </div>
@@ -313,6 +332,15 @@ export default function CustomPagesManager({
                       <span>Modifiée le {new Date(page.updatedAt).toLocaleDateString('fr-FR')}</span>
                       <span className="text-slate-300">•</span>
                       <span className="font-semibold text-slate-700">{page.viewsCount || 0} vue{(page.viewsCount || 0) > 1 ? 's' : ''}</span>
+                      {page.authorName && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="flex items-center gap-1 text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md font-medium text-[11px]">
+                            <UserIcon className="w-3 h-3 text-slate-500" />
+                            <span>{page.authorName}</span>
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 

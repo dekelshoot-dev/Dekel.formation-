@@ -492,8 +492,8 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
 // API: TRANSACTIONAL EMAIL SYSTEM ENDPOINTS
 // ==========================================
 
-// API: Queue a transactional email (Non-blocking async)
-app.post(["/api/emails/send", "/api/emails/queue"], (req, res) => {
+// API: Queue & send a transactional email
+app.post(["/api/emails/send", "/api/emails/queue"], async (req, res) => {
   const { to, recipientName, type, category, renderData, actionUrl, metadata } = req.body;
 
   if (!to || typeof to !== "string" || !to.includes("@")) {
@@ -525,10 +525,14 @@ app.post(["/api/emails/send", "/api/emails/queue"], (req, res) => {
       metadata: metadata || {}
     });
 
+    // Execute SMTP delivery immediately
+    const queueResult = await processTransactionalEmailQueue();
+
     return res.status(200).json({
       status: "success",
-      message: "E-mail transactionnel mis en file d'attente d'envoi.",
-      email: queuedEmail
+      message: queueResult.successCount > 0 ? "E-mail transactionnel transmis avec succès via le serveur SMTP." : "E-mail transactionnel mis en file d'attente d'envoi.",
+      email: queuedEmail,
+      queueResult
     });
   } catch (err: any) {
     return res.status(500).json({ status: "error", message: err.message });

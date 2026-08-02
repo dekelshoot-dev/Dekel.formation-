@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { 
   Bookmark as BookmarkIcon, Star, HelpCircle, CheckCircle2, XCircle, 
   Send, Upload, FileText, QrCode, Award, Clock, ArrowRight, RotateCcw, 
-  Trash2, MessageSquare, Reply, User as UserIcon, Check, FileUp, Download
+  Trash2, MessageSquare, Reply, User as UserIcon, Check, FileUp, Download,
+  Mail, ShieldCheck
 } from 'lucide-react';
 import { 
   User, Course, Chapter, StudentProgress, Bookmark, ChapterQuiz, 
@@ -12,6 +13,8 @@ import { QuizPlayerModal } from './QuizPlayerModal';
 import { showToast } from './Toast';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, getDocs, onSnapshot, query, where, addDoc } from 'firebase/firestore';
+import { emailTriggers } from '../services/emailClient';
+import { sendRealtimeNotification } from '../services/notificationService';
 
 // ============================================================================
 // 1. CHAPTER BOOKMARKS (SIGNETS)
@@ -1012,9 +1015,17 @@ interface CourseCertificateProps {
 export function CourseCertificateComponent({ currentUser, course, progressPercent }: CourseCertificateProps) {
   const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [quizzes, setQuizzes] = useState<CourseQuiz[]>([]);
   const [submissions, setSubmissions] = useState<QuizSubmission[]>([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
+
+  // Order certificate modal / form state
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [orderFullName, setOrderFullName] = useState(currentUser.name || '');
+  const [orderBirthDetails, setOrderBirthDetails] = useState('');
+  const [orderPhone, setOrderPhone] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
 
   useEffect(() => {
     // Look up issued certificate
@@ -1026,13 +1037,17 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
 
     getDocs(cQ).then((snapshot) => {
       if (!snapshot.empty) {
-        setCertificate(snapshot.docs[0].data() as Certificate);
+        const certData = snapshot.docs[0].data() as Certificate;
+        setCertificate(certData);
+        if (certData.fullName) setOrderFullName(certData.fullName);
       }
     }).catch(() => {
       // Offline check
       const saved = localStorage.getItem(`sio_cert_${course.id}_${currentUser.email}`);
       if (saved) {
-        setCertificate(JSON.parse(saved) as Certificate);
+        const certData = JSON.parse(saved) as Certificate;
+        setCertificate(certData);
+        if (certData.fullName) setOrderFullName(certData.fullName);
       }
     });
 
@@ -1066,7 +1081,7 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
       setLoadingQuizzes(false);
     });
 
-  }, [course.id, currentUser.email]);
+  }, [course.id, currentUser.email, currentUser.name]);
 
   // Calculate student best scores for mandatory quizzes
   const mandatoryQuizzesCount = quizzes.length;
@@ -1077,7 +1092,6 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
     const quizSubs = submissions.filter(s => (s as any).quizId === quiz.id || s.chapterId === quiz.targetId || s.chapterId === quiz.id);
     if (quizSubs.length > 0) {
       completedMandatoryQuizzesCount += 1;
-      // Get highest percentage score achieved
       const bestScore = Math.max(...quizSubs.map(s => s.score || (s as any).percentage || 0));
       totalBestPercentageSum += bestScore;
     }
@@ -1093,7 +1107,7 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
 
   const canGenerateCertificate = progressPercent >= 100 && isQuizzesQualified;
 
-  const handleGenerateCertificate = () => {
+  const handleOpenOrderForm = () => {
     if (progressPercent < 100) {
       showToast('Vous devez compléter 100% des chapitres de la formation !', 'warning');
       return;
@@ -1109,44 +1123,100 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
       return;
     }
 
+    setShowOrderForm(true);
+  };
+
+  const handleOrderCertificateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderFullName.trim()) {
+      showToast('Veuillez saisir votre nom complet tel qu\'il doit figurer sur le certificat.', 'warning');
+      return;
+    }
+
     setGenerating(true);
-    setTimeout(async () => {
-      const uniqueCode = `CERT-${course.id.substring(0, 4).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
-      const certId = `cert-${course.id}-${currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const uniqueCode = `CERT-${course.id.substring(0, 4).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const certId = `cert-${course.id}-${currentUser.email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const issuedAt = new Date().toISOString();
 
-      const newCert: Certificate = {
-        id: certId,
-        studentEmail: currentUser.email,
-        studentName: currentUser.name,
-        courseId: course.id,
-        courseTitle: course.title,
-        issuedAt: new Date().toISOString(),
-        verificationCode: uniqueCode
-      };
+    const newCert: Certificate = {
+      id: certId,
+      studentEmail: currentUser.email,
+      studentName: orderFullName.trim(),
+      fullName: orderFullName.trim(),
+      birthDetails: orderBirthDetails.trim(),
+      phone: orderPhone.trim(),
+      notes: orderNotes.trim(),
+      courseId: course.id,
+      courseTitle: course.title,
+      issuedAt: issuedAt,
+      verificationCode: uniqueCode
+    };
 
-      try {
-        await setDoc(doc(db, 'certificates', certId), newCert);
-        
-        // Audit log
-        await addDoc(collection(db, 'audit_logs'), {
-          userId: currentUser.id,
-          userName: currentUser.name,
-          userRole: currentUser.role,
-          action: 'Certificat généré',
-          details: `Obtention du certificat ${uniqueCode} pour le cours ${course.title} avec moyenne aux quiz ${overallQuizAverage}%`,
-          timestamp: new Date().toISOString()
-        });
+    try {
+      await setDoc(doc(db, 'certificates', certId), newCert);
+      
+      // Audit log
+      await addDoc(collection(db, 'audit_logs'), {
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        action: 'Certificat commandé et délivré',
+        details: `Commande certificat ${uniqueCode} pour ${orderFullName.trim()} sur le cours ${course.title}`,
+        timestamp: issuedAt
+      });
 
-        setCertificate(newCert);
-        showToast('Félicitations ! Votre certificat officiel de réussite a été généré.', 'success');
-      } catch (err) {
-        localStorage.setItem(`sio_cert_${course.id}_${currentUser.email}`, JSON.stringify(newCert));
-        setCertificate(newCert);
-        showToast('Certificat généré hors-ligne !', 'success');
-      } finally {
-        setGenerating(false);
-      }
-    }, 2000);
+      // Send Certificate transactional Email
+      await emailTriggers.certificateEarned(
+        currentUser.email,
+        orderFullName.trim(),
+        course.title,
+        certId,
+        uniqueCode,
+        orderFullName.trim(),
+        issuedAt
+      );
+
+      // Send Realtime Notification to student bell
+      await sendRealtimeNotification({
+        userEmail: currentUser.email,
+        title: '🎓 Certificat Officiel Généré !',
+        message: `Votre certificat officiel de réussite pour "${course.title}" a été généré avec succès. Vous pouvez le télécharger au format PDF.`,
+        type: 'certificate_earned',
+        courseId: course.id
+      });
+
+      setCertificate(newCert);
+      setShowOrderForm(false);
+      showToast('🎓 Félicitations ! Votre certificat officiel a été validé et envoyé par e-mail avec succès.', 'success');
+    } catch (err) {
+      localStorage.setItem(`sio_cert_${course.id}_${currentUser.email}`, JSON.stringify(newCert));
+      setCertificate(newCert);
+      setShowOrderForm(false);
+      showToast('Certificat généré hors-ligne et enregistré !', 'success');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (!certificate) return;
+    setSendingEmail(true);
+    try {
+      await emailTriggers.certificateEarned(
+        currentUser.email,
+        certificate.fullName || certificate.studentName,
+        course.title,
+        certificate.id,
+        certificate.verificationCode,
+        certificate.fullName || certificate.studentName,
+        certificate.issuedAt
+      );
+      showToast(`✉️ E-mail avec votre certificat renvoyé à ${currentUser.email}`, 'success');
+    } catch (e) {
+      showToast('Erreur lors de l\'envoi de l\'e-mail.', 'error');
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const handleDownloadCertificate = () => {
@@ -1157,7 +1227,7 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Certificat de Réussite - ${certificate.studentName}</title>
+  <title>Certificat de Réussite - ${certificate.fullName || certificate.studentName}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800;900&family=Playfair+Display:ital,wght@1,500;1,700&display=swap');
     body {
@@ -1248,7 +1318,8 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
     <div class="brand">DEKEL.FORMATION ACADEMY</div>
     <div class="title">Certificat Officiel de Réussite</div>
     <div class="awarded">Ce certificat est fièrement décerné à</div>
-    <div class="student-name">${certificate.studentName}</div>
+    <div class="student-name">${certificate.fullName || certificate.studentName}</div>
+    ${certificate.birthDetails ? `<p style="font-size: 12px; color: #94a3b8; margin-top: -16px; margin-bottom: 20px;">(${certificate.birthDetails})</p>` : ''}
     <p style="font-size: 14px; color: #cbd5e1; max-width: 600px; margin: 0 auto 16px auto;">
       pour avoir validé avec succès l'intégralité du cursus de formation :
       <div class="course-title">"${certificate.courseTitle}"</div>
@@ -1294,8 +1365,8 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
             <Award className="w-6 h-6 animate-pulse" />
           </div>
           <div>
-            <h3 className="text-sm md:text-base font-black text-white font-sans">Certificat de Réussite</h3>
-            <p className="text-xs text-slate-400 font-sans">Validez officiellement vos compétences acquises</p>
+            <h3 className="text-sm md:text-base font-black text-white font-sans">Certificat Officiel de Réussite</h3>
+            <p className="text-xs text-slate-400 font-sans">Commandez et recevez votre attestation par e-mail</p>
           </div>
         </div>
 
@@ -1304,30 +1375,20 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
             Verrouillé (Progression {progressPercent}%)
           </span>
         ) : (
-          !certificate && (
+          !certificate && !showOrderForm && (
             <button
-              onClick={handleGenerateCertificate}
-              disabled={generating}
+              onClick={handleOpenOrderForm}
               className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-lg transition-all cursor-pointer flex items-center gap-1.5 font-sans"
             >
-              {generating ? (
-                <>
-                  <Clock className="w-4 h-4 animate-spin" />
-                  <span>Génération en cours...</span>
-                </>
-              ) : (
-                <>
-                  <Award className="w-4 h-4" />
-                  <span>Générer mon Certificat</span>
-                </>
-              )}
+              <Award className="w-4 h-4" />
+              <span>Commander mon Certificat</span>
             </button>
           )
         )}
       </div>
 
       {/* Certificate conditions status card */}
-      {!certificate && (
+      {!certificate && !showOrderForm && (
         <div className="p-4 bg-slate-900/80 border border-slate-700/80 rounded-2xl space-y-3">
           <h4 className="text-xs font-bold text-white uppercase tracking-wider">Conditions d'obtention du certificat :</h4>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -1376,6 +1437,112 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
         </div>
       )}
 
+      {/* Certificate Order Form */}
+      {!certificate && showOrderForm && (
+        <form onSubmit={handleOrderCertificateSubmit} className="p-6 bg-slate-900/90 border border-indigo-500/30 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm font-sans">
+              <ShieldCheck className="w-5 h-5 text-indigo-400" />
+              <span>Formulaire de commande de certificat</span>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setShowOrderForm(false)}
+              className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+            >
+              Annuler
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-300 font-sans">
+            Renseignez vos informations personnelles. Dès validation, votre certificat sera généré et une copie officielle vous sera immédiatement envoyée par e-mail à <strong>{currentUser.email}</strong>.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
+            <div>
+              <label className="block text-slate-300 font-bold mb-1">
+                Nom & Prénom complets <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={orderFullName}
+                onChange={e => setOrderFullName(e.target.value)}
+                placeholder="Ex: Fatoumata Bâ"
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+              <span className="text-[10px] text-slate-400 mt-1 block">Saisissez exactement le nom tel qu'il doit apparaître sur l'attestation.</span>
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-bold mb-1">
+                Date & Lieu de naissance (Optionnel)
+              </label>
+              <input
+                type="text"
+                value={orderBirthDetails}
+                onChange={e => setOrderBirthDetails(e.target.value)}
+                placeholder="Ex: Né(e) le 15/04/1998 à Dakar"
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-bold mb-1">
+                Numéro de téléphone
+              </label>
+              <input
+                type="tel"
+                value={orderPhone}
+                onChange={e => setOrderPhone(e.target.value)}
+                placeholder="Ex: +221 77 000 00 00"
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-bold mb-1">
+                Remarques / Adresse (Optionnel)
+              </label>
+              <input
+                type="text"
+                value={orderNotes}
+                onChange={e => setOrderNotes(e.target.value)}
+                placeholder="Ex: Promotion 2026 - Master Class"
+                className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => setShowOrderForm(false)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer font-sans"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={generating}
+              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-90 text-white rounded-xl shadow-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 font-sans"
+            >
+              {generating ? (
+                <>
+                  <Clock className="w-4 h-4 animate-spin" />
+                  <span>Validation & Envoi par e-mail...</span>
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4" />
+                  <span>Valider et recevoir mon certificat par e-mail</span>
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* Actual Certificate view */}
       {certificate && (
         <div className="space-y-4">
@@ -1395,7 +1562,10 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
             <div className="space-y-2.5">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-indigo-400 font-sans">Certificat de Réussite Académique</span>
               <h2 className="text-xl md:text-2xl font-serif text-white font-medium italic">Ce certificat est fièrement décerné à</h2>
-              <p className="text-base md:text-lg font-black text-slate-100 uppercase tracking-wide font-sans">{certificate.studentName}</p>
+              <p className="text-base md:text-xl font-black text-slate-100 uppercase tracking-wide font-sans">{certificate.fullName || certificate.studentName}</p>
+              {certificate.birthDetails && (
+                <p className="text-xs text-indigo-300 font-sans">{certificate.birthDetails}</p>
+              )}
             </div>
 
             <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed font-sans">
@@ -1427,7 +1597,15 @@ export function CourseCertificateComponent({ currentUser, course, progressPercen
             </div>
           </div>
 
-          <div className="flex justify-end gap-2.5">
+          <div className="flex flex-wrap justify-end gap-2.5">
+            <button
+              onClick={handleResendEmail}
+              disabled={sendingEmail}
+              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-white/10 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 font-sans"
+            >
+              <Mail className="w-4 h-4 text-indigo-400" />
+              <span>{sendingEmail ? 'Envoi...' : 'Renvoyer par e-mail'}</span>
+            </button>
             <button
               onClick={handleDownloadCertificate}
               className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-90 text-white rounded-xl shadow-lg border border-white/10 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 font-sans"

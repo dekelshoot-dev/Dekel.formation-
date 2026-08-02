@@ -331,7 +331,10 @@ export default function CustomPagesManager({
                       <span className="text-slate-300">•</span>
                       <span>Modifiée le {new Date(page.updatedAt).toLocaleDateString('fr-FR')}</span>
                       <span className="text-slate-300">•</span>
-                      <span className="font-semibold text-slate-700">{page.viewsCount || 0} vue{(page.viewsCount || 0) > 1 ? 's' : ''}</span>
+                      <span className="flex items-center gap-1.5 font-bold text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-2.5 py-0.5 rounded-lg text-xs shadow-xs" title="Nombre de vues">
+                        <Eye className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                        <span>{page.viewsCount || 0} vue{(page.viewsCount || 0) > 1 ? 's' : ''}</span>
+                      </span>
                       {page.authorName && (
                         <>
                           <span className="text-slate-300">•</span>

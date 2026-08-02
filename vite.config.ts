@@ -3,9 +3,14 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+const currentBuildId = process.env.BUILD_ID || process.env.FIREBASE_DEPLOYMENT_ID || `build-${Date.now()}`;
+
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      'import.meta.env.VITE_APP_BUILD_ID': JSON.stringify(currentBuildId),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

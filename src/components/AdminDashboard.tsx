@@ -4,8 +4,10 @@ import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCi
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
 import CustomPagesManager from './CustomPagesManager';
+import EnrollmentGrowthChart from './EnrollmentGrowthChart';
 import { ConfirmModal } from './ConfirmModal';
 import { emailTriggers } from '../services/emailClient';
+import { clearAllBrowserCaches, APP_BUILD_ID } from '../services/cacheManager';
 
 interface AdminDashboardProps {
   currentUser: User;
@@ -669,6 +671,9 @@ Adresse e-mail attribuée : ${emailTrimmed}
                 <p className="text-xs text-slate-400">Statistiques globales calculées en temps réel.</p>
               </div>
 
+              {/* Recharts Enrollment Growth Chart */}
+              <EnrollmentGrowthChart allEnrollments={allEnrollments} />
+
               {/* Graphical simulation of database state */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="border border-slate-150 rounded-xl p-4 bg-slate-50/50">
@@ -711,6 +716,39 @@ Adresse e-mail attribuée : ${emailTrimmed}
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Firebase App Hosting Cache Control */}
+              <div className="bg-[#181c22] border border-white/10 rounded-2xl p-4 text-xs text-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/15 text-emerald-400 rounded-xl border border-emerald-500/25 shrink-0">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-white">Gestion du Cache & Déploiements Firebase</p>
+                      <span className="text-[10px] bg-emerald-500/15 text-emerald-300 font-mono px-2 py-0.5 rounded-md border border-emerald-500/20">
+                        {APP_BUILD_ID}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-[11px] mt-0.5">
+                      Le cache client est automatiquement purgé à chaque nouveau déploiement Firebase App Hosting.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await clearAllBrowserCaches();
+                    showToast('🧹 Cache navigateur intégralement réinitialisé !', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                  }}
+                  className="bg-white/10 hover:bg-white/15 text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 border border-white/10 transition-all shrink-0 cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Forcer réinitialisation cache</span>
+                </button>
               </div>
 
               {/* System summary */}

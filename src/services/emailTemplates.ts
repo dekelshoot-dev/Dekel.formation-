@@ -31,6 +31,8 @@ export interface EmailRenderData {
   discountPercent?: number;
   origin?: string;
   baseUrl?: string;
+  fullName?: string;
+  verificationCode?: string;
 }
 
 export const CATEGORY_LABELS: Record<EmailCategory, string> = {
@@ -63,7 +65,7 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     description: 'Envoyé après l\'inscription pour vérifier l\'adresse e-mail de l\'utilisateur.',
     defaultSubject: 'Vérifiez votre adresse e-mail - Dekel.Formation',
     defaultRecipients: ['student'],
-    sampleData: { recipientName: 'Amadou Sow', actionUrl: 'https://dekel-formation.com/verify?token=xyz123' }
+    sampleData: { recipientName: 'Amadou Sow', actionUrl: 'https://formation.dekel-dev.com/verify?token=xyz123' }
   },
   {
     type: 'auth_welcome',
@@ -83,7 +85,7 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     description: 'Envoyé pour réinitialiser le mot de passe oublié.',
     defaultSubject: 'Réinitialisation de votre mot de passe - Dekel.Formation',
     defaultRecipients: ['student', 'trainer', 'admin'],
-    sampleData: { recipientName: 'Moussa Diallo', actionUrl: 'https://dekel-formation.com/reset-password?token=abc456' }
+    sampleData: { recipientName: 'Moussa Diallo', actionUrl: 'https://formation.dekel-dev.com/reset-password?token=abc456' }
   },
   {
     type: 'auth_email_changed',
@@ -234,20 +236,30 @@ export const EMAIL_TEMPLATE_DEFINITIONS: EmailTemplateDefinition[] = [
     category: 'certificates',
     categoryLabel: CATEGORY_LABELS.certificates,
     name: 'Certificat obtenu',
-    description: 'Notification d\'obtention de certificat de réussite.',
-    defaultSubject: 'Félicitations ! Votre certificat pour {{courseTitle}} est disponible',
+    description: 'Notification d\'obtention et de commande de certificat de réussite.',
+    defaultSubject: '🎓 Félicitations ! Votre certificat officiel pour {{courseTitle}} est disponible',
     defaultRecipients: ['student'],
-    sampleData: { recipientName: 'Fatoumata Bâ', courseTitle: 'Développement Web Fullstack', certificateId: 'CERT-2026-99' }
+    sampleData: { recipientName: 'Fatoumata Bâ', courseTitle: 'Développement Web Fullstack', certificateId: 'CERT-2026-99', verificationCode: 'CERT-DEKEL-881293' }
   },
 
   // 9. Progress
+  {
+    type: 'progress_module_completed',
+    category: 'progress',
+    categoryLabel: CATEGORY_LABELS.progress,
+    name: 'Module terminé (Félicitations)',
+    description: 'Notification envoyée lorsqu\'un étudiant achève tous les chapitres d\'un module.',
+    defaultSubject: '🌟 Félicitations ! Vous avez terminé le module {{moduleTitle}} sur {{courseTitle}}',
+    defaultRecipients: ['student'],
+    sampleData: { recipientName: 'Amadou Sow', courseTitle: 'Canva Pro Masterclass', moduleTitle: 'Module 1 : Prise en main' }
+  },
   {
     type: 'progress_course_completed',
     category: 'progress',
     categoryLabel: CATEGORY_LABELS.progress,
     name: 'Formation terminée à 100%',
     description: 'Félicitations pour l\'achèvement complet d\'un programme.',
-    defaultSubject: 'Bravo ! Vous avez terminé 100% de la formation {{courseTitle}}',
+    defaultSubject: '🎉 Bravo ! Vous avez terminé 100% de la formation {{courseTitle}}',
     defaultRecipients: ['student'],
     sampleData: { recipientName: 'Bamba Kane', courseTitle: 'Automatisations Make & Zapier' }
   },
@@ -647,15 +659,49 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData & { cus
 
     // 8. CERTIFICATES
     case 'certificate_earned':
-      subject = `Certificat officiel obtenu : ${data.courseTitle || 'Formation Dekel'}`;
+      subject = `🎓 Votre Certificat Officiel de Réussite - ${data.courseTitle || 'Dekel.Formation'}`;
       badgeTitle = 'Certificat Débloqué';
       iconEmoji = '🏅';
-      title = 'Votre certificat est disponible !';
+      title = 'Votre Certificat Officiel est disponible !';
       contentHtml = `
         <p>Bonjour <strong>${name}</strong>,</p>
-        <p>Félicitations ! Ayant complété 100% de la formation <strong>« ${data.courseTitle || 'Formation'} »</strong>, votre certificat officiel est dès à présent disponible au téléchargement.</p>
+        <p>Nous avons le plaisir de vous délivrer votre <strong>Certificat Officiel de Réussite</strong> pour la formation <strong>« ${data.courseTitle || 'Formation'} »</strong>.</p>
+        <div style="background-color: #f8fafc; border: 2px dashed #6366f1; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
+          <p style="margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6366f1; font-weight: 800;">Attestation Académique Officielle</p>
+          <p style="margin: 0 0 8px 0; font-size: 18px; font-weight: 900; color: #0f172a;">${data.fullName || data.recipientName || name}</p>
+          <p style="margin: 0 0 12px 0; font-size: 13px; color: #475569;">A validé l'intégralité du programme d'apprentissage <strong>"${data.courseTitle || 'Dekel.Formation'}"</strong></p>
+          <p style="margin: 0; font-size: 11px; font-family: monospace; color: #4f46e5; font-weight: bold;">Code de vérification : ${data.verificationCode || data.certificateId || 'CERT-OFFICIEL'}</p>
+        </div>
+        <p>Vous pouvez consulter, imprimer ou télécharger votre certificat au format PDF / HTML directement depuis votre espace étudiant.</p>
       `;
       callToActionText = 'Télécharger mon certificat';
+      break;
+
+    // 9. PROGRESS
+    case 'progress_module_completed':
+      subject = `🌟 Félicitations ! Vous avez terminé le module ${data.moduleTitle || 'du cours'} sur ${data.courseTitle || 'Dekel.Formation'}`;
+      badgeTitle = 'Module Complété';
+      iconEmoji = '🌟';
+      title = 'Félicitations pour la validation de votre module !';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Nous tenons à vous féliciter chaleureusement ! Vous venez de terminer avec succès le module <strong>« ${data.moduleTitle || 'Module'} »</strong> de la formation <strong>« ${data.courseTitle || 'Formation'} »</strong>.</p>
+        <p style="margin-top: 12px; color: #047857; font-weight: 600;">Poursuivez sur votre lancée et continuez votre apprentissage pour débloquer les prochains modules et votre certificat officiel !</p>
+      `;
+      callToActionText = 'Continuer ma formation';
+      break;
+
+    case 'progress_course_completed':
+      subject = `🎉 Bravo ! Vous avez terminé 100% de la formation ${data.courseTitle || 'Dekel.Formation'}`;
+      badgeTitle = 'Formation Réussie 100%';
+      iconEmoji = '🎓';
+      title = 'Bravo ! Vous avez achevé l\'intégralité de la formation !';
+      contentHtml = `
+        <p>Bonjour <strong>${name}</strong>,</p>
+        <p>Félicitations exceptionnelles ! Vous avez accompli 100% du parcours de formation <strong>« ${data.courseTitle || 'Formation'} »</strong>.</p>
+        <p style="margin-top: 12px; color: #047857; font-weight: 600;">Vous êtes maintenant éligible pour commander votre certificat officiel de réussite attestant de vos compétences.</p>
+      `;
+      callToActionText = 'Commander mon Certificat';
       break;
 
     // 9. SECURITY

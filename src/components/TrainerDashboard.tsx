@@ -11,6 +11,7 @@ import { showToast } from './Toast';
 import UserProfile from './UserProfile';
 import CustomPagesManager from './CustomPagesManager';
 import EmailBroadcastManager from './EmailBroadcastManager';
+import ModuleProgressChart from './ModuleProgressChart';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { cleanUndefined } from '../firebaseService';
@@ -265,6 +266,7 @@ export default function TrainerDashboard({
 
   // 1. Filter Courses belonging to THIS trainer or the trainer who invited this assistant (Requirement Fine-Grained Permissions)
   const trainerCourses = allCourses.filter(c => {
+    if (currentUser.role === 'admin') return true;
     if (currentUser.role === 'assistant') {
       const trainer = allUsers.find(u => u.email.toLowerCase() === currentUser.invitedBy?.toLowerCase());
       return trainer ? c.trainerId === trainer.id : false;
@@ -273,6 +275,7 @@ export default function TrainerDashboard({
   });
 
   const selectedCourse = allCourses.find(c => {
+    if (currentUser.role === 'admin') return c.id === selectedCourseId;
     if (currentUser.role === 'assistant') {
       const trainer = allUsers.find(u => u.email.toLowerCase() === currentUser.invitedBy?.toLowerCase());
       return c.id === selectedCourseId && (trainer ? c.trainerId === trainer.id : false);
@@ -294,9 +297,26 @@ export default function TrainerDashboard({
   const courseIds = trainerCourses.map(c => c.id);
   const activeEnrollments = allEnrollments.filter(e => courseIds.includes(e.courseId));
   
-  // Extract unique students emails
-  const studentEmails = Array.from(new Set(activeEnrollments.map(e => e.studentEmail.toLowerCase())));
-  const trainerStudents = allUsers.filter(u => u.role === 'student' && studentEmails.includes(u.email.toLowerCase()));
+  // Extract unique student emails from enrollments & pre-registrations
+  const enrolledStudentEmails = new Set<string>([
+    ...activeEnrollments.map(e => e.studentEmail.trim().toLowerCase()),
+    ...preRegistered.filter(p => p.courseIds?.some(cid => courseIds.includes(cid))).map(p => p.email.trim().toLowerCase())
+  ]);
+
+  const trainerStudents = allUsers.filter(u => {
+    if (u.role !== 'student') return false;
+    if (currentUser.role === 'admin') return true;
+    return enrolledStudentEmails.has(u.email.trim().toLowerCase());
+  });
+
+  const allUniqueEmails = new Set<string>([
+    ...Array.from(enrolledStudentEmails),
+    ...trainerStudents.map(u => u.email.trim().toLowerCase())
+  ]);
+
+  const uniqueStudentCount = currentUser.role === 'admin'
+    ? Math.max(allUsers.filter(u => u.role === 'student').length, allUniqueEmails.size)
+    : (allUniqueEmails.size > 0 ? allUniqueEmails.size : trainerStudents.length);
 
   const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
 
@@ -1932,7 +1952,7 @@ Le support Dekel.Formation`,
                   }`}
                 >
                   <Users className="w-4 h-4" />
-                  <span>Mes élèves ({trainerStudents.length})</span>
+                  <span>Mes élèves ({uniqueStudentCount})</span>
                 </button>
 
                 <button
@@ -2061,7 +2081,7 @@ Le support Dekel.Formation`,
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Mes élèves ({trainerStudents.length})</span>
+          <span>Mes élèves ({uniqueStudentCount})</span>
         </button>
         <button
           onClick={() => { setActiveTab('webhooks'); setSelectedCourseId(null); }}
@@ -2118,7 +2138,7 @@ Le support Dekel.Formation`,
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-[#1a1e24] border border-white/10 p-3.5 sm:p-5 rounded-2xl text-center shadow-sm hover:scale-[1.015] hover:border-indigo-500/30 transition-all duration-200 overflow-hidden">
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">Total Étudiants inscrits</p>
-              <p className="text-3xl font-black text-slate-100 mt-1 truncate">{trainerStudents.length}</p>
+              <p className="text-3xl font-black text-slate-100 mt-1 truncate">{uniqueStudentCount}</p>
               <p className="text-[10px] text-slate-400 mt-1 truncate">Élèves uniques inscrits à vos cours</p>
             </div>
             <div className="bg-[#1a1e24] border border-white/10 p-3.5 sm:p-5 rounded-2xl text-center shadow-sm hover:scale-[1.015] hover:border-indigo-500/30 transition-all duration-200 overflow-hidden">
@@ -2134,6 +2154,15 @@ Le support Dekel.Formation`,
               <p className="text-[10px] text-slate-400 mt-1 truncate">Vérifications de paiement validées</p>
             </div>
           </div>
+
+          {/* Module Progress Recharts Data Visualization Component */}
+          <ModuleProgressChart
+            courses={trainerCourses}
+            modules={allModules}
+            chapters={allChapters}
+            enrollments={allEnrollments}
+            progress={allProgress}
+          />
 
           {/* Quick list of courses progress stats */}
           <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-5 shadow-sm hover:scale-[1.005] transition-all duration-200 overflow-hidden">
@@ -3578,16 +3607,16 @@ Le support Dekel.Formation`,
                             </td>
                             <td className="px-4 py-3.5">
                               {enroll.status === 'active' ? (
-                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100">
+                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full text-[10px] font-bold border border-emerald-200 shadow-xs">
                                   Accès actif
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-rose-100">
-                                  Suspendu
+                                <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-2.5 py-1 rounded-full text-[10px] font-bold border border-rose-200 shadow-xs">
+                                  Accès retiré
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3.5 text-right space-x-1">
+                            <td className="px-4 py-3.5 text-right space-x-2">
                               <button
                                 onClick={() => setViewingUserProfile(matchedStudent || {
                                   id: 'unknown',
@@ -3597,40 +3626,29 @@ Le support Dekel.Formation`,
                                   createdAt: enroll.enrolledAt,
                                   status: 'active'
                                 })}
-                                className="text-[10px] font-bold px-2 py-1 rounded border bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-all"
+                                className="text-[11px] font-semibold px-3 py-1.5 rounded-xl border bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer shadow-xs"
                               >
                                 Voir Profil
-                              </button>
-                              <button
-                                onClick={() => onUpdateEnrollmentStatus(enroll.id, enroll.status === 'active' ? 'revoked' : 'active')}
-                                className={`text-[10px] font-bold px-2 py-1 rounded border transition-all ${
-                                  enroll.status === 'active'
-                                    ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
-                                    : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                }`}
-                              >
-                                {enroll.status === 'active' ? 'Retirer accès' : 'Réactiver'}
                               </button>
                               <button
                                 onClick={() => {
                                   const matchedCourse = allCourses.find(c => c.id === enroll.courseId);
                                   setConfirmModal({
                                     isOpen: true,
-                                    title: "Retirer l'étudiant de la formation",
-                                    message: "Êtes-vous sûr de vouloir supprimer cet étudiant de l'effectif de la formation ? Cette action est définitive.",
+                                    title: "Retirer l'accès de la formation",
+                                    message: "Êtes-vous sûr de vouloir retirer l'accès de cet étudiant ? Il sera supprimé de cette formation.",
                                     itemName: `${enroll.studentEmail} — ${matchedCourse ? matchedCourse.title : 'Formation'}`,
-                                    confirmText: "Supprimer l'étudiant",
+                                    confirmText: "Retirer l'accès et supprimer",
                                     onConfirm: () => {
                                       onDeleteEnrollment(enroll.id);
-                                      triggerToast("Étudiant retiré de l'effectif avec succès !");
+                                      triggerToast("Accès retiré : L'étudiant a été supprimé de la formation !");
                                       closeConfirmModal();
                                     }
                                   });
                                 }}
-                                title="Supprimer de l'effectif"
-                                className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-red-500 inline-flex align-middle cursor-pointer"
+                                className="text-[11px] font-bold px-3 py-1.5 rounded-xl border bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 transition-all cursor-pointer shadow-xs"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                Retirer l'accès
                               </button>
                             </td>
                           </tr>

@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, updateDoc, increment } from "firebase/firestore";
 import { 
   queueTransactionalEmail, 
   processTransactionalEmailQueue, 
@@ -871,6 +871,198 @@ app.get("/api/sync-enrollments", (req, res) => {
   res.json({ enrollments: unsynced });
 });
 
+// Helper to render standalone HTML documents for Custom HTML Pages
+function renderCustomHtmlDocument(page: any): string {
+  const trimmedHtml = (page.html || "").trim();
+  if (trimmedHtml.toLowerCase().startsWith("<!doctype") || trimmedHtml.toLowerCase().startsWith("<html")) {
+    return page.html;
+  }
+
+  const seoTitle = (page.seoTitle || page.title || "Dekel.Formation")
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const seoDesc = (page.seoDescription || "").replace(/"/g, "&quot;");
+  const ogImg = page.ogImage || "";
+  const headTags = page.customHeadTags || "";
+  const css = page.css || "";
+  const htmlBody = page.html || "";
+  const js = page.js || "";
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${seoTitle}</title>
+  ${seoDesc ? `<meta name="description" content="${seoDesc}">` : ""}
+  ${ogImg ? `<meta property="og:image" content="${ogImg}">` : ""}
+  <meta property="og:title" content="${seoTitle.replace(/"/g, "&quot;")}">
+  ${headTags}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background-color: #ffffff;
+      color: #0f172a;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    ${css}
+  </style>
+</head>
+<body>
+  ${htmlBody}
+  <script>
+    window.addEventListener('error', function(e) {
+      console.warn('Custom Page Script Warning:', e.message);
+    });
+    try {
+      ${js}
+    } catch(err) {
+      console.error('Custom Page JS execution error:', err);
+    }
+  </script>
+</body>
+</html>`;
+}
+
+// FAST DIRECT SERVER-SIDE ROUTE FOR CUSTOM HTML PAGES (/p/:slug, /page/:slug, /pages/:slug)
+app.get(["/p/:slug", "/p/:slug/*", "/page/:slug", "/pages/:slug"], async (req, res, next) => {
+  const rawSlug = req.params.slug || "";
+  const cleanSlug = rawSlug.trim().replace(/^\/+/, "").replace(/\/+$/, "").toLowerCase();
+
+  if (!cleanSlug) {
+    return next();
+  }
+
+  try {
+    let matchedDoc: any = null;
+
+    // Direct ID lookup in Firestore
+    const docRef = doc(dbFirestore, "custom_pages", cleanSlug);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      matchedDoc = docSnap.data();
+    } else {
+      // Query by slug variants
+      const possibleSlugs = [cleanSlug, `/${cleanSlug}`, `p/${cleanSlug}`];
+      const q = query(
+        collection(dbFirestore, "custom_pages"),
+        where("slug", "in", possibleSlugs)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        matchedDoc = querySnapshot.docs[0].data();
+      } else {
+        // Full scan fallback for fuzzy slug matches
+        const allSnap = await getDocs(collection(dbFirestore, "custom_pages"));
+        allSnap.forEach((d) => {
+          if (!matchedDoc) {
+            const pageData = d.data();
+            const pSlug = (pageData.slug || "").trim().replace(/^\/+/, "").replace(/\/+$/, "").toLowerCase();
+            if (pSlug === cleanSlug || d.id === cleanSlug) {
+              matchedDoc = pageData;
+            }
+          }
+        });
+      }
+    }
+
+    if (matchedDoc && matchedDoc.html) {
+      if (matchedDoc.id) {
+        updateDoc(doc(dbFirestore, "custom_pages", matchedDoc.id), {
+          viewsCount: increment(1)
+        }).catch(() => {});
+      }
+      const pageHtml = renderCustomHtmlDocument(matchedDoc);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      return res.status(200).send(pageHtml);
+    }
+  } catch (err) {
+    console.error("Error serving custom page directly from Express server:", err);
+  }
+
+  next();
+});
+
+// FAST DIRECT SERVER-SIDE ROUTE FOR TOP-LEVEL CUSTOM SLUGS (e.g. /offre-speciale)
+const SYSTEM_PREFIXES = [
+  "api", "marketplace", "admin", "student", "trainer", "auth", 
+  "verify-email", "reset-password", "assets", "favicon.ico", 
+  "@vite", "@fs", "src", "node_modules", "index.html", "p", "page", "pages"
+];
+
+app.get("/:slug", async (req, res, next) => {
+  const rawSlug = req.params.slug || "";
+  const cleanSlug = rawSlug.trim().replace(/^\/+/, "").replace(/\/+$/, "").toLowerCase();
+
+  // Skip system routes and static files
+  if (!cleanSlug || cleanSlug.includes(".") || SYSTEM_PREFIXES.includes(cleanSlug)) {
+    return next();
+  }
+
+  try {
+    let matchedDoc: any = null;
+
+    const docRef = doc(dbFirestore, "custom_pages", cleanSlug);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      matchedDoc = docSnap.data();
+    } else {
+      const possibleSlugs = [cleanSlug, `/${cleanSlug}`];
+      const q = query(
+        collection(dbFirestore, "custom_pages"),
+        where("slug", "in", possibleSlugs)
+      );
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        matchedDoc = querySnapshot.docs[0].data();
+      }
+    }
+
+    if (matchedDoc && matchedDoc.html) {
+      if (matchedDoc.id) {
+        updateDoc(doc(dbFirestore, "custom_pages", matchedDoc.id), {
+          viewsCount: increment(1)
+        }).catch(() => {});
+      }
+      const pageHtml = renderCustomHtmlDocument(matchedDoc);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      return res.status(200).send(pageHtml);
+    }
+  } catch (err) {
+    console.error("Error serving root custom page directly from Express server:", err);
+  }
+
+  next();
+});
+
+// Server Deployment Version & Cache Invalidation Info
+const BUILD_VERSION = process.env.BUILD_ID || process.env.FIREBASE_DEPLOYMENT_ID || `deploy-${Date.now()}`;
+
+// API: Version Check for Automatic Cache Invalidation
+app.get("/api/version", (req, res) => {
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  return res.json({
+    version: BUILD_VERSION,
+    buildTime: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
 // Vite Middleware & SPA Static Serving
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
@@ -881,8 +1073,24 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    
+    // Serve static assets
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+    }));
+
+    // Fallback SPA routing with strict no-cache for index.html
     app.get("*", (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Deployment-ID', BUILD_VERSION);
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

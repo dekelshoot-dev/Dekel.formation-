@@ -92,8 +92,15 @@ export const emailTriggers = {
   quizPassed: (to: string, recipientName: string, courseTitle: string, quizTitle: string, scorePercent: number) =>
     sendTransactionalEmail({ to, recipientName, type: 'quiz_passed', category: 'quizzes', renderData: { courseTitle, quizTitle, scorePercent } }),
 
-  certificateEarned: (to: string, recipientName: string, courseTitle: string, certificateId?: string) =>
-    sendTransactionalEmail({ to, recipientName, type: 'certificate_earned', category: 'certificates', renderData: { courseTitle, certificateId } }),
+  certificateEarned: (to: string, recipientName: string, courseTitle: string, certificateId?: string, verificationCode?: string, fullName?: string, issuedAt?: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'certificate_earned', category: 'certificates', renderData: { courseTitle, certificateId, verificationCode, fullName, issuedAt } }),
+
+  // Progress
+  moduleCompleted: (to: string, recipientName: string, courseTitle: string, moduleTitle: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'progress_module_completed', category: 'progress', renderData: { courseTitle, moduleTitle } }),
+
+  courseCompleted: (to: string, recipientName: string, courseTitle: string) =>
+    sendTransactionalEmail({ to, recipientName, type: 'progress_course_completed', category: 'progress', renderData: { courseTitle } }),
 
   // Security
   securityNewLogin: (to: string, recipientName: string, ipAddress?: string, deviceInfo?: string) =>

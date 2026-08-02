@@ -1,5 +1,5 @@
 import { 
-  collection, doc, getDocs, setDoc, deleteDoc, writeBatch, query, where, getDoc
+  collection, doc, getDocs, setDoc, deleteDoc, writeBatch, query, where, getDoc, updateDoc, increment
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { 
@@ -330,6 +330,18 @@ export async function deleteCustomPage(pageId: string) {
     await deleteDoc(doc(db, 'custom_pages', pageId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function incrementCustomPageViewCount(pageId: string) {
+  const path = `custom_pages/${pageId}`;
+  try {
+    await updateDoc(doc(db, 'custom_pages', pageId), {
+      viewsCount: increment(1)
+    });
+  } catch (error) {
+    // If updateDoc fails because document doesn't exist yet or lacks viewsCount
+    console.warn('Could not increment page view count:', error);
   }
 }
 

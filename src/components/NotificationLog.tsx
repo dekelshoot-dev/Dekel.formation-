@@ -28,7 +28,7 @@ export default function NotificationLog({ emails, onClear }: NotificationLogProp
 
       {/* Drawer Container */}
       {isOpen && (
-        <div className="absolute bottom-16 left-0 glass-light backdrop-blur-xl shadow-2xl border border-white/15 rounded-2xl w-80 md:w-96 p-4 text-xs text-white transition-all duration-300">
+        <div className="fixed bottom-20 left-3 right-3 sm:left-4 sm:right-auto sm:w-96 max-w-[calc(100vw-1.5rem)] glass-light backdrop-blur-xl shadow-2xl border border-white/15 rounded-2xl p-4 text-xs text-white transition-all duration-300 z-50">
           <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-3">
             <div>
               <h3 className="font-bold text-white flex items-center gap-1.5">

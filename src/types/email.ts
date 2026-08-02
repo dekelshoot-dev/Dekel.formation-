@@ -84,6 +84,7 @@ export type EmailType =
   | 'certificate_revoked'
 
   // 9. Progress
+  | 'progress_module_completed'
   | 'progress_course_completed'
   | 'progress_25'
   | 'progress_50'

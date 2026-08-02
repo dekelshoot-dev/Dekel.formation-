@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { Course, Module, Chapter, Enrollment, User, SimulatedEmail } from '../types';
+import CourseFaqComponent from './CourseFaqComponent';
 import { BookOpen, User as UserIcon, Coins, MessageSquare, ShieldCheck, CheckCircle, ArrowRight, Smartphone, AlertCircle, Lock, Unlock, PlayCircle, Eye, X, ArrowLeft, Search, Plus, Trash2, Tag } from 'lucide-react';
 
 interface MarketplaceProps {
@@ -897,6 +898,14 @@ export default function Marketplace({
                   )}
                 </div>
 
+              </div>
+
+              {/* Course FAQ Section on Detail View */}
+              <div className="p-4 md:p-6 border-t border-white/10 bg-slate-900/40">
+                <CourseFaqComponent 
+                  course={selectedCourseForDetails} 
+                  currentUser={currentUser} 
+                />
               </div>
 
             </div>

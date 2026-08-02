@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
 import { Course, Module, Chapter, StudentProgress, User } from '../types';
+import CourseFaqComponent from './CourseFaqComponent';
 import { 
   Play, CheckCircle2, ChevronRight, ChevronDown, Download, ExternalLink, 
   ArrowLeft, FileText, Globe, Sparkles, BookOpen, Menu, X, Check, Lock, Unlock,
@@ -644,6 +645,12 @@ export default function CoursePlayer({
                     <ChapterCommentsComponent 
                       currentUser={currentUser} 
                       chapterId={activeChapter.id} 
+                    />
+
+                    {/* Course FAQ Component */}
+                    <CourseFaqComponent 
+                      course={course} 
+                      currentUser={currentUser} 
                     />
                   </div>
                 )}

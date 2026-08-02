@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CustomHtmlPage } from '../types';
+import { incrementCustomPageViewCount } from '../firebaseService';
 import { ArrowLeft, Monitor, Smartphone, Tablet, Edit3, ExternalLink, X, Eye, ShieldCheck } from 'lucide-react';
 
 interface CustomPageViewerProps {
@@ -16,6 +17,13 @@ export default function CustomPageViewer({
   onEditPage
 }: CustomPageViewerProps) {
   const [deviceViewport, setDeviceViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+
+  // Increment view counter when loaded live (not preview mode)
+  useEffect(() => {
+    if (!isPreviewMode && page?.id) {
+      incrementCustomPageViewCount(page.id);
+    }
+  }, [page?.id, isPreviewMode]);
 
   // Inject Meta Title & Meta Description on host page as well for SEO
   useEffect(() => {

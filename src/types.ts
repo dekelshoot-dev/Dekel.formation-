@@ -72,6 +72,19 @@ export interface Course {
   seoDescription?: string;
   seoSlug?: string;
   seoShareImage?: string;
+  // Course FAQs
+  faqs?: FaqItem[];
+}
+
+export interface FaqItem {
+  id: string;
+  courseId: string;
+  question: string;
+  answer: string;
+  category?: string;
+  createdAt?: string;
+  authorEmail?: string;
+  isPinned?: boolean;
 }
 
 export interface Module {
@@ -138,6 +151,8 @@ export interface StudentProgress {
   lastVideoTimestamp?: number;
   timeSpentMinutes?: number;
   lastChapterId?: string;
+  completedModuleEmailsSent?: string[];
+  courseCompletedEmailSent?: boolean;
 }
 
 export * from './types/email';
@@ -316,6 +331,11 @@ export interface Certificate {
   id: string; // e.g. CERT-XXXX-YYYY
   studentEmail: string;
   studentName: string;
+  fullName?: string;
+  birthDetails?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
   courseId: string;
   courseTitle: string;
   issuedAt: string;
@@ -333,6 +353,17 @@ export interface MediaFile {
 }
 
 export type CustomPageStatus = 'published' | 'draft' | 'archived';
+
+export interface AppNotification {
+  id: string;
+  userEmail: string;
+  title: string;
+  message: string;
+  type: 'module_completed' | 'course_completed' | 'certificate_earned' | 'access_granted' | 'quiz_passed' | 'info';
+  isRead: boolean;
+  createdAt: string;
+  courseId?: string;
+}
 
 export interface CustomHtmlPage {
   id: string;

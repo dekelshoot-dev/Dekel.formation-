@@ -19,7 +19,9 @@ import UserProfile from './components/UserProfile';
 import CustomPageViewer from './components/CustomPageViewer';
 import { ToastContainer, showToast } from './components/Toast';
 import GlobalOverflowPopover from './components/GlobalOverflowPopover';
+import { NotificationBell } from './components/NotificationBell';
 import { emailTriggers } from './services/emailClient';
+import { sendRealtimeNotification } from './services/notificationService';
 
 // Icons
 import { BookOpen, LogOut, Layout, Star, LogIn, Plus, Menu, X, User as UserIcon, KeyRound } from 'lucide-react';
@@ -36,52 +38,34 @@ import {
   saveCustomPage, deleteCustomPage
 } from './firebaseService';
 
+// Safe localStorage JSON parser helper to prevent white screen crashes from corrupt cache
+function safeJsonStorage<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    return JSON.parse(saved);
+  } catch (err) {
+    console.warn(`Error parsing localStorage key "${key}":`, err);
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      // Ignore storage errors
+    }
+    return fallback;
+  }
+}
+
 export default function App() {
   // --- Persistent State Handlers (localStorage/Firestore cached fallback) ---
-  const [allUsers, setAllUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('sio_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
-  });
-
-  const [allCourses, setAllCourses] = useState<Course[]>(() => {
-    const saved = localStorage.getItem('sio_courses');
-    return saved ? JSON.parse(saved) : INITIAL_COURSES;
-  });
-
-  const [allModules, setAllModules] = useState<Module[]>(() => {
-    const saved = localStorage.getItem('sio_modules');
-    return saved ? JSON.parse(saved) : INITIAL_MODULES;
-  });
-
-  const [allChapters, setAllChapters] = useState<Chapter[]>(() => {
-    const saved = localStorage.getItem('sio_chapters');
-    return saved ? JSON.parse(saved) : INITIAL_CHAPTERS;
-  });
-
-  const [allEnrollments, setAllEnrollments] = useState<Enrollment[]>(() => {
-    const saved = localStorage.getItem('sio_enrollments');
-    return saved ? JSON.parse(saved) : INITIAL_ENROLLMENTS;
-  });
-
-  const [allProgress, setAllProgress] = useState<StudentProgress[]>(() => {
-    const saved = localStorage.getItem('sio_progress');
-    return saved ? JSON.parse(saved) : INITIAL_PROGRESS;
-  });
-
-  const [emails, setEmails] = useState<SimulatedEmail[]>(() => {
-    const saved = localStorage.getItem('sio_emails');
-    return saved ? JSON.parse(saved) : INITIAL_EMAILS;
-  });
-
-  const [preRegistered, setPreRegistered] = useState<PreRegisteredStudent[]>(() => {
-    const saved = localStorage.getItem('sio_preregistered');
-    return saved ? JSON.parse(saved) : INITIAL_PRE_REGISTERED;
-  });
-
-  const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('sio_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-  });
+  const [allUsers, setAllUsers] = useState<User[]>(() => safeJsonStorage('sio_users', INITIAL_USERS));
+  const [allCourses, setAllCourses] = useState<Course[]>(() => safeJsonStorage('sio_courses', INITIAL_COURSES));
+  const [allModules, setAllModules] = useState<Module[]>(() => safeJsonStorage('sio_modules', INITIAL_MODULES));
+  const [allChapters, setAllChapters] = useState<Chapter[]>(() => safeJsonStorage('sio_chapters', INITIAL_CHAPTERS));
+  const [allEnrollments, setAllEnrollments] = useState<Enrollment[]>(() => safeJsonStorage('sio_enrollments', INITIAL_ENROLLMENTS));
+  const [allProgress, setAllProgress] = useState<StudentProgress[]>(() => safeJsonStorage('sio_progress', INITIAL_PROGRESS));
+  const [emails, setEmails] = useState<SimulatedEmail[]>(() => safeJsonStorage('sio_emails', INITIAL_EMAILS));
+  const [preRegistered, setPreRegistered] = useState<PreRegisteredStudent[]>(() => safeJsonStorage('sio_preregistered', INITIAL_PRE_REGISTERED));
+  const [categories, setCategories] = useState<string[]>(() => safeJsonStorage('sio_categories', INITIAL_CATEGORIES));
 
   // Sync categories with Firestore settings
   useEffect(() => {
@@ -180,17 +164,13 @@ export default function App() {
   };
 
   // --- Custom HTML Pages State & Firestore Sync ---
-  const [allCustomPages, setAllCustomPages] = useState<CustomHtmlPage[]>(() => {
-    const saved = localStorage.getItem('sio_custom_pages');
-    return saved ? JSON.parse(saved) : INITIAL_CUSTOM_PAGES;
-  });
+  const [allCustomPages, setAllCustomPages] = useState<CustomHtmlPage[]>(() => safeJsonStorage('sio_custom_pages', INITIAL_CUSTOM_PAGES));
 
   const [previewingCustomPage, setPreviewingCustomPage] = useState<CustomHtmlPage | null>(null);
   
   // Synchronous initial route detection (zero delay / no home page flash)
   const [activeCustomPageRoute, setActiveCustomPageRoute] = useState<CustomHtmlPage | null>(() => {
-    const saved = localStorage.getItem('sio_custom_pages');
-    const pages: CustomHtmlPage[] = saved ? JSON.parse(saved) : INITIAL_CUSTOM_PAGES;
+    const pages: CustomHtmlPage[] = safeJsonStorage('sio_custom_pages', INITIAL_CUSTOM_PAGES);
     let slug = '';
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     if (pathParts.length >= 2 && pathParts[0] === 'p') {
@@ -449,6 +429,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Safety timer: Never block rendering for more than 2 seconds
+    const fallbackTimer = setTimeout(() => {
+      setAuthLoading(false);
+    }, 2000);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {
@@ -492,10 +477,14 @@ export default function App() {
       } catch (err) {
         console.error('Error on auth state change:', err);
       } finally {
+        clearTimeout(fallbackTimer);
         setAuthLoading(false);
       }
     });
-    return () => unsubscribeAuth();
+    return () => {
+      clearTimeout(fallbackTimer);
+      unsubscribeAuth();
+    };
   }, []);
 
   useEffect(() => {
@@ -837,6 +826,15 @@ Bon apprentissage.`,
       courseObj ? courseObj.trainerName : 'Formateur'
     );
 
+    // Send Realtime Notification
+    sendRealtimeNotification({
+      userEmail: emailTrimmed,
+      title: '🔓 Nouveau cours débloqué !',
+      message: `Vous avez été inscrit(e) à la formation "${courseObj ? courseObj.title : 'Nouvelle Formation'}".`,
+      type: 'access_granted',
+      courseId: courseId
+    });
+
     const userExists = allUsers.some(u => u.email.toLowerCase() === emailTrimmed);
     if (!userExists) {
       const existing = preRegistered.find(p => p.email.toLowerCase() === emailTrimmed);
@@ -884,8 +882,81 @@ Bon apprentissage.`,
         studentEmail: currentUser.email.toLowerCase(),
         courseId: activeCoursePlayer.id,
         completedChapterIds: [chapterId],
-        lastAccessedAt: now
+        lastAccessedAt: now,
+        completedModuleEmailsSent: [],
+        courseCompletedEmailSent: false
       };
+    }
+
+    // Check if adding this chapter completes a module or the course
+    const isAddingChapter = existingIdx === -1 || !allProgress[existingIdx].completedChapterIds.includes(chapterId);
+
+    if (isAddingChapter) {
+      const courseModules = allModules.filter(m => m.courseId === activeCoursePlayer.id);
+      const courseChapters = allChapters.filter(ch => {
+        const mod = allModules.find(m => m.id === ch.moduleId);
+        return mod?.courseId === activeCoursePlayer.id;
+      });
+
+      // Find module for this chapter
+      const targetChapter = courseChapters.find(ch => ch.id === chapterId);
+      if (targetChapter) {
+        const targetModule = courseModules.find(m => m.id === targetChapter.moduleId);
+        if (targetModule) {
+          const moduleChapters = courseChapters.filter(ch => ch.moduleId === targetModule.id);
+          const isModuleComplete = moduleChapters.length > 0 && moduleChapters.every(ch => updatedProgress.completedChapterIds.includes(ch.id));
+
+          const sentModuleIds = updatedProgress.completedModuleEmailsSent || [];
+          if (isModuleComplete && !sentModuleIds.includes(targetModule.id)) {
+            emailTriggers.moduleCompleted(
+              currentUser.email,
+              currentUser.name,
+              activeCoursePlayer.title,
+              targetModule.title
+            );
+
+            // Send Realtime Notification
+            sendRealtimeNotification({
+              userEmail: currentUser.email,
+              title: `🌟 Module « ${targetModule.title} » validé !`,
+              message: `Félicitations ! Vous avez validé toutes les leçons du module dans "${activeCoursePlayer.title}".`,
+              type: 'module_completed',
+              courseId: activeCoursePlayer.id
+            });
+
+            updatedProgress = {
+              ...updatedProgress,
+              completedModuleEmailsSent: [...sentModuleIds, targetModule.id]
+            };
+            showToast(`🌟 Félicitations ! Module « ${targetModule.title} » terminé. Un e-mail vous a été envoyé !`, 'success');
+          }
+        }
+      }
+
+      // Check overall course completion (100%)
+      const isCourseComplete = courseChapters.length > 0 && courseChapters.every(ch => updatedProgress.completedChapterIds.includes(ch.id));
+      if (isCourseComplete && !updatedProgress.courseCompletedEmailSent) {
+        emailTriggers.courseCompleted(
+          currentUser.email,
+          currentUser.name,
+          activeCoursePlayer.title
+        );
+
+        // Send Realtime Notification
+        sendRealtimeNotification({
+          userEmail: currentUser.email,
+          title: `🎉 Formation 100% terminée !`,
+          message: `Bravo ! Vous avez terminé 100% de la formation "${activeCoursePlayer.title}". Vous pouvez commander votre certificat officiel.`,
+          type: 'course_completed',
+          courseId: activeCoursePlayer.id
+        });
+
+        updatedProgress = {
+          ...updatedProgress,
+          courseCompletedEmailSent: true
+        };
+        showToast(`🎉 Bravo ! Vous avez terminé 100% de la formation « ${activeCoursePlayer.title} ». Un e-mail vous a été envoyé !`, 'success');
+      }
     }
 
     setAllProgress(prev => {
@@ -1015,9 +1086,18 @@ Bon apprentissage.`,
 
 
 
-            {/* Logout actions */}
+            {/* Notification Bell & Logout actions */}
             {currentUser && (
               <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/10">
+                <NotificationBell 
+                  currentUser={currentUser} 
+                  onOpenCourse={(courseId) => {
+                    const course = allCourses.find(c => c.id === courseId);
+                    if (course) {
+                      setActiveCoursePlayer(course);
+                    }
+                  }} 
+                />
                 <div className="hidden md:block text-right">
                   <p className="text-xs font-bold text-white leading-none">{currentUser.name}</p>
                   <span className="text-[9px] bg-white/10 text-slate-300 font-bold px-1.5 py-0.5 rounded-full capitalize">
@@ -1035,6 +1115,65 @@ Bon apprentissage.`,
             )}
           </nav>
         </div>
+
+        {/* Mobile Sub-Navigation Bar for Students & Visitors */}
+        {!activeCoursePlayer && (
+          <div className="md:hidden border-t border-white/10 bg-slate-950/80 px-4 py-2 flex items-center justify-around gap-1 overflow-x-auto text-xs">
+            {currentUser?.role === 'student' && (
+              <>
+                <button
+                  onClick={() => setStudentTab('my-space')}
+                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    studentTab === 'my-space' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Layout className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Espace</span>
+                </button>
+                <button
+                  onClick={() => setStudentTab('catalog')}
+                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    studentTab === 'catalog' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Star className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Catalogue</span>
+                </button>
+                <button
+                  onClick={() => setStudentTab('profile')}
+                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    studentTab === 'profile' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <UserIcon className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Profil</span>
+                </button>
+              </>
+            )}
+
+            {!currentUser && (
+              <>
+                <button
+                  onClick={() => setVisitorTab('catalog')}
+                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold text-center transition-all ${
+                    visitorTab === 'catalog' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <span className="text-[11px]">Catalogue</span>
+                </button>
+                <button
+                  onClick={() => setVisitorTab('auth')}
+                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    visitorTab === 'auth' ? 'accent-gradient text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span className="text-[11px]">Connexion</span>
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Main Container Layout */}

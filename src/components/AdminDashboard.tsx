@@ -31,6 +31,8 @@ interface AdminDashboardProps {
   onSaveCustomPage?: (page: CustomHtmlPage) => void;
   onDeleteCustomPage?: (pageId: string) => void;
   onPreviewCustomPage?: (page: CustomHtmlPage) => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export default function AdminDashboard({
@@ -54,9 +56,24 @@ export default function AdminDashboard({
   onEditCourse,
   onSaveCustomPage,
   onDeleteCustomPage,
-  onPreviewCustomPage
+  onPreviewCustomPage,
+  initialTab,
+  onTabChange
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile'>(
+    (initialTab as any) || 'stats'
+  );
+
+  React.useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab as any);
+    }
+  }, [initialTab]);
+
+  const handleTabClick = (tab: 'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile') => {
+    setActiveTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   

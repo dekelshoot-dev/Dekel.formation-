@@ -520,17 +520,13 @@ body {
 .theme-slate .bg-slate-50,
 .theme-slate .bg-slate-100,
 .theme-slate .bg-slate-150,
-.theme-slate .bg-slate-200/50,
-.theme-slate .bg-slate-50/50,
-.theme-slate .bg-slate-100/50,
+.theme-slate .bg-slate-200\/50,
+.theme-slate .bg-slate-50\/50,
+.theme-slate .bg-slate-100\/50,
 .theme-slate .bg-gray-50,
 .theme-slate .bg-gray-100,
-.theme-slate .bg-white/5,
-.theme-slate .bg-white/10,
 .theme-slate .bg-white\/5,
-.theme-slate .bg-white\/10,
-.theme-slate .bg-slate-50\/50,
-.theme-slate .bg-slate-100\/50 {
+.theme-slate .bg-white\/10 {
   background-color: #ffffff !important;
 }
 
@@ -681,17 +677,13 @@ body {
 .theme-nature .bg-slate-50,
 .theme-nature .bg-slate-100,
 .theme-nature .bg-slate-150,
-.theme-nature .bg-slate-200/50,
-.theme-nature .bg-slate-50/50,
-.theme-nature .bg-slate-100/50,
+.theme-nature .bg-slate-200\/50,
+.theme-nature .bg-slate-50\/50,
+.theme-nature .bg-slate-100\/50,
 .theme-nature .bg-gray-50,
 .theme-nature .bg-gray-100,
-.theme-nature .bg-white/5,
-.theme-nature .bg-white/10,
 .theme-nature .bg-white\/5,
-.theme-nature .bg-white\/10,
-.theme-nature .bg-slate-50\/50,
-.theme-nature .bg-slate-100\/50 {
+.theme-nature .bg-white\/10 {
   background-color: #FFFFFF !important;
 }
 
@@ -948,23 +940,19 @@ body.theme-nature-dark,
 /* Secondary off-black layout backgrounds and general non-elevated states */
 .theme-nature-dark .bg-slate-50,
 .theme-nature-dark .bg-slate-150,
-.theme-nature-dark .bg-slate-200/50,
-.theme-nature-dark .bg-slate-50/50,
+.theme-nature-dark .bg-slate-200\/50,
+.theme-nature-dark .bg-slate-50\/50,
 .theme-nature-dark .bg-slate-900\/40,
 .theme-nature-dark .bg-gray-50,
 .theme-nature-dark .bg-gray-100,
-.theme-nature-dark .bg-white/5,
-.theme-nature-dark .bg-white/10,
 .theme-nature-dark .bg-white\/5,
-.theme-nature-dark .bg-white\/10,
-.theme-nature-dark .bg-slate-50\/50 {
+.theme-nature-dark .bg-white\/10 {
   background-color: #1B2028 !important; /* Elegant card background */
   color: #E5E7EB !important;
   border-color: #2D3748 !important;
 }
 
 .theme-nature-dark .bg-slate-100,
-.theme-nature-dark .bg-slate-100/50,
 .theme-nature-dark .bg-slate-100\/50 {
   background-color: #161a20 !important;
   color: #E5E7EB !important;

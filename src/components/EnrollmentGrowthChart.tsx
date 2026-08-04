@@ -84,10 +84,10 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-red-500/15 text-red-400 rounded-xl border border-red-500/25">
+            <div className="p-2 bg-red-500/15 text-red-400 rounded-xl border border-red-500/25 shrink-0">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <h3 className="text-base md:text-lg font-black text-white">
+            <h3 className="text-sm sm:text-base md:text-lg font-black text-white">
               Croissance des Inscriptions (6 Derniers Mois)
             </h3>
           </div>
@@ -97,11 +97,11 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
         </div>
 
         {/* Toggle Area vs Bar Chart */}
-        <div className="flex items-center bg-slate-900 border border-white/10 p-1 rounded-2xl self-start sm:self-auto">
+        <div className="flex items-center w-full sm:w-auto bg-slate-900 border border-white/10 p-1 rounded-2xl shrink-0">
           <button
             type="button"
             onClick={() => setChartType('area')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               chartType === 'area'
                 ? 'bg-red-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
@@ -113,7 +113,7 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
           <button
             type="button"
             onClick={() => setChartType('bar')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               chartType === 'bar'
                 ? 'bg-red-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200'
@@ -126,44 +126,44 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
       </div>
 
       {/* Highlights Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Ce mois-ci</p>
-          <div className="flex items-baseline gap-2">
-            <p className="text-xl font-black text-white">{currentMonthData.inscriptions}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-3.5 space-y-1">
+          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Ce mois-ci</p>
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <p className="text-lg sm:text-xl font-black text-white">{currentMonthData.inscriptions}</p>
             <span className="text-[10px] font-bold text-emerald-400 flex items-center">
               <ArrowUpRight className="w-3 h-3" />
               +{growthRate}%
             </span>
           </div>
-          <p className="text-[10px] text-slate-400">Inscriptions nouvelles</p>
+          <p className="text-[10px] text-slate-400 truncate">Inscriptions nouvelles</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Cumul total</p>
-          <p className="text-xl font-black text-red-400">{currentMonthData.cumule}</p>
-          <p className="text-[10px] text-slate-400">Élèves enregistrés</p>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-3.5 space-y-1">
+          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Cumul total</p>
+          <p className="text-lg sm:text-xl font-black text-red-400">{currentMonthData.cumule}</p>
+          <p className="text-[10px] text-slate-400 truncate">Élèves enregistrés</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Moyenne mensuelle</p>
-          <p className="text-xl font-black text-indigo-300">{monthlyAverage}</p>
-          <p className="text-[10px] text-slate-400">Inscriptions / mois</p>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-3.5 space-y-1">
+          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Moyenne mensuelle</p>
+          <p className="text-lg sm:text-xl font-black text-indigo-300">{monthlyAverage}</p>
+          <p className="text-[10px] text-slate-400 truncate">Inscriptions / mois</p>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-1">
-          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Total semestre</p>
-          <p className="text-xl font-black text-emerald-400">{total6Months}</p>
-          <p className="text-[10px] text-slate-400">Sur les 6 mois</p>
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-3.5 space-y-1">
+          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate">Total semestre</p>
+          <p className="text-lg sm:text-xl font-black text-emerald-400">{total6Months}</p>
+          <p className="text-[10px] text-slate-400 truncate">Sur les 6 mois</p>
         </div>
       </div>
 
       {/* Chart Canvas */}
-      <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-4 pt-6">
-        <div className="h-64 md:h-72 w-full">
+      <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-2 sm:p-4 pt-4 sm:pt-6 overflow-hidden">
+        <div className="h-56 sm:h-64 md:h-72 w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             {chartType === 'area' ? (
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorCumule" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4}/>
@@ -178,12 +178,12 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
                 <XAxis 
                   dataKey="label" 
                   stroke="#94a3b8" 
-                  fontSize={11} 
+                  fontSize={10} 
                   tickLine={false} 
                 />
                 <YAxis 
                   stroke="#94a3b8" 
-                  fontSize={11} 
+                  fontSize={10} 
                   tickLine={false} 
                 />
                 <Tooltip 
@@ -203,7 +203,7 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
                   verticalAlign="top" 
                   height={36} 
                   formatter={(value) => (
-                    <span className="text-xs text-slate-300 font-medium">
+                    <span className="text-[11px] sm:text-xs text-slate-300 font-medium">
                       {value === 'cumule' ? 'Cumul global' : 'Inscriptions du mois'}
                     </span>
                   )}
@@ -228,17 +228,17 @@ export default function EnrollmentGrowthChart({ allEnrollments }: EnrollmentGrow
                 />
               </AreaChart>
             ) : (
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
                 <XAxis 
                   dataKey="label" 
                   stroke="#94a3b8" 
-                  fontSize={11} 
+                  fontSize={10} 
                   tickLine={false} 
                 />
                 <YAxis 
                   stroke="#94a3b8" 
-                  fontSize={11} 
+                  fontSize={10} 
                   tickLine={false} 
                 />
                 <Tooltip 

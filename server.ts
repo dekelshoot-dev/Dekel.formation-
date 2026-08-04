@@ -994,6 +994,247 @@ app.get(["/p/:slug", "/p/:slug/*", "/page/:slug", "/pages/:slug"], async (req, r
   next();
 });
 
+// SEO: Dynamic Robots.txt Route
+app.get("/robots.txt", (req, res) => {
+  const hostUrl = `${req.protocol}://${req.get("host")}`;
+  const robotsTxt = `User-agent: *
+Disallow: /admin
+Disallow: /admin/
+Disallow: /student
+Disallow: /student/
+Disallow: /trainer
+Disallow: /trainer/
+Disallow: /auth
+Disallow: /auth/
+Disallow: /api/
+Disallow: /verify-email
+Disallow: /reset-password
+
+Allow: /
+Allow: /formation/
+Allow: /formateur/
+Allow: /categorie/
+Allow: /marketplace
+Allow: /p/
+Allow: /sitemap.xml
+
+Sitemap: ${hostUrl}/sitemap.xml
+`;
+  res.setHeader("Content-Type", "text/plain; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  return res.status(200).send(robotsTxt);
+});
+
+// SEO: Dynamic Sitemap.xml Generator
+app.get("/sitemap.xml", async (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const now = new Date().toISOString().split("T")[0];
+
+  const courseUrls: string[] = [];
+  const categoryUrls: string[] = [];
+  const customPageUrls: string[] = [];
+
+  try {
+    // 1. Fetch published courses
+    const coursesRef = collection(dbFirestore, "courses");
+    const qCourses = query(coursesRef, where("status", "==", "published"));
+    const coursesSnap = await getDocs(qCourses);
+
+    const categoriesSet = new Set<string>();
+
+    coursesSnap.forEach((docSnap) => {
+      const data = docSnap.data();
+      const slug = data.seoSlug || docSnap.id;
+      const courseDate = (data.updatedAt || data.createdAt || now).split("T")[0];
+
+      courseUrls.push(`  <url>
+    <loc>${baseUrl}/formation/${encodeURIComponent(slug)}</loc>
+    <lastmod>${courseDate}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>`);
+
+      if (data.type) {
+        categoriesSet.add(data.type);
+      }
+    });
+
+    // Categories URLs
+    categoriesSet.forEach((cat) => {
+      const catSlug = cat.toLowerCase().trim().replace(/\s+/g, "-");
+      categoryUrls.push(`  <url>
+    <loc>${baseUrl}/categorie/${encodeURIComponent(catSlug)}</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`);
+    });
+
+    // 2. Fetch custom HTML pages
+    const pagesSnap = await getDocs(collection(dbFirestore, "custom_pages"));
+    pagesSnap.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.status === "published" || !data.status) {
+        const slug = (data.slug || docSnap.id).trim().replace(/^\/+/, "");
+        const pageDate = (data.updatedAt || data.createdAt || now).split("T")[0];
+        customPageUrls.push(`  <url>
+    <loc>${baseUrl}/p/${encodeURIComponent(slug)}</loc>
+    <lastmod>${pageDate}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`);
+      }
+    });
+  } catch (err) {
+    console.warn("Sitemap database generation notice:", err);
+  }
+
+  const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/marketplace</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+${courseUrls.join("\n")}
+${categoryUrls.join("\n")}
+${customPageUrls.join("\n")}
+</urlset>`;
+
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=1800, s-maxage=3600");
+  return res.status(200).send(sitemapXml);
+});
+
+// Helper for serving index.html with server-injected SEO meta tags for social crawlers (WhatsApp, FB, Twitter, LinkedIn)
+async function renderHtmlWithSeoMeta(req: express.Request, meta: {
+  title?: string;
+  description?: string;
+  image?: string;
+  url?: string;
+  type?: string;
+  jsonLd?: any;
+}) {
+  let html = "";
+  const indexPath = process.env.NODE_ENV === "production"
+    ? path.join(process.cwd(), "dist", "index.html")
+    : path.join(process.cwd(), "index.html");
+
+  try {
+    html = fs.readFileSync(indexPath, "utf-8");
+  } catch (e) {
+    html = `<!DOCTYPE html><html><head><title>${meta.title || "Dekel.Formation"}</title></head><body><div id="root"></div></body></html>`;
+  }
+
+  const cleanTitle = meta.title || "Dekel.Formation - Plateforme E-Learning";
+  const cleanDesc = meta.description || "Découvrez nos formations certifiantes et développez vos compétences avec Dekel.Formation.";
+  const cleanImage = meta.image || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200";
+  const cleanUrl = meta.url || `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
+  // Replace default title tag
+  html = html.replace(/<title>.*?<\/title>/gi, `<title>${cleanTitle}</title>`);
+
+  const metaTags = `
+    <meta name="description" content="${cleanDesc.replace(/"/g, '&quot;')}" />
+    <link rel="canonical" href="${cleanUrl}" />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:site_name" content="Dekel.Formation" />
+    <meta property="og:type" content="${meta.type || 'website'}" />
+    <meta property="og:title" content="${cleanTitle.replace(/"/g, '&quot;')}" />
+    <meta property="og:description" content="${cleanDesc.replace(/"/g, '&quot;')}" />
+    <meta property="og:image" content="${cleanImage}" />
+    <meta property="og:url" content="${cleanUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${cleanTitle.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:description" content="${cleanDesc.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:image" content="${cleanImage}" />
+    ${meta.jsonLd ? `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>` : ''}
+  `;
+
+  return html.replace('</head>', `${metaTags}\n</head>`);
+}
+
+// SEO Public Course Server Route for Social Crawlers
+app.get(["/formation/:slug", "/course/:slug", "/f/:slug"], async (req, res, next) => {
+  const rawSlug = req.params.slug || "";
+  const cleanSlug = rawSlug.trim().toLowerCase();
+
+  if (!cleanSlug) return next();
+
+  try {
+    let courseData: any = null;
+    let courseId = cleanSlug;
+
+    // Check direct doc ID
+    const docRef = doc(dbFirestore, "courses", cleanSlug);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      courseData = docSnap.data();
+    } else {
+      // Check by seoSlug
+      const q = query(collection(dbFirestore, "courses"), where("seoSlug", "==", cleanSlug));
+      const querySnap = await getDocs(q);
+      if (!querySnap.empty) {
+        courseData = querySnap.docs[0].data();
+        courseId = querySnap.docs[0].id;
+      }
+    }
+
+    if (courseData) {
+      const title = `${courseData.seoTitle || courseData.title} | Formation Dekel`;
+      const description = courseData.seoDescription || courseData.description || "";
+      const image = courseData.seoShareImage || courseData.coverImage || "";
+      const url = `${req.protocol}://${req.get("host")}/formation/${courseData.seoSlug || courseId}`;
+
+      const courseJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Course",
+        "name": courseData.seoTitle || courseData.title,
+        "description": description,
+        "provider": {
+          "@type": "EducationalOrganization",
+          "name": "Dekel.Formation",
+          "sameAs": `${req.protocol}://${req.get("host")}`
+        },
+        "author": {
+          "@type": "Person",
+          "name": courseData.trainerName || "Formateur Dekel"
+        },
+        "offers": {
+          "@type": "Offer",
+          "category": "Paid",
+          "price": courseData.promoPrice && courseData.promoPrice > 0 ? courseData.promoPrice : courseData.price,
+          "priceCurrency": "XAF"
+        }
+      };
+
+      const htmlWithSeo = await renderHtmlWithSeoMeta(req, {
+        title,
+        description,
+        image,
+        url,
+        jsonLd: courseJsonLd
+      });
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      return res.status(200).send(htmlWithSeo);
+    }
+  } catch (err) {
+    console.warn("Course page SEO server rendering notice:", err);
+  }
+
+  next();
+});
+
 // FAST DIRECT SERVER-SIDE ROUTE FOR TOP-LEVEL CUSTOM SLUGS (e.g. /offre-speciale)
 const SYSTEM_PREFIXES = [
   "api", "marketplace", "admin", "student", "trainer", "auth", 

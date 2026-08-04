@@ -135,9 +135,60 @@
       "studentName": "Étudiant E2E Succès",
       "enrolledAt": "2026-08-02T20:27:14.024Z",
       "synced": true
+    },
+    {
+      "id": "we-1785747160973-eyke",
+      "courseId": "c-1",
+      "studentEmail": "e2e-student-1785747160876@dekel-test.com",
+      "studentName": "Étudiant E2E Succès",
+      "enrolledAt": "2026-08-03T08:52:40.973Z",
+      "synced": true
     }
   ],
   "logs": [
+    {
+      "id": "log-1785747160193-qb12",
+      "courseId": "unknown-course-id",
+      "url": "http://localhost:3000/api/webhooks/payment/unknown-course-id",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "52",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": {
+        "email": "eleve-test@gmail.com",
+        "name": "Eleve Test"
+      },
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-08-03T08:52:40.731Z",
+      "status": "failed_unauthorized_course",
+      "errorMessage": "Accès non autorisé : La formation avec l'identifiant 'unknown-course-id' n'existe pas ou le webhook n'est pas autorisé.",
+      "outcome": "Accès refusé (formation introuvable ou non enregistrée)"
+    },
+    {
+      "id": "log-1785747160187-eye4",
+      "courseId": "malformed_json_payload",
+      "url": "http://localhost:3000/api/webhooks/payment/c-1",
+      "method": "POST",
+      "headers": {
+        "content-type": "application/json",
+        "content-length": "43",
+        "host": "localhost:3000",
+        "connection": "keep-alive"
+      },
+      "body": null,
+      "query": {},
+      "detectedEmail": null,
+      "detectedName": null,
+      "receivedAt": "2026-08-03T08:52:40.187Z",
+      "status": "failed_malformed_json",
+      "errorMessage": "Format JSON invalide : Expected ',' or '}' after property value in JSON at position 43 (line 1 column 44)",
+      "outcome": "Échec critique du parsing JSON (La charge utile brute envoyée est syntaxiquement incorrecte ou tronquée)"
+    },
     {
       "id": "log-1785702433489-3989",
       "courseId": "unknown-course-id",
@@ -484,6 +535,25 @@
     }
   ],
   "transactional_emails": [
+    {
+      "id": "tx-em-1785747160975-h7pa",
+      "to": "e2e-student-1785747160876@dekel-test.com",
+      "recipientName": "Étudiant E2E Succès",
+      "subject": "Notification Dekel.Formation",
+      "type": "payment_webhook_enrolled",
+      "category": "payments",
+      "htmlBody": "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Notification Dekel.Formation</title>\n</head>\n<body style=\"margin: 0; padding: 0; background-color: #0f1115; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"background-color: #0f1115; padding: 24px 12px;\">\n    <tr>\n      <td align=\"center\">\n        <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0;\">\n          \n          <!-- Header -->\n          <tr>\n            <td style=\"background-color: #1b2028; padding: 28px 24px; text-align: center; border-bottom: 3px solid #10b981;\">\n              <div style=\"display: inline-flex; align-items: center; justify-content: center; background-color: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 8px 16px;\">\n                <span style=\"font-size: 18px; margin-right: 8px;\"></span>\n                <span style=\"color: #ffffff; font-weight: 800; font-size: 18px;\">Dekel.<span style=\"color: #34d399;\">Formation</span></span>\n              </div>\n              <p style=\"margin: 6px 0 0 0; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;\">Service Expéditeur : service@dekel-dev.com</p>\n            </td>\n          </tr>\n\n          <!-- Content Body -->\n          <tr>\n            <td style=\"padding: 32px 28px 24px 28px;\">\n              <div style=\"margin-bottom: 16px;\">\n                <span style=\"display: inline-block; background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 4px 10px; border-radius: 20px;\">\n                  ✉️ Notification\n                </span>\n              </div>\n\n              <h1 style=\"margin: 0 0 16px 0; color: #0f172a; font-size: 20px; font-weight: 800;\">\n                Notification automatique\n              </h1>\n\n              <div style=\"font-size: 15px; line-height: 1.6; color: #334155;\">\n                \n        <p>Bonjour <strong>Étudiant E2E Succès</strong>,</p>\n        <p>Vous avez reçu une notification importante sur votre compte Dekel.Formation.</p>\n        <p>Formation : <strong>Formation Dekel Test</strong></p>\n      \n              </div>\n\n              \n              <div style=\"margin-top: 28px; text-align: center;\">\n                <a href=\"http://localhost:3000\" target=\"_blank\" style=\"display: inline-block; background-color: #059669; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 26px; border-radius: 12px;\">\n                  Ouvrir Dekel.Formation &rarr;\n                </a>\n              </div>\n              \n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #0f172a; padding: 20px; text-align: center; color: #94a3b8; font-size: 11px;\">\n              <p style=\"margin: 0 0 6px 0; font-weight: 600; color: #cbd5e1;\">Dekel.Formation &bull; Expéditeur officiel : service@dekel-dev.com</p>\n              <p style=\"margin: 0;\">&copy; 2026 Dekel.Formation. Tous droits réservés.</p>\n            </td>\n          </tr>\n\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>",
+      "textBody": "Notification automatique\n\n\n        Bonjour Étudiant E2E Succès,\n        Vous avez reçu une notification importante sur votre compte Dekel.Formation.\n        Formation : Formation Dekel Test\n      \n\nDekel.Formation - Expéditeur : service@dekel-dev.com",
+      "status": "processing",
+      "queuedAt": "2026-08-03T08:52:40.975Z",
+      "attempts": 0,
+      "maxAttempts": 3,
+      "metadata": {
+        "source": "webhook",
+        "courseId": "c-1",
+        "enrollmentId": "we-1785747160973-eyke"
+      }
+    },
     {
       "id": "tx-em-1785702434026-c7ey",
       "to": "e2e-student-1785702433954@dekel-test.com",

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
 import { Course, Module, Chapter, StudentProgress, User } from '../types';
-import CourseFaqComponent from './CourseFaqComponent';
 import { 
   Play, CheckCircle2, ChevronRight, ChevronDown, Download, ExternalLink, 
   ArrowLeft, FileText, Globe, Sparkles, BookOpen, Menu, X, Check, Lock, Unlock,
@@ -41,10 +40,11 @@ export default function CoursePlayer({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter active modules and chapters for the student view
-  const activeModules = modules.filter(m => m.active !== false);
-  const activeChapters = chapters.filter(ch => {
+  const activeModules = (modules || []).filter(m => m && m.active !== false);
+  const activeChapters = (chapters || []).filter(ch => {
+    if (!ch) return false;
     const parentMod = activeModules.find(m => m.id === ch.moduleId);
-    const matchesSearch = searchQuery ? ch.title.toLowerCase().includes(searchQuery.toLowerCase()) : true;
+    const matchesSearch = searchQuery ? (ch.title || '').toLowerCase().includes(searchQuery.toLowerCase()) : true;
     return parentMod && ch.active !== false && matchesSearch;
   });
 
@@ -240,9 +240,9 @@ export default function CoursePlayer({
             <ArrowLeft className="w-4 h-4" />
           </button>
           
-          <div className="truncate">
-            <h1 className="text-xs font-black text-white truncate">{course.title}</h1>
-            <p className="text-[10px] text-slate-400 font-semibold truncate font-sans">Formateur : {course.trainerName}</p>
+          <div className="truncate flex flex-col text-left items-start">
+            <h1 className="text-xs font-black text-white truncate text-left w-full">{course.title}</h1>
+            <p className="text-[10px] text-slate-400 font-semibold truncate font-sans text-left w-full mt-0.5">Formateur : {course.trainerName}</p>
           </div>
         </div>
 
@@ -645,12 +645,6 @@ export default function CoursePlayer({
                     <ChapterCommentsComponent 
                       currentUser={currentUser} 
                       chapterId={activeChapter.id} 
-                    />
-
-                    {/* Course FAQ Component */}
-                    <CourseFaqComponent 
-                      course={course} 
-                      currentUser={currentUser} 
                     />
                   </div>
                 )}

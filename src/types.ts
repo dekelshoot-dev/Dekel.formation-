@@ -74,6 +74,12 @@ export interface Course {
   seoShareImage?: string;
   // Course FAQs
   faqs?: FaqItem[];
+  // Presentation fields
+  prerequisites?: string[];
+  objectives?: string[];
+  skillsAcquired?: string[];
+  hasCertificate?: boolean;
+  certificateInfo?: string;
 }
 
 export interface FaqItem {

@@ -1,16 +1,23 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with persistent cache and resilient long-polling for sandboxed environments
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with resilient fallback for sandboxed/iframe environments
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    experimentalForceLongPolling: true,
+  }, firebaseConfig.firestoreDatabaseId || undefined);
+} catch (e) {
+  console.warn('Persistent Firestore cache notice, falling back to standard Firestore:', e);
+  dbInstance = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
+}
 
+export const db = dbInstance;
 export const auth = getAuth(app);
 
 export enum OperationType {

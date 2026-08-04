@@ -3,7 +3,7 @@
   "scripts": {
     "lint": "tsc --noEmit",
     "build": "tsc",
-    "gcp-build": "node -e \"console.log('Prebuilt lib ready')\"",
+    "gcp-build": "npm run build",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase serve --only functions",
     "shell": "npm run build && firebase functions:shell",

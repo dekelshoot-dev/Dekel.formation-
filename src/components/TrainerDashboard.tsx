@@ -55,6 +55,8 @@ interface TrainerDashboardProps {
   onUpdateUser: (user: User) => void;
   onPreviewCourse?: (course: Course) => void;
   onAddUser?: (user: User) => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export default function TrainerDashboard({
@@ -90,9 +92,24 @@ export default function TrainerDashboard({
   onUpdateUser,
   onPreviewCourse,
   onAddUser,
+  initialTab,
+  onTabChange
 }: TrainerDashboardProps) {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants' | 'custom-pages' | 'emails'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants' | 'custom-pages' | 'emails'>(
+    (initialTab as any) || 'dashboard'
+  );
+
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab as any);
+    }
+  }, [initialTab]);
+
+  const changeTab = (tab: any) => {
+    setActiveTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   
   // Selection states

@@ -17,6 +17,9 @@ import CoursePlayer from './components/CoursePlayer';
 import Marketplace from './components/Marketplace';
 import UserProfile from './components/UserProfile';
 import CustomPageViewer from './components/CustomPageViewer';
+import PublicCoursePage from './components/PublicCoursePage';
+import NotFoundPage from './components/NotFoundPage';
+import ForbiddenPage from './components/ForbiddenPage';
 import { ToastContainer, showToast } from './components/Toast';
 import GlobalOverflowPopover from './components/GlobalOverflowPopover';
 import { NotificationBell } from './components/NotificationBell';
@@ -264,116 +267,85 @@ export default function App() {
   }, [allCustomPages, currentUser]);
 
   const [activeCoursePlayer, setActiveCoursePlayer] = useState<Course | null>(null);
-  const [visitorTab, setVisitorTab] = useState<'catalog' | 'auth' | 'reset-password' | 'verify-email'>('catalog');
-  const [showVerifyEmailPage, setShowVerifyEmailPage] = useState<boolean>(false);
-  const [studentTab, setStudentTab] = useState<'my-space' | 'catalog' | 'profile'>('my-space');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [autoOpenCourseSlug, setAutoOpenCourseSlug] = useState('');
 
-  // Auto-detect password reset or email verification query parameters from Firebase Auth link or direct route
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const code = searchParams.get('oobCode');
-    const mode = searchParams.get('mode');
+  // --- Centralized SPA Router State ---
+  const [currentPath, setCurrentPath] = useState<string>(() => 
+    window.location.pathname + window.location.search + window.location.hash
+  );
 
-    if (mode === 'verifyEmail' || mode === 'verifyEmailCode' || mode === 'select' || (code && mode === 'verifyEmail') || window.location.pathname.includes('verify-email')) {
-      setShowVerifyEmailPage(true);
-      setVisitorTab('verify-email');
-    } else if (code || mode === 'resetPassword' || window.location.pathname.includes('reset-password')) {
-      setVisitorTab('reset-password');
+  const navigateTo = (path: string, replace = false) => {
+    if (replace) {
+      window.history.replaceState({}, '', path);
+    } else {
+      window.history.pushState({}, '', path);
     }
+    setCurrentPath(path);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname + window.location.search + window.location.hash);
+    };
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
 
-  // Dynamic SEO URL Router & Meta Tags Injector (Requirement 26)
+  // Sync document title and canonical link on route changes
   useEffect(() => {
-    if (allCourses.length === 0) return;
+    let rawPath = currentPath.split('?')[0].split('#')[0] || '/';
+    if (rawPath.length > 1 && rawPath.endsWith('/')) {
+      rawPath = rawPath.slice(0, -1);
+    }
+    const pathname = rawPath.toLowerCase();
 
-    const checkUrlForSeoRoute = () => {
-      let slug = '';
-      
-      // 1. Pathname check (e.g. /marketplace/my-course)
-      const pathParts = window.location.pathname.split('/');
-      const mIdx = pathParts.indexOf('marketplace');
-      if (mIdx !== -1 && pathParts[mIdx + 1]) {
-        slug = pathParts[mIdx + 1];
+    let pageTitle = 'Dekel.Formation - Plateforme E-Learning';
+
+    if (pathname === '/' || pathname === '/marketplace' || pathname === '/catalogue') {
+      pageTitle = 'Catalogue de Formations | Dekel.Formation';
+    } else if (pathname === '/connexion' || pathname === '/auth' || pathname === '/login') {
+      pageTitle = 'Connexion | Dekel.Formation';
+    } else if (pathname === '/inscription' || pathname === '/register') {
+      pageTitle = 'Création de compte | Dekel.Formation';
+    } else if (pathname === '/mot-de-passe-oublie' || pathname === '/reset-password') {
+      pageTitle = 'Mot de passe oublié | Dekel.Formation';
+    } else if (pathname === '/verifier-email' || pathname === '/verify-email') {
+      pageTitle = 'Vérification Email | Dekel.Formation';
+    } else if (pathname.startsWith('/dashboard') || pathname.startsWith('/student')) {
+      pageTitle = 'Mon Espace Étudiant | Dekel.Formation';
+    } else if (pathname.startsWith('/trainer')) {
+      pageTitle = 'Espace Formateur | Dekel.Formation';
+    } else if (pathname.startsWith('/admin')) {
+      pageTitle = 'Espace Administration | Dekel.Formation';
+    }
+
+    const courseMatch = pathname.match(/^\/(formation|course|f)\/([^/]+)/i);
+    if (courseMatch && courseMatch[2]) {
+      const slug = courseMatch[2];
+      const course = allCourses.find(c => c.seoSlug?.toLowerCase() === slug || c.id.toLowerCase() === slug);
+      if (course) {
+        pageTitle = `${course.seoTitle || course.title} | Formation Dekel`;
+      } else {
+        pageTitle = '404 - Page introuvable | Dekel.Formation';
       }
+    }
 
-      // 2. Query parameters fallback (?course=slug, ?f=slug, ?slug=slug)
-      if (!slug) {
-        const params = new URLSearchParams(window.location.search);
-        slug = params.get('course') || params.get('f') || params.get('slug') || '';
-      }
+    document.title = pageTitle;
 
-      // 3. Hash fallback (e.g. #/marketplace/slug or #slug)
-      if (!slug && window.location.hash) {
-        const hash = window.location.hash.replace('#', '');
-        const hashParts = hash.split('/');
-        const hIdx = hashParts.indexOf('marketplace');
-        if (hIdx !== -1 && hashParts[hIdx + 1]) {
-          slug = hashParts[hIdx + 1];
-        } else if (hash && !hash.includes('/')) {
-          slug = hash;
-        }
-      }
-
-      if (slug) {
-        const matchedCourse = allCourses.find(c => c.seoSlug === slug || c.id === slug);
-        if (matchedCourse) {
-          // Open Marketplace catalog tab
-          if (currentUser) {
-            setStudentTab('catalog');
-          } else {
-            setVisitorTab('catalog');
-          }
-
-          // Inject custom Meta Title
-          document.title = matchedCourse.seoTitle || matchedCourse.title;
-
-          // Inject custom Meta Description
-          let metaDesc = document.querySelector('meta[name="description"]');
-          if (!metaDesc) {
-            metaDesc = document.createElement('meta');
-            metaDesc.setAttribute('name', 'description');
-            document.head.appendChild(metaDesc);
-          }
-          metaDesc.setAttribute('content', matchedCourse.seoDescription || matchedCourse.description);
-
-          // Inject Open Graph tags
-          const ogProps = {
-            'og:title': matchedCourse.seoTitle || matchedCourse.title,
-            'og:description': matchedCourse.seoDescription || matchedCourse.description,
-            'og:image': matchedCourse.seoShareImage || matchedCourse.coverImage || '',
-            'og:url': window.location.href,
-            'og:type': 'video.movie'
-          };
-
-          Object.entries(ogProps).forEach(([prop, val]) => {
-            let metaTag = document.querySelector(`meta[property="${prop}"]`);
-            if (!metaTag) {
-              metaTag = document.createElement('meta');
-              metaTag.setAttribute('property', prop);
-              document.head.appendChild(metaTag);
-            }
-            if (val) {
-              metaTag.setAttribute('content', val);
-            }
-          });
-
-          // Set state to auto-open details in the Marketplace
-          setAutoOpenCourseSlug(slug);
-        }
-      }
-    };
-
-    checkUrlForSeoRoute();
-
-    window.addEventListener('popstate', checkUrlForSeoRoute);
-    window.addEventListener('hashchange', checkUrlForSeoRoute);
-    return () => {
-      window.removeEventListener('popstate', checkUrlForSeoRoute);
-      window.removeEventListener('hashchange', checkUrlForSeoRoute);
-    };
-  }, [allCourses, currentUser]);
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', window.location.href);
+  }, [currentPath, allCourses]);
 
   // Single application theme: Nature Dark (Premium)
   const currentTheme = 'theme-nature-dark';
@@ -730,7 +702,18 @@ L'équipe de support client : support@dekel-formation.com`,
   const handleLogin = async (user: User) => {
     setCurrentUser(user);
     setActiveCoursePlayer(null);
-    setStudentTab('my-space');
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const redirectUrl = searchParams.get('redirect');
+    if (redirectUrl) {
+      navigateTo(redirectUrl, true);
+    } else if (user.role === 'admin') {
+      navigateTo('/admin', true);
+    } else if (user.role === 'trainer' || user.role === 'assistant') {
+      navigateTo('/trainer', true);
+    } else {
+      navigateTo('/dashboard', true);
+    }
 
     // Case 2 Activation
     const preRegMatch = preRegistered.find(p => p.email.toLowerCase() === user.email.toLowerCase());
@@ -777,7 +760,7 @@ Bon apprentissage.`,
   const handleLogout = async () => {
     setCurrentUser(null);
     setActiveCoursePlayer(null);
-    setVisitorTab('catalog');
+    navigateTo('/');
     try {
       await auth.signOut();
       showToast('Déconnexion réussie !', 'success');
@@ -971,16 +954,623 @@ Bon apprentissage.`,
     await saveStudentProgress(updatedProgress);
   };
 
-  // Standalone Fullscreen Custom Page View (no platform header/footer/layout)
-  if (activeCustomPageRoute || previewingCustomPage) {
-    return (
-      <CustomPageViewer
-        page={activeCustomPageRoute || previewingCustomPage!}
-        isPreviewMode={!!previewingCustomPage}
-        onClosePreview={() => setPreviewingCustomPage(null)}
-      />
-    );
-  }
+  const renderCurrentRoute = () => {
+    let rawPath = currentPath.split('?')[0].split('#')[0] || '/';
+    if (rawPath.length > 1 && rawPath.endsWith('/')) {
+      rawPath = rawPath.slice(0, -1);
+    }
+    const pathname = rawPath.toLowerCase();
+
+    // 1. Preview mode for Custom Pages in modal
+    if (previewingCustomPage) {
+      return (
+        <CustomPageViewer 
+          page={previewingCustomPage} 
+          isPreviewMode={true}
+          onClosePreview={() => setPreviewingCustomPage(null)} 
+        />
+      );
+    }
+
+    // 2. Public Course Presentation Page: /formation/:slug, /course/:slug, /f/:slug
+    const courseMatch = pathname.match(/^\/(formation|course|f)\/([^/]+)/i);
+    if (courseMatch && courseMatch[2]) {
+      const slug = courseMatch[2];
+      const course = allCourses.find(c => c.seoSlug?.toLowerCase() === slug || c.id.toLowerCase() === slug);
+      if (course) {
+        return (
+          <PublicCoursePage
+            course={course}
+            allModules={allModules.filter(m => m.courseId === course.id)}
+            allChapters={allChapters.filter(ch => {
+              const mod = allModules.find(m => m.id === ch.moduleId);
+              return mod?.courseId === course.id;
+            })}
+            currentUser={currentUser}
+            onNavigateToCatalog={() => navigateTo('/marketplace')}
+            onNavigateToLogin={() => navigateTo('/connexion')}
+            isEnrolled={currentUser ? allEnrollments.some(e => e.studentEmail.toLowerCase() === currentUser.email.toLowerCase() && e.courseId === course.id && e.status === 'active') : false}
+          />
+        );
+      } else {
+        return <NotFoundPage onNavigate={navigateTo} />;
+      }
+    }
+
+    // 3. Custom HTML Page Route: /p/:slug or /page/:slug or root /:slug if matched
+    const customPageMatch = pathname.match(/^\/(p|page|pages)\/([^/]+)/i);
+    const targetSlug = customPageMatch ? customPageMatch[2] : (pathname.startsWith('/') ? pathname.slice(1) : '');
+    
+    if (targetSlug && !['', 'marketplace', 'catalogue', 'admin', 'student', 'trainer', 'auth', 'connexion', 'inscription', 'register', 'dashboard', 'reset-password', 'verify-email', 'api'].includes(targetSlug)) {
+      const matchedPage = allCustomPages.find(p => p.slug?.toLowerCase() === targetSlug || p.id?.toLowerCase() === targetSlug);
+      if (matchedPage && (matchedPage.status === 'published' || currentUser?.role === 'admin')) {
+        return (
+          <CustomPageViewer
+            page={matchedPage}
+            onClosePreview={() => navigateTo('/')}
+          />
+        );
+      }
+    }
+
+    // 4. Public Pages
+    if (pathname === '/' || pathname === '/accueil') {
+      if (currentUser?.role === 'student') {
+        return (
+          <StudentDashboard
+            currentUser={currentUser}
+            allCourses={allCourses}
+            allModules={allModules}
+            allChapters={allChapters}
+            allEnrollments={allEnrollments}
+            allProgress={allProgress}
+            onOpenCoursePlayer={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
+            onOpenCatalog={() => navigateTo('/marketplace')}
+            onOpenPublicPage={(c) => navigateTo(`/formation/${c.seoSlug || c.id}`)}
+          />
+        );
+      } else if (currentUser?.role === 'trainer' || currentUser?.role === 'assistant') {
+        return (
+          <TrainerDashboard
+            currentUser={currentUser}
+            allUsers={allUsers}
+            allCourses={allCourses}
+            allModules={allModules}
+            allChapters={allChapters}
+            allEnrollments={allEnrollments}
+            allProgress={allProgress}
+            preRegistered={preRegistered}
+            categories={categories}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+            onAddCourse={(c) => { setAllCourses(prev => [...prev, c]); saveCourse(c); }}
+            onUpdateCourse={(c) => { setAllCourses(prev => prev.map(x => x.id === c.id ? c : x)); saveCourse(c); }}
+            onDeleteCourse={(id) => { setAllCourses(prev => prev.filter(c => c.id !== id)); deleteCourse(id); }}
+            onAddModule={(m) => { setAllModules(prev => [...prev, m]); saveModule(m); }}
+            onUpdateModules={async (mods) => {
+              const ids = new Set(mods.map(m => m.id));
+              setAllModules(prev => [...prev.filter(m => !ids.has(m.id)), ...mods]);
+              await saveModuleList(mods);
+            }}
+            onDeleteModule={(id) => {
+              const mod = allModules.find(m => m.id === id);
+              setAllModules(prev => prev.filter(m => m.id !== id));
+              deleteModule(id, mod ? mod.courseId : '');
+            }}
+            onAddChapter={(ch) => { setAllChapters(prev => [...prev, ch]); saveChapter(ch); }}
+            onUpdateChapters={async (chaps) => { setAllChapters(chaps); await saveChapterList(chaps); }}
+            onDeleteChapter={(id) => {
+              const ch = allChapters.find(c => c.id === id);
+              setAllChapters(prev => prev.filter(c => c.id !== id));
+              deleteChapter(id, ch ? ch.moduleId : '', ch ? ch.courseId : '');
+            }}
+            onAddEnrollment={(e) => { setAllEnrollments(prev => [...prev, e]); saveEnrollment(e); }}
+            onUpdateEnrollmentStatus={(id, status) => {
+              const updated = allEnrollments.map(e => e.id === id ? { ...e, status } : e);
+              setAllEnrollments(updated);
+              const found = updated.find(e => e.id === id);
+              if (found) saveEnrollment(found);
+            }}
+            onDeleteEnrollment={(id) => { setAllEnrollments(prev => prev.filter(e => e.id !== id)); deleteEnrollment(id); }}
+            onAddPreRegistered={(p) => { setPreRegistered(prev => [...prev, p]); savePreRegistered(p); }}
+            onSendEmail={handleSendEmail}
+            onUpdateUser={(u) => {
+              setAllUsers(prev => prev.map(x => x.id === u.id ? u : x));
+              setCurrentUser(u);
+              saveUserProfile(u);
+            }}
+            onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
+            onAddUser={handleAddUser}
+            customPages={allCustomPages}
+            onSaveCustomPage={handleSaveCustomPage}
+            onDeleteCustomPage={handleDeleteCustomPage}
+            onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
+            initialTab="dashboard"
+            onTabChange={(tab) => navigateTo(`/trainer/${tab}`)}
+          />
+        );
+      } else if (currentUser?.role === 'admin') {
+        return (
+          <AdminDashboard
+            currentUser={currentUser}
+            allUsers={allUsers}
+            allCourses={allCourses}
+            allEnrollments={allEnrollments}
+            onToggleCourseStatus={(id) => {
+              const updated = allCourses.map(c => c.id === id ? { ...c, status: (c.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' } : c);
+              setAllCourses(updated);
+              const found = updated.find(c => c.id === id);
+              if (found) saveCourse(found);
+            }}
+            onDeleteCourse={(id) => { setAllCourses(prev => prev.filter(c => c.id !== id)); deleteCourse(id); }}
+            onUpdateUserStatus={(id, isDeactivated) => {
+              const updated = allUsers.map(u => u.id === id ? { ...u, status: (isDeactivated ? 'deactivated' : 'active') as 'active' | 'deactivated' } : u);
+              setAllUsers(updated);
+              const found = updated.find(u => u.id === id);
+              if (found) saveUserProfile(found);
+            }}
+            onUpdateUserRole={(id, newRole) => {
+              const updated = allUsers.map(u => u.id === id ? { ...u, role: newRole } : u);
+              setAllUsers(updated);
+              const found = updated.find(u => u.id === id);
+              if (found) saveUserProfile(found);
+              if (currentUser && currentUser.id === id) {
+                setCurrentUser(prev => prev ? { ...prev, role: newRole } : null);
+              }
+            }}
+            onDeleteUser={(id) => { setAllUsers(prev => prev.filter(u => u.id !== id)); deleteUserProfile(id); }}
+            onAddUser={handleAddUser}
+            onSendEmail={handleSendEmail}
+            onUpdateUser={(updatedUser) => {
+              setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+              if (currentUser?.id === updatedUser.id) setCurrentUser(updatedUser);
+              saveUserProfile(updatedUser);
+            }}
+            onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
+            categories={categories}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+            customPages={allCustomPages}
+            onSaveCustomPage={handleSaveCustomPage}
+            onDeleteCustomPage={handleDeleteCustomPage}
+            onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
+            initialTab="stats"
+            onTabChange={(tab) => navigateTo(`/admin/${tab}`)}
+          />
+        );
+      } else {
+        return (
+          <Marketplace
+            allCourses={allCourses}
+            allModules={allModules}
+            allChapters={allChapters}
+            allEnrollments={allEnrollments}
+            currentUser={null}
+            categories={categories}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+            onEnrollStudent={handleEnrollStudent}
+            onSendEmail={handleSendEmail}
+            onSwitchToLogin={() => navigateTo('/connexion')}
+            autoOpenSlug={autoOpenCourseSlug}
+            onClearAutoOpen={() => setAutoOpenCourseSlug('')}
+            onOpenPublicPage={(course) => navigateTo(`/formation/${course.seoSlug || course.id}`)}
+          />
+        );
+      }
+    }
+
+    if (pathname === '/marketplace' || pathname === '/catalogue') {
+      return (
+        <Marketplace
+          allCourses={allCourses}
+          allModules={allModules}
+          allChapters={allChapters}
+          allEnrollments={allEnrollments}
+          currentUser={currentUser}
+          categories={categories}
+          onAddCategory={handleAddCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onEnrollStudent={handleEnrollStudent}
+          onSendEmail={handleSendEmail}
+          onSwitchToLogin={() => navigateTo('/connexion')}
+          autoOpenSlug={autoOpenCourseSlug}
+          onClearAutoOpen={() => setAutoOpenCourseSlug('')}
+          onOpenPublicPage={(course) => navigateTo(`/formation/${course.seoSlug || course.id}`)}
+        />
+      );
+    }
+
+    if (pathname === '/connexion' || pathname === '/auth' || pathname === '/login') {
+      if (currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4">
+            <p className="text-white font-bold">Vous êtes déjà connecté(e) en tant que {currentUser.name}.</p>
+            <button 
+              onClick={() => {
+                if (currentUser.role === 'admin') navigateTo('/admin');
+                else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') navigateTo('/trainer');
+                else navigateTo('/dashboard');
+              }} 
+              className="accent-gradient text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+            >
+              Accéder à mon espace
+            </button>
+          </div>
+        );
+      }
+      return (
+        <Auth
+          allUsers={allUsers}
+          onLogin={handleLogin}
+          onAddUser={handleAddUser}
+          onSendEmail={handleSendEmail}
+        />
+      );
+    }
+
+    if (pathname === '/inscription' || pathname === '/register' || pathname === '/signup') {
+      if (currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4">
+            <p className="text-white font-bold">Vous êtes déjà connecté(e).</p>
+            <button 
+              onClick={() => {
+                if (currentUser.role === 'admin') navigateTo('/admin');
+                else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') navigateTo('/trainer');
+                else navigateTo('/dashboard');
+              }} 
+              className="accent-gradient text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+            >
+              Accéder à mon espace
+            </button>
+          </div>
+        );
+      }
+      return (
+        <Auth
+          allUsers={allUsers}
+          onLogin={handleLogin}
+          onAddUser={handleAddUser}
+          onSendEmail={handleSendEmail}
+        />
+      );
+    }
+
+    if (pathname === '/mot-de-passe-oublie' || pathname === '/reset-password') {
+      return (
+        <ResetPassword
+          allUsers={allUsers}
+          onBackToLogin={() => navigateTo('/connexion')}
+          onSendEmail={handleSendEmail}
+        />
+      );
+    }
+
+    if (pathname === '/verifier-email' || pathname === '/verify-email') {
+      return (
+        <VerifyEmail
+          currentUser={currentUser}
+          onBackToLogin={() => navigateTo('/connexion')}
+          onGoToDashboard={() => navigateTo('/dashboard')}
+        />
+      );
+    }
+
+    // 5. Student Dashboard Routes (/dashboard/*, /student/*)
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/student')) {
+      if (!currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4 glass p-8 rounded-3xl max-w-md mx-auto border border-white/10">
+            <h2 className="text-xl font-bold text-white">Connexion requise</h2>
+            <p className="text-xs text-slate-300">Veuillez vous connecter pour accéder à votre espace étudiant.</p>
+            <button 
+              onClick={() => navigateTo(`/connexion?redirect=${encodeURIComponent(currentPath)}`)}
+              className="w-full accent-gradient text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg cursor-pointer"
+            >
+              Se connecter
+            </button>
+          </div>
+        );
+      }
+
+      const playerMatch = pathname.match(/^\/(dashboard|student)\/(formation|cours)\/([^/]+)/i);
+      if (playerMatch && playerMatch[3]) {
+        const courseId = playerMatch[3];
+        const course = allCourses.find(c => c.id.toLowerCase() === courseId.toLowerCase() || c.seoSlug?.toLowerCase() === courseId.toLowerCase());
+        if (course) {
+          return (
+            <CoursePlayer
+              course={course}
+              modules={allModules.filter(m => m.courseId === course.id)}
+              chapters={allChapters.filter(ch => {
+                const mod = allModules.find(m => m.id === ch.moduleId);
+                return mod?.courseId === course.id;
+              })}
+              progress={allProgress.find(
+                p => p.studentEmail.toLowerCase() === currentUser.email.toLowerCase() && p.courseId === course.id
+              ) || null}
+              onToggleChapterComplete={handleToggleChapterComplete}
+              onBack={() => navigateTo('/dashboard')}
+              currentUser={currentUser}
+              isEnrolled={
+                currentUser.role === 'admin' ||
+                currentUser.role === 'trainer' ||
+                allEnrollments.some(
+                  e => e.studentEmail.toLowerCase() === currentUser.email.toLowerCase() &&
+                       e.courseId === course.id &&
+                       e.status === 'active'
+                )
+              }
+            />
+          );
+        } else {
+          return <NotFoundPage onNavigate={navigateTo} />;
+        }
+      }
+
+      if (pathname.endsWith('/mon-profil') || pathname.endsWith('/profil') || pathname.endsWith('/parametres')) {
+        return (
+          <UserProfile
+            currentUser={currentUser}
+            onUpdateUser={(updatedUser) => {
+              setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+              setCurrentUser(updatedUser);
+              saveUserProfile(updatedUser);
+            }}
+          />
+        );
+      }
+
+      if (pathname.endsWith('/catalogue') || pathname.endsWith('/marketplace')) {
+        return (
+          <Marketplace
+            allCourses={allCourses}
+            allModules={allModules}
+            allChapters={allChapters}
+            allEnrollments={allEnrollments}
+            currentUser={currentUser}
+            categories={categories}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+            onEnrollStudent={handleEnrollStudent}
+            onSendEmail={handleSendEmail}
+            onSwitchToLogin={() => navigateTo('/connexion')}
+            autoOpenSlug={autoOpenCourseSlug}
+            onClearAutoOpen={() => setAutoOpenCourseSlug('')}
+            onOpenPublicPage={(course) => navigateTo(`/formation/${course.seoSlug || course.id}`)}
+          />
+        );
+      }
+
+      return (
+        <StudentDashboard
+          currentUser={currentUser}
+          allCourses={allCourses}
+          allModules={allModules}
+          allChapters={allChapters}
+          allEnrollments={allEnrollments}
+          allProgress={allProgress}
+          onOpenCoursePlayer={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
+          onOpenCatalog={() => navigateTo('/marketplace')}
+          onOpenPublicPage={(c) => navigateTo(`/formation/${c.seoSlug || c.id}`)}
+        />
+      );
+    }
+
+    // 6. Trainer Dashboard Routes (/trainer/*, /dashboard/formateur/*)
+    if (pathname.startsWith('/trainer') || pathname.startsWith('/dashboard/formateur')) {
+      if (!currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4 glass p-8 rounded-3xl max-w-md mx-auto border border-white/10">
+            <h2 className="text-xl font-bold text-white">Connexion Formateur requise</h2>
+            <p className="text-xs text-slate-300">Veuillez vous connecter avec votre compte Formateur.</p>
+            <button 
+              onClick={() => navigateTo(`/connexion?redirect=${encodeURIComponent(currentPath)}`)}
+              className="w-full accent-gradient text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg cursor-pointer"
+            >
+              Se connecter
+            </button>
+          </div>
+        );
+      }
+
+      if (currentUser.role !== 'trainer' && currentUser.role !== 'assistant' && currentUser.role !== 'admin') {
+        return <ForbiddenPage requiredRole="Formateur" onNavigate={navigateTo} />;
+      }
+
+      let subTab = 'dashboard';
+      if (pathname.includes('/mes-cours') || pathname.includes('/courses') || pathname.includes('/creer-cours')) subTab = 'courses';
+      else if (pathname.includes('/etudiants') || pathname.includes('/students')) subTab = 'students';
+      else if (pathname.includes('/webhooks')) subTab = 'webhooks';
+      else if (pathname.includes('/assistants')) subTab = 'assistants';
+      else if (pathname.includes('/custom-pages') || pathname.includes('/pages')) subTab = 'custom-pages';
+      else if (pathname.includes('/emails')) subTab = 'emails';
+      else if (pathname.includes('/parametres') || pathname.includes('/profil') || pathname.includes('/profile')) subTab = 'profile';
+
+      return (
+        <TrainerDashboard
+          currentUser={currentUser}
+          allUsers={allUsers}
+          allCourses={allCourses}
+          allModules={allModules}
+          allChapters={allChapters}
+          allEnrollments={allEnrollments}
+          allProgress={allProgress}
+          preRegistered={preRegistered}
+          categories={categories}
+          onAddCategory={handleAddCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onAddCourse={(newCourse) => {
+            setAllCourses(prev => [...prev, newCourse]);
+            saveCourse(newCourse);
+          }}
+          onUpdateCourse={(updatedCourse) => {
+            setAllCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
+            saveCourse(updatedCourse);
+          }}
+          onDeleteCourse={(courseId) => {
+            setAllCourses(prev => prev.filter(c => c.id !== courseId));
+            deleteCourse(courseId);
+          }}
+          onAddModule={(newMod) => {
+            setAllModules(prev => [...prev, newMod]);
+            saveModule(newMod);
+          }}
+          onUpdateModules={async (updatedMods) => {
+            const updatedModIds = new Set(updatedMods.map(m => m.id));
+            setAllModules(prev => [
+              ...prev.filter(m => !updatedModIds.has(m.id)),
+              ...updatedMods
+            ]);
+            await saveModuleList(updatedMods);
+          }}
+          onDeleteModule={(moduleId) => {
+            const mod = allModules.find(m => m.id === moduleId);
+            setAllModules(prev => prev.filter(m => m.id !== moduleId));
+            deleteModule(moduleId, mod ? mod.courseId : '');
+          }}
+          onAddChapter={(newCh) => {
+            setAllChapters(prev => [...prev, newCh]);
+            saveChapter(newCh);
+          }}
+          onUpdateChapters={async (updatedChaps) => {
+            setAllChapters(updatedChaps);
+            await saveChapterList(updatedChaps);
+          }}
+          onDeleteChapter={(chapterId) => {
+            const ch = allChapters.find(c => c.id === chapterId);
+            setAllChapters(prev => prev.filter(c => c.id !== chapterId));
+            deleteChapter(chapterId, ch ? ch.moduleId : '', ch ? ch.courseId : '');
+          }}
+          onAddEnrollment={(newEnroll) => {
+            setAllEnrollments(prev => [...prev, newEnroll]);
+            saveEnrollment(newEnroll);
+          }}
+          onUpdateEnrollmentStatus={(enrollmentId, status) => {
+            const updated = allEnrollments.map(e => e.id === enrollmentId ? { ...e, status } : e);
+            setAllEnrollments(updated);
+            const found = updated.find(e => e.id === enrollmentId);
+            if (found) saveEnrollment(found);
+          }}
+          onDeleteEnrollment={(enrollmentId) => {
+            setAllEnrollments(prev => prev.filter(e => e.id !== enrollmentId));
+            deleteEnrollment(enrollmentId);
+          }}
+          onAddPreRegistered={(newPre) => {
+            setPreRegistered(prev => [...prev, newPre]);
+            savePreRegistered(newPre);
+          }}
+          onSendEmail={handleSendEmail}
+          onUpdateUser={(updatedUser) => {
+            setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+            setCurrentUser(updatedUser);
+            saveUserProfile(updatedUser);
+          }}
+          onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
+          onAddUser={handleAddUser}
+          customPages={allCustomPages}
+          onSaveCustomPage={handleSaveCustomPage}
+          onDeleteCustomPage={handleDeleteCustomPage}
+          onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
+          initialTab={subTab}
+          onTabChange={(tab) => navigateTo(`/trainer/${tab}`)}
+        />
+      );
+    }
+
+    // 7. Admin Dashboard Routes (/admin/*, /dashboard/admin/*)
+    if (pathname.startsWith('/admin') || pathname.startsWith('/dashboard/admin')) {
+      if (!currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4 glass p-8 rounded-3xl max-w-md mx-auto border border-white/10">
+            <h2 className="text-xl font-bold text-white">Connexion Administrateur requise</h2>
+            <p className="text-xs text-slate-300">Veuillez vous connecter avec votre compte Administrateur.</p>
+            <button 
+              onClick={() => navigateTo(`/connexion?redirect=${encodeURIComponent(currentPath)}`)}
+              className="w-full accent-gradient text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg cursor-pointer"
+            >
+              Se connecter
+            </button>
+          </div>
+        );
+      }
+
+      if (currentUser.role !== 'admin') {
+        return <ForbiddenPage requiredRole="Administrateur" onNavigate={navigateTo} />;
+      }
+
+      let subTab = 'stats';
+      if (pathname.includes('/utilisateurs') || pathname.includes('/users')) subTab = 'users';
+      else if (pathname.includes('/trainers') || pathname.includes('/formateurs')) subTab = 'trainers';
+      else if (pathname.includes('/formations') || pathname.includes('/courses')) subTab = 'courses';
+      else if (pathname.includes('/students') || pathname.includes('/etudiants')) subTab = 'students';
+      else if (pathname.includes('/custom-pages') || pathname.includes('/pages')) subTab = 'custom-pages';
+      else if (pathname.includes('/emails') || pathname.includes('/smtp')) subTab = 'emails';
+      else if (pathname.includes('/webhooks')) subTab = 'webhooks';
+      else if (pathname.includes('/parametres') || pathname.includes('/settings') || pathname.includes('/profil')) subTab = 'settings';
+
+      return (
+        <AdminDashboard
+          currentUser={currentUser}
+          allUsers={allUsers}
+          allCourses={allCourses}
+          allEnrollments={allEnrollments}
+          onToggleCourseStatus={(courseId) => {
+            const updated = allCourses.map(c => c.id === courseId ? { ...c, status: (c.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' } : c);
+            setAllCourses(updated);
+            const found = updated.find(c => c.id === courseId);
+            if (found) saveCourse(found);
+          }}
+          onDeleteCourse={(courseId) => {
+            setAllCourses(prev => prev.filter(c => c.id !== courseId));
+            deleteCourse(courseId);
+          }}
+          onUpdateUserStatus={(userId, isDeactivated) => {
+            const updated = allUsers.map(u => u.id === userId ? { ...u, status: (isDeactivated ? 'deactivated' : 'active') as 'active' | 'deactivated' } : u);
+            setAllUsers(updated);
+            const found = updated.find(u => u.id === userId);
+            if (found) saveUserProfile(found);
+          }}
+          onUpdateUserRole={(userId, newRole) => {
+            const updated = allUsers.map(u => u.id === userId ? { ...u, role: newRole } : u);
+            setAllUsers(updated);
+            const found = updated.find(u => u.id === userId);
+            if (found) saveUserProfile(found);
+            if (currentUser && currentUser.id === userId) {
+              setCurrentUser(prev => prev ? { ...prev, role: newRole } : null);
+            }
+          }}
+          onDeleteUser={(userId) => {
+            setAllUsers(prev => prev.filter(u => u.id !== userId));
+            deleteUserProfile(userId);
+          }}
+          onAddUser={handleAddUser}
+          onSendEmail={handleSendEmail}
+          onUpdateUser={(updatedUser) => {
+            setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+            if (currentUser?.id === updatedUser.id) {
+              setCurrentUser(updatedUser);
+            }
+            saveUserProfile(updatedUser);
+          }}
+          onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
+          categories={categories}
+          onAddCategory={handleAddCategory}
+          onDeleteCategory={handleDeleteCategory}
+          customPages={allCustomPages}
+          onSaveCustomPage={handleSaveCustomPage}
+          onDeleteCustomPage={handleDeleteCustomPage}
+          onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
+          initialTab={subTab}
+          onTabChange={(tab) => navigateTo(`/admin/${tab}`)}
+        />
+      );
+    }
+
+    // 8. 404 - Page Introuvable Catch-all
+    return <NotFoundPage onNavigate={navigateTo} />;
+  };
 
   if (authLoading) {
     return (
@@ -994,7 +1584,7 @@ Bon apprentissage.`,
   return (
     <div className={`min-h-screen mesh-bg font-sans antialiased pb-20 ${currentTheme}`}>
       
-      {/* Dynamic Header Wrapper (Section 5) */}
+      {/* Dynamic Header Wrapper */}
       <header className="glass-light border-b border-white/10 sticky top-0 z-30 shadow-md backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 md:py-4 flex items-center justify-between gap-4">
           
@@ -1010,11 +1600,8 @@ Bon apprentissage.`,
 
             {/* Logo / Brand */}
             <button 
-              onClick={() => {
-                setActiveCoursePlayer(null);
-                if (currentUser?.role === 'student') setStudentTab('my-space');
-              }}
-              className="flex items-center gap-2 text-left group"
+              onClick={() => navigateTo('/')}
+              className="flex items-center gap-2 text-left group cursor-pointer"
             >
               <div className="accent-gradient text-white p-2 rounded-xl group-hover:scale-105 transition-transform shadow-lg shadow-indigo-500/20">
                 <BookOpen className="w-5 h-5" />
@@ -1029,30 +1616,30 @@ Bon apprentissage.`,
           {/* Navigation link items */}
           <nav className="flex items-center gap-1.5 md:gap-4">
             {/* If Student */}
-            {currentUser?.role === 'student' && !activeCoursePlayer && (
+            {currentUser?.role === 'student' && (
               <div className="hidden md:flex items-center gap-2">
                 <button
-                  onClick={() => setStudentTab('my-space')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
-                    studentTab === 'my-space' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  onClick={() => navigateTo('/dashboard')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath.startsWith('/dashboard') && !currentPath.includes('catalogue') && !currentPath.includes('profil') ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <Layout className="w-4 h-4" />
                   <span>Mon Espace</span>
                 </button>
                 <button
-                  onClick={() => setStudentTab('catalog')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
-                    studentTab === 'catalog' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  onClick={() => navigateTo('/marketplace')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath === '/marketplace' || currentPath === '/catalogue' ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <Star className="w-4 h-4" />
                   <span>Catalogue cours</span>
                 </button>
                 <button
-                  onClick={() => setStudentTab('profile')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
-                    studentTab === 'profile' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  onClick={() => navigateTo('/dashboard/mon-profil')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath.includes('profil') ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <UserIcon className="w-4 h-4" />
@@ -1061,21 +1648,69 @@ Bon apprentissage.`,
               </div>
             )}
 
+            {/* If Trainer / Assistant */}
+            {(currentUser?.role === 'trainer' || currentUser?.role === 'assistant') && (
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={() => navigateTo('/trainer')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath.startsWith('/trainer') ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Layout className="w-4 h-4" />
+                  <span>Espace Formateur</span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/marketplace')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath === '/marketplace' ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Catalogue public</span>
+                </button>
+              </div>
+            )}
+
+            {/* If Admin */}
+            {currentUser?.role === 'admin' && (
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={() => navigateTo('/admin')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath.startsWith('/admin') ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <Layout className="w-4 h-4" />
+                  <span>Administration</span>
+                </button>
+                <button
+                  onClick={() => navigateTo('/marketplace')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath === '/marketplace' ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Catalogue public</span>
+                </button>
+              </div>
+            )}
+
             {/* If Visitor (no session) */}
             {!currentUser && (
               <div className="hidden md:flex items-center gap-2">
                 <button
-                  onClick={() => setVisitorTab('catalog')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                    visitorTab === 'catalog' ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  onClick={() => navigateTo('/marketplace')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    currentPath === '/marketplace' || currentPath === '/' ? 'bg-white/10 text-white font-bold' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   Catalogue
                 </button>
                 <button
-                  onClick={() => setVisitorTab('auth')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
-                    visitorTab === 'auth' ? 'accent-gradient text-white shadow-lg' : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  onClick={() => navigateTo('/connexion')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    currentPath === '/connexion' ? 'accent-gradient text-white shadow-lg' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <LogIn className="w-4 h-4" />
@@ -1084,19 +1719,12 @@ Bon apprentissage.`,
               </div>
             )}
 
-
-
             {/* Notification Bell & Logout actions */}
             {currentUser && (
               <div className="flex items-center gap-2 ml-2 pl-2 border-l border-white/10">
                 <NotificationBell 
                   currentUser={currentUser} 
-                  onOpenCourse={(courseId) => {
-                    const course = allCourses.find(c => c.id === courseId);
-                    if (course) {
-                      setActiveCoursePlayer(course);
-                    }
-                  }} 
+                  onOpenCourse={(courseId) => navigateTo(`/dashboard/formation/${courseId}`)}
                 />
                 <div className="hidden md:block text-right">
                   <p className="text-xs font-bold text-white leading-none">{currentUser.name}</p>
@@ -1107,7 +1735,7 @@ Bon apprentissage.`,
                 <button
                   onClick={handleLogout}
                   title="Se déconnecter"
-                  className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl transition-colors"
+                  className="p-2 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-xl transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4.5 h-4.5" />
                 </button>
@@ -1116,348 +1744,11 @@ Bon apprentissage.`,
           </nav>
         </div>
 
-        {/* Mobile Sub-Navigation Bar for Students & Visitors */}
-        {!activeCoursePlayer && (
-          <div className="md:hidden border-t border-white/10 bg-slate-950/80 px-4 py-2 flex items-center justify-around gap-1 overflow-x-auto text-xs">
-            {currentUser?.role === 'student' && (
-              <>
-                <button
-                  onClick={() => setStudentTab('my-space')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    studentTab === 'my-space' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Layout className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Espace</span>
-                </button>
-                <button
-                  onClick={() => setStudentTab('catalog')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    studentTab === 'catalog' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Star className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Catalogue</span>
-                </button>
-                <button
-                  onClick={() => setStudentTab('profile')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    studentTab === 'profile' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <UserIcon className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Profil</span>
-                </button>
-              </>
-            )}
-
-            {!currentUser && (
-              <>
-                <button
-                  onClick={() => setVisitorTab('catalog')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold text-center transition-all ${
-                    visitorTab === 'catalog' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <span className="text-[11px]">Catalogue</span>
-                </button>
-                <button
-                  onClick={() => setVisitorTab('auth')}
-                  className={`flex-1 py-1.5 px-2 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    visitorTab === 'auth' ? 'accent-gradient text-white shadow-sm' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Connexion</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
       </header>
 
       {/* Main Container Layout */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 md:py-8">
-        
-        {/* Course Player (Active Room) takes full viewport */}
-        {activeCoursePlayer ? (
-          <CoursePlayer
-            course={activeCoursePlayer}
-            modules={allModules.filter(m => m.courseId === activeCoursePlayer.id)}
-            chapters={allChapters.filter(ch => {
-              const mod = allModules.find(m => m.id === ch.moduleId);
-              return mod?.courseId === activeCoursePlayer.id;
-            })}
-            progress={allProgress.find(
-              p => p.studentEmail.toLowerCase() === currentUser?.email.toLowerCase() && p.courseId === activeCoursePlayer.id
-            ) || null}
-            onToggleChapterComplete={handleToggleChapterComplete}
-            onBack={() => setActiveCoursePlayer(null)}
-            currentUser={currentUser}
-            isEnrolled={
-              currentUser?.role === 'admin' ||
-              currentUser?.role === 'trainer' ||
-              (currentUser ? allEnrollments.some(
-                e => e.studentEmail.toLowerCase() === currentUser.email.toLowerCase() &&
-                     e.courseId === activeCoursePlayer.id &&
-                     e.status === 'active'
-              ) : false)
-            }
-          />
-        ) : showVerifyEmailPage ? (
-          <VerifyEmail
-            currentUser={currentUser}
-            onBackToLogin={() => {
-              setShowVerifyEmailPage(false);
-              setVisitorTab('auth');
-            }}
-            onGoToDashboard={() => {
-              setShowVerifyEmailPage(false);
-              if (!currentUser) setVisitorTab('auth');
-            }}
-          />
-        ) : (
-          <>
-            {/* 1. VISITOR VIEW (Unauthenticated) */}
-            {!currentUser && (
-              <div className="space-y-6">
-                {visitorTab === 'catalog' && (
-                  <Marketplace
-                    allCourses={allCourses}
-                    allModules={allModules}
-                    allChapters={allChapters}
-                    allEnrollments={allEnrollments}
-                    currentUser={null}
-                    categories={categories}
-                    onAddCategory={handleAddCategory}
-                    onDeleteCategory={handleDeleteCategory}
-                    onEnrollStudent={handleEnrollStudent}
-                    onSendEmail={handleSendEmail}
-                    onSwitchToLogin={() => setVisitorTab('auth')}
-                    autoOpenSlug={autoOpenCourseSlug}
-                    onClearAutoOpen={() => setAutoOpenCourseSlug('')}
-                  />
-                )}
-                {visitorTab === 'auth' && (
-                  <Auth
-                    allUsers={allUsers}
-                    onLogin={handleLogin}
-                    onAddUser={handleAddUser}
-                    onSendEmail={handleSendEmail}
-                  />
-                )}
-                {visitorTab === 'reset-password' && (
-                  <ResetPassword
-                    allUsers={allUsers}
-                    onBackToLogin={() => setVisitorTab('auth')}
-                    onSendEmail={handleSendEmail}
-                  />
-                )}
-                {visitorTab === 'verify-email' && (
-                  <VerifyEmail
-                    currentUser={currentUser}
-                    onBackToLogin={() => setVisitorTab('auth')}
-                    onGoToDashboard={() => setVisitorTab('auth')}
-                  />
-                )}
-              </div>
-            )}
-
-            {/* 2. ADMINISTRATOR VIEW */}
-            {currentUser?.role === 'admin' && (
-              <AdminDashboard
-                currentUser={currentUser}
-                allUsers={allUsers}
-                allCourses={allCourses}
-                allEnrollments={allEnrollments}
-                onToggleCourseStatus={(courseId) => {
-                  const updated = allCourses.map(c => c.id === courseId ? { ...c, status: (c.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' } : c);
-                  setAllCourses(updated);
-                  const found = updated.find(c => c.id === courseId);
-                  if (found) saveCourse(found);
-                }}
-                onDeleteCourse={(courseId) => {
-                  setAllCourses(prev => prev.filter(c => c.id !== courseId));
-                  deleteCourse(courseId);
-                }}
-                onUpdateUserStatus={(userId, isDeactivated) => {
-                  const updated = allUsers.map(u => u.id === userId ? { ...u, status: (isDeactivated ? 'deactivated' : 'active') as 'active' | 'deactivated' } : u);
-                  setAllUsers(updated);
-                  const found = updated.find(u => u.id === userId);
-                  if (found) saveUserProfile(found);
-                }}
-                onUpdateUserRole={(userId, newRole) => {
-                  const updated = allUsers.map(u => u.id === userId ? { ...u, role: newRole } : u);
-                  setAllUsers(updated);
-                  const found = updated.find(u => u.id === userId);
-                  if (found) saveUserProfile(found);
-                  if (currentUser && currentUser.id === userId) {
-                    setCurrentUser(prev => prev ? { ...prev, role: newRole } : null);
-                  }
-                }}
-                onDeleteUser={(userId) => {
-                  setAllUsers(prev => prev.filter(u => u.id !== userId));
-                  deleteUserProfile(userId);
-                }}
-                onAddUser={handleAddUser}
-                onSendEmail={handleSendEmail}
-                onUpdateUser={(updatedUser) => {
-                  setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-                  if (currentUser?.id === updatedUser.id) {
-                    setCurrentUser(updatedUser);
-                  }
-                  saveUserProfile(updatedUser);
-                }}
-                onPreviewCourse={setActiveCoursePlayer}
-                categories={categories}
-                onAddCategory={handleAddCategory}
-                onDeleteCategory={handleDeleteCategory}
-                customPages={allCustomPages}
-                onSaveCustomPage={handleSaveCustomPage}
-                onDeleteCustomPage={handleDeleteCustomPage}
-                onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
-              />
-            )}
-
-            {/* 3. TRAINER VIEW */}
-            {(currentUser?.role === 'trainer' || currentUser?.role === 'assistant') && (
-              <TrainerDashboard
-                currentUser={currentUser}
-                allUsers={allUsers}
-                allCourses={allCourses}
-                allModules={allModules}
-                allChapters={allChapters}
-                allEnrollments={allEnrollments}
-                allProgress={allProgress}
-                preRegistered={preRegistered}
-                categories={categories}
-                onAddCategory={handleAddCategory}
-                onDeleteCategory={handleDeleteCategory}
-                
-                // State changers
-                onAddCourse={(newCourse) => {
-                  setAllCourses(prev => [...prev, newCourse]);
-                  saveCourse(newCourse);
-                }}
-                onUpdateCourse={(updatedCourse) => {
-                  setAllCourses(prev => prev.map(c => c.id === updatedCourse.id ? updatedCourse : c));
-                  saveCourse(updatedCourse);
-                }}
-                onDeleteCourse={(courseId) => {
-                  setAllCourses(prev => prev.filter(c => c.id !== courseId));
-                  deleteCourse(courseId);
-                }}
-                onAddModule={(newMod) => {
-                  setAllModules(prev => [...prev, newMod]);
-                  saveModule(newMod);
-                }}
-                onUpdateModules={async (updatedMods) => {
-                  const updatedModIds = new Set(updatedMods.map(m => m.id));
-                  setAllModules(prev => [
-                    ...prev.filter(m => !updatedModIds.has(m.id)),
-                    ...updatedMods
-                  ]);
-                  await saveModuleList(updatedMods);
-                }}
-                onDeleteModule={(moduleId) => {
-                  const mod = allModules.find(m => m.id === moduleId);
-                  const courseId = mod ? mod.courseId : '';
-                  setAllModules(prev => prev.filter(m => m.id !== moduleId));
-                  deleteModule(moduleId, courseId);
-                }}
-                onAddChapter={(newCh) => {
-                  setAllChapters(prev => [...prev, newCh]);
-                  saveChapter(newCh);
-                }}
-                onUpdateChapters={async (updatedChaps) => {
-                  setAllChapters(updatedChaps);
-                  await saveChapterList(updatedChaps);
-                }}
-                onDeleteChapter={(chapterId) => {
-                  const ch = allChapters.find(c => c.id === chapterId);
-                  const moduleId = ch ? ch.moduleId : '';
-                  const courseId = ch ? ch.courseId : '';
-                  setAllChapters(prev => prev.filter(ch => ch.id !== chapterId));
-                  deleteChapter(chapterId, moduleId, courseId);
-                }}
-                onAddEnrollment={(newEnroll) => {
-                  setAllEnrollments(prev => [...prev, newEnroll]);
-                  saveEnrollment(newEnroll);
-                }}
-                onUpdateEnrollmentStatus={(enrollmentId, status) => {
-                  const updated = allEnrollments.map(e => e.id === enrollmentId ? { ...e, status } : e);
-                  setAllEnrollments(updated);
-                  const found = updated.find(e => e.id === enrollmentId);
-                  if (found) saveEnrollment(found);
-                }}
-                onDeleteEnrollment={(enrollmentId) => {
-                  setAllEnrollments(prev => prev.filter(e => e.id !== enrollmentId));
-                  deleteEnrollment(enrollmentId);
-                }}
-                onAddPreRegistered={(newPre) => {
-                  setPreRegistered(prev => [...prev, newPre]);
-                  savePreRegistered(newPre);
-                }}
-                onSendEmail={handleSendEmail}
-                onUpdateUser={(updatedUser) => {
-                  setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-                  setCurrentUser(updatedUser);
-                  saveUserProfile(updatedUser);
-                }}
-                onPreviewCourse={setActiveCoursePlayer}
-                onAddUser={handleAddUser}
-                customPages={allCustomPages}
-                onSaveCustomPage={handleSaveCustomPage}
-                onDeleteCustomPage={handleDeleteCustomPage}
-                onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
-              />
-            )}
-
-            {/* 4. STUDENT VIEW */}
-            {currentUser?.role === 'student' && (
-              <div className="space-y-6 animate-fade-in">
-                {studentTab === 'my-space' ? (
-                  <StudentDashboard
-                    currentUser={currentUser}
-                    allCourses={allCourses}
-                    allModules={allModules}
-                    allChapters={allChapters}
-                    allEnrollments={allEnrollments}
-                    allProgress={allProgress}
-                    onOpenCoursePlayer={(course) => setActiveCoursePlayer(course)}
-                    onOpenCatalog={() => setStudentTab('catalog')}
-                  />
-                ) : studentTab === 'profile' ? (
-                  <UserProfile
-                    currentUser={currentUser}
-                    onUpdateUser={(updatedUser) => {
-                      setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-                      setCurrentUser(updatedUser);
-                      saveUserProfile(updatedUser);
-                    }}
-                  />
-                ) : (
-                  <Marketplace
-                    allCourses={allCourses}
-                    allModules={allModules}
-                    allChapters={allChapters}
-                    allEnrollments={allEnrollments}
-                    currentUser={currentUser}
-                    categories={categories}
-                    onAddCategory={handleAddCategory}
-                    onDeleteCategory={handleDeleteCategory}
-                    onEnrollStudent={handleEnrollStudent}
-                    onSendEmail={handleSendEmail}
-                    onSwitchToLogin={() => setStudentTab('my-space')}
-                    autoOpenSlug={autoOpenCourseSlug}
-                    onClearAutoOpen={() => setAutoOpenCourseSlug('')}
-                  />
-                )}
-              </div>
-            )}
-          </>
-        )}
-
+        {renderCurrentRoute()}
       </main>
 
       {/* Mobile Offcanvas Sidebar Drawer */}
@@ -1509,32 +1800,32 @@ Bon apprentissage.`,
 
               {/* Navigation Links list */}
               <div className="space-y-1">
-                {/* 1. VISITOR NAVIGATION */}
+                {/* VISITOR NAVIGATION */}
                 {!currentUser && (
                   <>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">Navigation</p>
                     <button
-                      onClick={() => { setVisitorTab('catalog'); setIsMobileDrawerOpen(false); }}
+                      onClick={() => { navigateTo('/marketplace'); setIsMobileDrawerOpen(false); }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                        visitorTab === 'catalog' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        currentPath === '/marketplace' || currentPath === '/' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <BookOpen className="w-4 h-4" />
                       <span>Catalogue</span>
                     </button>
                     <button
-                      onClick={() => { setVisitorTab('auth'); setIsMobileDrawerOpen(false); }}
+                      onClick={() => { navigateTo('/connexion'); setIsMobileDrawerOpen(false); }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                        visitorTab === 'auth' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        currentPath === '/connexion' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <LogIn className="w-4 h-4" />
                       <span>Se connecter</span>
                     </button>
                     <button
-                      onClick={() => { setVisitorTab('reset-password'); setIsMobileDrawerOpen(false); }}
+                      onClick={() => { navigateTo('/mot-de-passe-oublie'); setIsMobileDrawerOpen(false); }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                        visitorTab === 'reset-password' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        currentPath === '/mot-de-passe-oublie' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <KeyRound className="w-4 h-4" />
@@ -1543,32 +1834,32 @@ Bon apprentissage.`,
                   </>
                 )}
 
-                {/* 2. STUDENT NAVIGATION */}
+                {/* STUDENT NAVIGATION */}
                 {currentUser?.role === 'student' && (
                   <>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">Espace Étudiant</p>
                     <button
-                      onClick={() => { setStudentTab('my-space'); setIsMobileDrawerOpen(false); }}
+                      onClick={() => { navigateTo('/dashboard'); setIsMobileDrawerOpen(false); }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                        studentTab === 'my-space' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        currentPath === '/dashboard' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <Layout className="w-4 h-4" />
                       <span>Mon Espace</span>
                     </button>
                     <button
-                      onClick={() => { setStudentTab('catalog'); setIsMobileDrawerOpen(false); }}
+                      onClick={() => { navigateTo('/marketplace'); setIsMobileDrawerOpen(false); }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                        studentTab === 'catalog' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        currentPath === '/marketplace' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <Star className="w-4 h-4" />
                       <span>Catalogue cours</span>
                     </button>
                     <button
-                      onClick={() => { setStudentTab('profile'); setIsMobileDrawerOpen(false); }}
+                      onClick={() => { navigateTo('/dashboard/mon-profil'); setIsMobileDrawerOpen(false); }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                        studentTab === 'profile' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        currentPath.includes('profil') ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <UserIcon className="w-4 h-4" />
@@ -1577,19 +1868,35 @@ Bon apprentissage.`,
                   </>
                 )}
 
-                {/* 3. TRAINER NAVIGATION */}
-                {currentUser?.role === 'trainer' && (
+                {/* TRAINER NAVIGATION */}
+                {(currentUser?.role === 'trainer' || currentUser?.role === 'assistant') && (
                   <>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">Espace Formateur</p>
-                    <p className="text-[11px] text-slate-500 px-2 leading-relaxed pb-3">Utilisez le bouton menu (☰) sur le tableau de bord de votre formateur pour basculer facilement d'onglet.</p>
+                    <button
+                      onClick={() => { navigateTo('/trainer'); setIsMobileDrawerOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                        currentPath.startsWith('/trainer') ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Layout className="w-4 h-4" />
+                      <span>Tableau de bord</span>
+                    </button>
                   </>
                 )}
                 
-                {/* 4. ADMIN NAVIGATION */}
+                {/* ADMIN NAVIGATION */}
                 {currentUser?.role === 'admin' && (
                   <>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 mb-2">Espace Administrateur</p>
-                    <p className="text-[11px] text-slate-500 px-2 leading-relaxed pb-3">Utilisez le bouton menu (☰) sur le tableau de bord administrateur pour gérer les différents onglets.</p>
+                    <button
+                      onClick={() => { navigateTo('/admin'); setIsMobileDrawerOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                        currentPath.startsWith('/admin') ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Layout className="w-4 h-4" />
+                      <span>Administration</span>
+                    </button>
                   </>
                 )}
               </div>

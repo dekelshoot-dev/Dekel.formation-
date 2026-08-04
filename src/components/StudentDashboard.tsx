@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Course, Module, Chapter, Enrollment, StudentProgress } from '../types';
-import { BookOpen, Play, Search, Clock, Sparkles, ChevronRight, HelpCircle } from 'lucide-react';
+import { BookOpen, Play, Search, Clock, Sparkles, ChevronRight, HelpCircle, Eye } from 'lucide-react';
 
 interface StudentDashboardProps {
   currentUser: { email: string; name: string };
@@ -11,6 +11,7 @@ interface StudentDashboardProps {
   allProgress: StudentProgress[];
   onOpenCoursePlayer: (course: Course) => void;
   onOpenCatalog: () => void;
+  onOpenPublicPage?: (course: Course) => void;
 }
 
 export default function StudentDashboard({
@@ -21,37 +22,39 @@ export default function StudentDashboard({
   allEnrollments,
   allProgress,
   onOpenCoursePlayer,
-  onOpenCatalog
+  onOpenCatalog,
+  onOpenPublicPage
 }: StudentDashboardProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // 1. Filter enrolled courses
-  const studentEnrollments = allEnrollments.filter(
-    e => e.studentEmail.toLowerCase() === currentUser.email.toLowerCase() && e.status === 'active'
+  const userEmail = (currentUser?.email || '').trim().toLowerCase();
+  const userName = currentUser?.name || 'Étudiant';
+
+  const studentEnrollments = (allEnrollments || []).filter(
+    e => (e?.studentEmail || '').trim().toLowerCase() === userEmail && e?.status === 'active'
   );
   
   const enrolledCourseIds = studentEnrollments.map(e => e.courseId);
-  const enrolledCourses = allCourses.filter(c => enrolledCourseIds.includes(c.id));
+  const enrolledCourses = (allCourses || []).filter(c => c?.id && enrolledCourseIds.includes(c.id));
 
-  // 2. Identify newly added courses (e.g., enrolled within the last few weeks/days)
-  // Let's sort enrolled courses by enrollment date to highlight the latest addition
+  // 2. Identify newly added courses
   const sortedEnrollments = [...studentEnrollments].sort(
-    (a, b) => new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime()
+    (a, b) => new Date(b?.enrolledAt || 0).getTime() - new Date(a?.enrolledAt || 0).getTime()
   );
   const latestEnrollmentId = sortedEnrollments[0]?.courseId;
   const latestAddedCourse = enrolledCourses.find(c => c.id === latestEnrollmentId);
 
   // 3. Last accessed lessons
-  // Find courses that have some recorded progress, sorted by last accessed date
-  const studentProgresses = allProgress.filter(
-    p => p.studentEmail.toLowerCase() === currentUser.email.toLowerCase()
+  const studentProgresses = (allProgress || []).filter(
+    p => (p?.studentEmail || '').trim().toLowerCase() === userEmail
   );
   
   const sortedProgresses = [...studentProgresses].sort(
-    (a, b) => new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime()
+    (a, b) => new Date(b?.lastAccessedAt || 0).getTime() - new Date(a?.lastAccessedAt || 0).getTime()
   );
 
-  // Global search across courses, modules, chapters (Section 15)
+  // Global search across courses, modules, chapters
   const isSearching = searchQuery.trim().length > 0;
   
   // Search results
@@ -64,21 +67,23 @@ export default function StudentDashboard({
   if (isSearching) {
     const query = searchQuery.toLowerCase();
     
-    // Only search within enrolled courses to maintain privacy (Section 19)
     enrolledCourses.forEach(c => {
-      if (c.title.toLowerCase().includes(query) || c.description.toLowerCase().includes(query)) {
+      if (!c) return;
+      if ((c.title || '').toLowerCase().includes(query) || (c.description || '').toLowerCase().includes(query)) {
         searchResults.courses.push(c);
       }
       
-      const courseMods = allModules.filter(m => m.courseId === c.id);
+      const courseMods = (allModules || []).filter(m => m?.courseId === c.id);
       courseMods.forEach(m => {
-        if (m.title.toLowerCase().includes(query)) {
+        if (!m) return;
+        if ((m.title || '').toLowerCase().includes(query)) {
           searchResults.modules.push({ module: m, course: c });
         }
         
-        const modChaps = allChapters.filter(ch => ch.moduleId === m.id);
+        const modChaps = (allChapters || []).filter(ch => ch?.moduleId === m.id);
         modChaps.forEach(ch => {
-          if (ch.title.toLowerCase().includes(query) || ch.richText.toLowerCase().includes(query)) {
+          if (!ch) return;
+          if ((ch.title || '').toLowerCase().includes(query) || (ch.richText || '').toLowerCase().includes(query)) {
             searchResults.chapters.push({ chapter: ch, module: m, course: c });
           }
         });
@@ -233,18 +238,32 @@ export default function StudentDashboard({
                     const pct = totalChapters > 0 ? Math.round((completedCount / totalChapters) * 100) : 0;
 
                     return (
-                      <div key={course.id} className="glass border border-white/10 rounded-2xl overflow-hidden shadow-lg flex flex-col justify-between hover:shadow-xl transition-shadow">
-                        <div className="relative aspect-video">
-                          <img src={course.coverImage} className="w-full h-full object-cover" />
+                      <div key={course.id} className="glass border border-white/10 rounded-2xl overflow-hidden shadow-lg flex flex-col justify-between hover:shadow-xl transition-shadow group/card">
+                        <div 
+                          onClick={() => {
+                            if (onOpenPublicPage) {
+                              onOpenPublicPage(course);
+                            } else {
+                              onOpenCoursePlayer(course);
+                            }
+                          }}
+                          className="relative aspect-video cursor-pointer overflow-hidden group/banner"
+                          title="Cliquer pour voir l'aperçu de la formation"
+                        >
+                          <img src={course.coverImage} className="w-full h-full object-cover group-hover/banner:scale-105 transition-transform duration-500" alt={course.title} />
                           <span className="absolute bottom-3 left-3 bg-slate-900/85 text-white font-semibold text-[9px] px-2 py-0.5 rounded uppercase">
                             {course.type}
+                          </span>
+                          <span className="absolute top-3 right-3 bg-indigo-600/90 text-white font-bold text-[10px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-md opacity-90 group-hover/banner:opacity-100 transition-opacity">
+                            <Eye className="w-3 h-3" />
+                            <span>Aperçu</span>
                           </span>
                         </div>
 
                         <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-                          <div>
-                            <h4 className="font-bold text-white text-xs leading-snug line-clamp-2">{course.title}</h4>
-                            <p className="text-[10px] text-slate-400 mt-1 font-semibold">Par {course.trainerName}</p>
+                          <div className="flex flex-col text-left items-start w-full">
+                            <h4 className="font-bold text-white text-xs leading-snug line-clamp-2 text-left w-full">{course.title}</h4>
+                            <p className="text-[10px] text-slate-400 mt-1 font-semibold text-left block w-full self-start">Par {course.trainerName}</p>
                           </div>
 
                           {/* Progress bar */}

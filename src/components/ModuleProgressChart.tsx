@@ -159,11 +159,11 @@ export default function ModuleProgressChart({
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl">
+          <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-xl shrink-0">
             <BarChart3 className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-100 uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-xs sm:text-sm font-black text-slate-100 uppercase tracking-wider flex items-center gap-2">
               Progression Globale des Élèves par Module
             </h3>
             <p className="text-[11px] text-slate-400">
@@ -173,13 +173,13 @@ export default function ModuleProgressChart({
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/60 rounded-xl px-2.5 py-1.5 text-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/60 rounded-xl px-2.5 py-1.5 text-xs w-full sm:w-auto">
             <Filter className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <select
               value={selectedCourseId}
               onChange={e => setSelectedCourseId(e.target.value)}
-              className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs font-semibold"
+              className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs font-semibold w-full"
             >
               <option value="all" className="bg-slate-900 text-slate-200">Toutes les formations</option>
               {courses.map(course => (
@@ -190,10 +190,10 @@ export default function ModuleProgressChart({
             </select>
           </div>
 
-          <div className="flex bg-slate-900 border border-slate-700/60 p-0.5 rounded-xl text-[11px] font-bold">
+          <div className="flex bg-slate-900 border border-slate-700/60 p-0.5 rounded-xl text-[11px] font-bold w-full sm:w-auto shrink-0">
             <button
               onClick={() => setChartMetric('completion')}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
                 chartMetric === 'completion'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -203,7 +203,7 @@ export default function ModuleProgressChart({
             </button>
             <button
               onClick={() => setChartMetric('students')}
-              className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg transition-all cursor-pointer text-center ${
                 chartMetric === 'students'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
@@ -216,31 +216,31 @@ export default function ModuleProgressChart({
       </div>
 
       {/* Overview Stat Badges */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-center">
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1">
-            <TrendingUp className="w-3 h-3 text-indigo-400" /> Taux Moyen
-          </p>
-          <p className="text-xl font-black text-indigo-400 mt-1">{overallStats.avgPct}%</p>
-        </div>
-
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-center">
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1">
-            <BookOpen className="w-3 h-3 text-blue-400" /> Modules Analysez
-          </p>
-          <p className="text-xl font-black text-slate-200 mt-1">{overallStats.totalModules}</p>
-        </div>
-
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-center">
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1">
-            <CheckCircle className="w-3 h-3 text-emerald-400" /> Modules Validés
-          </p>
-          <p className="text-xl font-black text-emerald-400 mt-1">{overallStats.totalCompletions}</p>
-        </div>
-
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-center truncate">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 sm:p-3 text-center">
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1 truncate">
-            <Users className="w-3 h-3 text-amber-400" /> Meilleur Module
+            <TrendingUp className="w-3 h-3 text-indigo-400 shrink-0" /> Taux Moyen
+          </p>
+          <p className="text-lg sm:text-xl font-black text-indigo-400 mt-1">{overallStats.avgPct}%</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 sm:p-3 text-center">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1 truncate">
+            <BookOpen className="w-3 h-3 text-blue-400 shrink-0" /> Modules Analysez
+          </p>
+          <p className="text-lg sm:text-xl font-black text-slate-200 mt-1">{overallStats.totalModules}</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 sm:p-3 text-center">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1 truncate">
+            <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0" /> Modules Validés
+          </p>
+          <p className="text-lg sm:text-xl font-black text-emerald-400 mt-1">{overallStats.totalCompletions}</p>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-2.5 sm:p-3 text-center truncate">
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-1 truncate">
+            <Users className="w-3 h-3 text-amber-400 shrink-0" /> Meilleur Module
           </p>
           <p className="text-xs font-bold text-amber-300 mt-1.5 truncate">
             {overallStats.topModule ? overallStats.topModule.fullName : 'N/A'}
@@ -254,11 +254,11 @@ export default function ModuleProgressChart({
           Aucun module disponible pour la sélection actuelle.
         </div>
       ) : (
-        <div className="w-full h-72 sm:h-80 pt-2">
+        <div className="w-full h-64 sm:h-72 md:h-80 pt-2 min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={chartData}
-              margin={{ top: 10, right: 10, left: -20, bottom: 25 }}
+              margin={{ top: 10, right: 10, left: -25, bottom: 25 }}
             >
               <defs>
                 <linearGradient id="areaColor" x1="0" y1="0" x2="0" y2="1">

@@ -14,10 +14,10 @@ export default function ShareModal({ course, isOpen, onClose }: ShareModalProps)
 
   if (!isOpen) return null;
 
-  // Build target public URL for course presentation page
-  const baseUrl = window.location.origin + window.location.pathname;
+  // Build target public URL for course presentation page (clean path for social media crawlers & WhatsApp/FB/Twitter preview cards)
+  const origin = window.location.origin;
   const courseSlugOrId = course.seoSlug || course.id;
-  const publicUrl = `${baseUrl}#/course/${courseSlugOrId}`;
+  const publicUrl = `${origin}/formation/${courseSlugOrId}`;
 
   const shareTitle = course.seoTitle || course.title;
   const shareText = `Découvrez la formation "${shareTitle}" par ${course.trainerName} !`;

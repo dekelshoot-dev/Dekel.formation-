@@ -1,0 +1,10 @@
+# Configuration for Firebase App Hosting
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  maxInstances: 10
+  concurrency: 80
+
+env:
+  - variable: NODE_ENV
+    value: production

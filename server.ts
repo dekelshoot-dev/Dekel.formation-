@@ -1113,6 +1113,43 @@ ${customPageUrls.join("\n")}
   return res.status(200).send(sitemapXml);
 });
 
+// Fallback Mock Courses for Server SEO when Firestore is empty or offline
+const MOCK_COURSES_SEO_FALLBACK = [
+  {
+    id: 'c-1',
+    seoSlug: 'devenir-developpeur-web-moderne',
+    title: 'Devenir Développeur Web Moderne',
+    description: 'Apprenez HTML, CSS, JavaScript, React et Node.js en partant de zéro jusqu\'au niveau professionnel.',
+    coverImage: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=1200&auto=format&fit=crop&q=80',
+    seoTitle: 'Devenir Développeur Web Moderne',
+    seoDescription: 'Formation complète en développement web moderne : React, Node.js, HTML5, CSS3, TypeScript.',
+    trainerName: 'Jean Dupont',
+    price: 49000
+  },
+  {
+    id: 'c-2',
+    seoSlug: 'creer-un-e-commerce-a-succes',
+    title: 'Créer un E-Commerce à Succès',
+    description: 'Stratégies complètes pour lancer votre boutique en ligne, maîtriser le marketing et générer vos premières ventes.',
+    coverImage: 'https://images.unsplash.com/photo-1556742049-0a670f4a4591?w=1200&auto=format&fit=crop&q=80',
+    seoTitle: 'Créer un E-Commerce à Succès',
+    seoDescription: 'Apprenez à lancer et développer un business e-commerce rentable.',
+    trainerName: 'Marie Laurent',
+    price: 35000
+  },
+  {
+    id: 'c-3',
+    seoSlug: 'masterclass-ui-ux-design-figma',
+    title: 'Masterclass UI/UX Design & Figma',
+    description: 'Concevez des interfaces utilisateur magnifiques et intuitives. Maîtrisez Figma de A à Z.',
+    coverImage: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=1200&auto=format&fit=crop&q=80',
+    seoTitle: 'Masterclass UI/UX Design & Figma',
+    seoDescription: 'Formation pratique au design d\'interfaces modernes avec Figma.',
+    trainerName: 'Jean Dupont',
+    price: 29000
+  }
+];
+
 // Helper for serving index.html with server-injected SEO meta tags for social crawlers (WhatsApp, FB, Twitter, LinkedIn)
 async function renderHtmlWithSeoMeta(req: express.Request, meta: {
   title?: string;
@@ -1133,27 +1170,38 @@ async function renderHtmlWithSeoMeta(req: express.Request, meta: {
     html = `<!DOCTYPE html><html><head><title>${meta.title || "Dekel.Formation"}</title></head><body><div id="root"></div></body></html>`;
   }
 
-  const cleanTitle = meta.title || "Dekel.Formation - Plateforme E-Learning";
-  const cleanDesc = meta.description || "Découvrez nos formations certifiantes et développez vos compétences avec Dekel.Formation.";
-  const cleanImage = meta.image || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200";
+  const cleanTitle = meta.title || "Dekel.Formation | Plateforme de formations en ligne";
+  const cleanDesc = meta.description || "Dekel.Formation est une plateforme moderne de formation en ligne permettant aux étudiants d'apprendre auprès de formateurs professionnels grâce à des vidéos, quiz, certificats et un suivi de progression.";
+  const cleanImage = meta.image || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80";
   const cleanUrl = meta.url || `${req.protocol}://${req.get("host")}${req.originalUrl}`;
 
   // Replace default title tag
-  html = html.replace(/<title>.*?<\/title>/gi, `<title>${cleanTitle}</title>`);
+  html = html.replace(/<title>.*?<\/title>/gi, `<title>${cleanTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>`);
+
+  // Strip existing default meta tags from index.html so social crawlers read only the exact target tags
+  html = html.replace(/<meta\s+name=["']description["'].*?>/gi, "");
+  html = html.replace(/<meta\s+property=["']og:.*?["'].*?>/gi, "");
+  html = html.replace(/<meta\s+name=["']twitter:.*?["'].*?>/gi, "");
+  html = html.replace(/<link\s+rel=["']canonical["'].*?>/gi, "");
+
+  const safeTitle = cleanTitle.replace(/"/g, '&quot;');
+  const safeDesc = cleanDesc.replace(/"/g, '&quot;');
 
   const metaTags = `
-    <meta name="description" content="${cleanDesc.replace(/"/g, '&quot;')}" />
+    <meta name="description" content="${safeDesc}" />
     <link rel="canonical" href="${cleanUrl}" />
     <meta name="robots" content="index, follow" />
     <meta property="og:site_name" content="Dekel.Formation" />
     <meta property="og:type" content="${meta.type || 'website'}" />
-    <meta property="og:title" content="${cleanTitle.replace(/"/g, '&quot;')}" />
-    <meta property="og:description" content="${cleanDesc.replace(/"/g, '&quot;')}" />
+    <meta property="og:title" content="${safeTitle}" />
+    <meta property="og:description" content="${safeDesc}" />
     <meta property="og:image" content="${cleanImage}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:url" content="${cleanUrl}" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${cleanTitle.replace(/"/g, '&quot;')}" />
-    <meta name="twitter:description" content="${cleanDesc.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:title" content="${safeTitle}" />
+    <meta name="twitter:description" content="${safeDesc}" />
     <meta name="twitter:image" content="${cleanImage}" />
     ${meta.jsonLd ? `<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>` : ''}
   `;
@@ -1172,14 +1220,14 @@ app.get(["/formation/:slug", "/course/:slug", "/f/:slug"], async (req, res, next
     let courseData: any = null;
     let courseId = cleanSlug;
 
-    // Check direct doc ID
+    // 1. Check direct doc ID in Firestore
     const docRef = doc(dbFirestore, "courses", cleanSlug);
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
       courseData = docSnap.data();
     } else {
-      // Check by seoSlug
+      // 2. Check by seoSlug in Firestore
       const q = query(collection(dbFirestore, "courses"), where("seoSlug", "==", cleanSlug));
       const querySnap = await getDocs(q);
       if (!querySnap.empty) {
@@ -1188,10 +1236,17 @@ app.get(["/formation/:slug", "/course/:slug", "/f/:slug"], async (req, res, next
       }
     }
 
+    // 3. Fallback to mock course list if not in Firestore
+    if (!courseData) {
+      courseData = MOCK_COURSES_SEO_FALLBACK.find(
+        c => c.id.toLowerCase() === cleanSlug || c.seoSlug.toLowerCase() === cleanSlug
+      );
+    }
+
     if (courseData) {
-      const title = `${courseData.seoTitle || courseData.title} | Formation Dekel`;
-      const description = courseData.seoDescription || courseData.description || "";
-      const image = courseData.seoShareImage || courseData.coverImage || "";
+      const title = `${courseData.seoTitle || courseData.title} | Dekel.Formation`;
+      const description = courseData.seoDescription || courseData.description || `Découvrez la formation ${courseData.title} sur Dekel.Formation.`;
+      const image = courseData.seoShareImage || courseData.coverImage || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80";
       const url = `${req.protocol}://${req.get("host")}/formation/${courseData.seoSlug || courseId}`;
 
       const courseJsonLd = {
@@ -1211,7 +1266,7 @@ app.get(["/formation/:slug", "/course/:slug", "/f/:slug"], async (req, res, next
         "offers": {
           "@type": "Offer",
           "category": "Paid",
-          "price": courseData.promoPrice && courseData.promoPrice > 0 ? courseData.promoPrice : courseData.price,
+          "price": courseData.promoPrice && courseData.promoPrice > 0 ? courseData.promoPrice : courseData.price || 0,
           "priceCurrency": "XAF"
         }
       };

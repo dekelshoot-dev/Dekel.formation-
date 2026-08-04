@@ -282,7 +282,7 @@ export default function Marketplace({
       </div>
 
       {/* Courses Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredCourses.length === 0 ? (
           <div className="text-center col-span-full py-16 bg-white/5 border border-white/15 rounded-3xl p-6 space-y-2">
             <p className="text-sm font-bold text-slate-200">Aucune formation trouvée</p>
@@ -314,7 +314,7 @@ export default function Marketplace({
                       setLockedChapterAlert(null);
                     }
                   }}
-                  className="relative aspect-video overflow-hidden cursor-pointer"
+                  className="relative w-full aspect-video shrink-0 overflow-hidden cursor-pointer"
                   title="Voir la page de présentation complète"
                 >
                   <img
@@ -322,33 +322,28 @@ export default function Marketplace({
                     alt={course.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                  <span className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 glass-light backdrop-blur shadow text-white font-black px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[8px] sm:text-xs flex flex-col items-end">
+                  <span className="absolute top-2 right-2 sm:top-3 sm:right-3 glass-light backdrop-blur shadow text-white font-black px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs flex flex-col items-end">
                     {course.promoPrice && course.promoPrice > 0 ? (
                       <>
-                        <span className="line-through text-[7px] sm:text-[10px] text-slate-350 font-normal">
+                        <span className="line-through text-[8px] sm:text-[10px] text-slate-350 font-normal">
                           {course.price.toLocaleString('fr-FR')} XAF
                         </span>
-                        <span className="text-emerald-300 font-extrabold text-[8px] sm:text-xs">
+                        <span className="text-emerald-300 font-extrabold text-[10px] sm:text-xs">
                           {course.promoPrice.toLocaleString('fr-FR')} XAF
                         </span>
                       </>
                     ) : (
-                      <span className="text-[8px] sm:text-xs">{course.price.toLocaleString('fr-FR')} XAF</span>
+                      <span className="text-[10px] sm:text-xs">{course.price.toLocaleString('fr-FR')} XAF</span>
                     )}
                   </span>
-                  <span className="absolute bottom-1.5 left-1.5 sm:bottom-3 sm:left-3 bg-slate-900/80 text-white font-semibold px-1 py-0.5 sm:px-2 rounded text-[7px] sm:text-[10px] uppercase">
+                  <span className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 bg-slate-900/80 text-white font-semibold px-1.5 py-0.5 sm:px-2 rounded text-[8px] sm:text-[10px] uppercase">
                     {course.type}
                   </span>
                 </div>
 
                 {/* Course Body */}
-                <div className="p-2 sm:p-5 flex-1 flex flex-col justify-between space-y-1.5 sm:space-y-4">
-                  <div className="space-y-1 sm:space-y-2">
-                    <div className="flex items-center gap-1 sm:gap-1.5 text-[8px] sm:text-[10px] text-slate-400 font-bold">
-                      <span>{course.level}</span>
-                      <span>•</span>
-                      <span>{course.duration}</span>
-                    </div>
+                <div className="p-3.5 sm:p-5 flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
+                  <div className="space-y-1.5 sm:space-y-2">
                     <h3 
                       onClick={() => {
                         if (onOpenPublicPage) {
@@ -360,14 +355,33 @@ export default function Marketplace({
                           setLockedChapterAlert(null);
                         }
                       }}
-                      className="font-bold text-white text-[11px] sm:text-sm leading-tight sm:leading-snug group-hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2"
+                      className="font-bold text-white text-sm leading-snug group-hover:text-indigo-400 transition-colors cursor-pointer line-clamp-2"
                       title="Voir la page de présentation complète"
                     >
                       {course.title}
                     </h3>
+
+                    <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-light text-slate-400">
+                      <span>{course.level}</span>
+                      {course.duration && (
+                        <>
+                          <span className="text-slate-500">•</span>
+                          <span>{course.duration}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <img
+                        src={course.trainerPhoto}
+                        className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-white/10"
+                        alt={course.trainerName}
+                      />
+                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">{course.trainerName}</span>
+                    </div>
                   </div>
 
-                  {/* Modules preview program outline (Desktop only to keep mobile cards compact) */}
+                  {/* Modules preview program outline (Desktop only to keep mobile cards clean) */}
                   <div className="hidden sm:block border-t border-white/10 pt-3.5 space-y-2">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Aperçu du programme :</p>
                     <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
@@ -388,17 +402,8 @@ export default function Marketplace({
                   </div>
 
                   {/* Instructor row & action buttons */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5 border-t border-white/10 pt-1.5 sm:pt-3.5">
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      <img
-                        src={course.trainerPhoto}
-                        className="w-4 h-4 sm:w-6 sm:h-6 rounded-full object-cover border border-white/10"
-                        alt={course.trainerName}
-                      />
-                      <span className="text-[8px] sm:text-[10px] text-slate-400 font-semibold truncate max-w-[80px] sm:max-w-[120px]">{course.trainerName}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/10 pt-2 sm:pt-3.5">
+                    <div className="flex items-center gap-1.5 w-full">
                       {/* Share button (Desktop only) */}
                       <button
                         type="button"
@@ -428,21 +433,21 @@ export default function Marketplace({
                           }
                         }}
                         title="Voir la page publique complète de présentation"
-                        className="flex-1 sm:flex-initial justify-center bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 font-bold text-[8px] sm:text-[9px] px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center gap-0.5 sm:gap-1"
+                        className="flex-1 justify-center bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center gap-1"
                       >
-                        <Eye className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-indigo-400 shrink-0" />
+                        <Eye className="w-3 h-3 text-indigo-400 shrink-0" />
                         <span className="truncate">Aperçu</span>
                       </button>
 
                       {/* Enrollment button */}
                       {isAlreadyEnrolled ? (
-                        <span className="flex-1 sm:flex-initial text-center bg-emerald-500/10 text-emerald-400 font-bold text-[8px] sm:text-[9px] px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl border border-emerald-500/20 truncate">
+                        <span className="flex-1 text-center bg-emerald-500/10 text-emerald-400 font-bold text-[10px] sm:text-xs px-2.5 py-1.5 rounded-lg sm:rounded-xl border border-emerald-500/20 truncate">
                           Inscrit
                         </span>
                       ) : (
                         <button
                           onClick={() => openCheckout(course)}
-                          className="flex-1 sm:flex-initial text-center accent-gradient hover:opacity-90 text-white font-bold text-[8px] sm:text-[9px] px-1.5 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl transition-all shadow-md shadow-indigo-500/20 cursor-pointer truncate"
+                          className="flex-1 sm:flex-initial text-center accent-gradient hover:opacity-90 text-white font-bold text-[9px] px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl transition-all shadow-md shadow-indigo-500/20 cursor-pointer truncate"
                         >
                           S'inscrire
                         </button>

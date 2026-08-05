@@ -539,6 +539,116 @@ app.post(["/api/emails/send", "/api/emails/queue"], async (req, res) => {
   }
 });
 
+// ==========================================
+// API: NEWSLETTER SUBSCRIBERS ENDPOINTS
+// ==========================================
+
+// Subscribe to newsletter
+app.post("/api/newsletter/subscribe", async (req, res) => {
+  const { email } = req.body;
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    return res.status(400).json({ status: "error", message: "Adresse e-mail invalide." });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const subId = `sub-${cleanEmail.replace(/[^a-z0-9]/gi, '_')}`;
+
+  try {
+    await setDoc(doc(dbFirestore, "newsletter_subscribers", subId), {
+      email: cleanEmail,
+      subscribedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.warn("Firestore newsletter subscribe fallback:", err);
+  }
+
+  const db = readDb();
+  db.newsletter_subscribers = db.newsletter_subscribers || [];
+  if (!db.newsletter_subscribers.some((s: any) => s.email === cleanEmail)) {
+    db.newsletter_subscribers.push({
+      id: subId,
+      email: cleanEmail,
+      subscribedAt: new Date().toISOString()
+    });
+    writeDb(db);
+  }
+
+  return res.status(200).json({ status: "success", message: "Inscription à la newsletter validée.", email: cleanEmail });
+});
+
+// Unsubscribe from newsletter (POST)
+app.post("/api/newsletter/unsubscribe", async (req, res) => {
+  const email = req.body.email || req.query.email;
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    return res.status(400).json({ status: "error", message: "Adresse e-mail invalide." });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+  const subId = `sub-${cleanEmail.replace(/[^a-z0-9]/gi, '_')}`;
+
+  try {
+    await deleteDoc(doc(dbFirestore, "newsletter_subscribers", subId));
+  } catch (err) {
+    console.warn("Firestore newsletter unsubscribe fallback:", err);
+  }
+
+  const db = readDb();
+  if (db.newsletter_subscribers) {
+    db.newsletter_subscribers = db.newsletter_subscribers.filter((s: any) => s.email !== cleanEmail);
+    writeDb(db);
+  }
+
+  return res.status(200).json({ status: "success", message: "Vous avez été désinscrit de la newsletter.", email: cleanEmail });
+});
+
+// Unsubscribe from newsletter (GET link)
+app.get("/api/newsletter/unsubscribe", async (req, res) => {
+  const email = req.query.email as string;
+  if (email && typeof email === "string" && email.includes("@")) {
+    const cleanEmail = email.trim().toLowerCase();
+    const subId = `sub-${cleanEmail.replace(/[^a-z0-9]/gi, '_')}`;
+    try {
+      await deleteDoc(doc(dbFirestore, "newsletter_subscribers", subId));
+    } catch (err) {}
+    const db = readDb();
+    if (db.newsletter_subscribers) {
+      db.newsletter_subscribers = db.newsletter_subscribers.filter((s: any) => s.email !== cleanEmail);
+      writeDb(db);
+    }
+  }
+
+  const requestOrigin = req.headers.origin 
+    || (req.headers.referer ? new URL(req.headers.referer as string).origin : null)
+    || `${req.protocol}://${req.get('host')}`;
+
+  return res.redirect(`${requestOrigin}/unsubscribe?email=${encodeURIComponent(email || '')}&status=unsubscribed`);
+});
+
+// Get newsletter subscribers list
+app.get("/api/newsletter/subscribers", async (req, res) => {
+  let subscribers: any[] = [];
+  try {
+    const snapshot = await getDocs(collection(dbFirestore, "newsletter_subscribers"));
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      subscribers.push({
+        id: docSnap.id,
+        email: data.email,
+        subscribedAt: data.subscribedAt
+      });
+    });
+  } catch (err) {
+    console.warn("Firestore fetch subscribers fallback:", err);
+  }
+
+  if (subscribers.length === 0) {
+    const db = readDb();
+    subscribers = db.newsletter_subscribers || [];
+  }
+
+  return res.status(200).json({ status: "success", subscribers });
+});
+
 // API: Get transactional email logs with filtering and search
 app.get("/api/emails/logs", (req, res) => {
   const db = readEmailDb();
@@ -691,7 +801,7 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
   // Generate signed server token (oobCode) valid for 1 hour (3600 seconds)
   const oobCode = generateSignedToken('reset_password', trimmedEmail, 3600);
   const baseUrl = origin || `${req.protocol}://${req.get('host')}`;
-  const resetUrl = `${baseUrl}?mode=resetPassword&oobCode=${oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
+  const resetUrl = `${baseUrl}/reset-password?oobCode=${oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
 
   try {
     const queuedEmail = queueTransactionalEmail({
@@ -1293,8 +1403,9 @@ app.get(["/formation/:slug", "/course/:slug", "/f/:slug"], async (req, res, next
 // FAST DIRECT SERVER-SIDE ROUTE FOR TOP-LEVEL CUSTOM SLUGS (e.g. /offre-speciale)
 const SYSTEM_PREFIXES = [
   "api", "marketplace", "admin", "student", "trainer", "auth", 
-  "verify-email", "reset-password", "assets", "favicon.ico", 
-  "@vite", "@fs", "src", "node_modules", "index.html", "p", "page", "pages"
+  "verify-email", "verify", "verifier-email", "reset-password", "mot-de-passe-oublie", 
+  "connexion", "login", "inscription", "register", "unsubscribe", "desabonnement", "desinscription", 
+  "assets", "favicon.ico", "@vite", "@fs", "src", "node_modules", "index.html", "p", "page", "pages"
 ];
 
 app.get("/:slug", async (req, res, next) => {

@@ -35,15 +35,21 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
   const [formError, setFormError] = useState<string>('');
 
   useEffect(() => {
-    // Check URL parameters for oobCode or mode
+    // Check URL parameters for oobCode, token, or code
     const searchParams = new URLSearchParams(window.location.search);
-    let code = searchParams.get('oobCode');
+    let code = searchParams.get('oobCode') || searchParams.get('token') || searchParams.get('code');
+    let emailParam = searchParams.get('email') || searchParams.get('user') || '';
 
     // Also check hash in case of single page hash router or hash search params
-    if (!code && window.location.hash.includes('oobCode=')) {
+    if (!code && (window.location.hash.includes('oobCode=') || window.location.hash.includes('token=') || window.location.hash.includes('code='))) {
       const hashQuery = window.location.hash.split('?')[1] || window.location.hash;
       const hashParams = new URLSearchParams(hashQuery);
-      code = hashParams.get('oobCode');
+      code = hashParams.get('oobCode') || hashParams.get('token') || hashParams.get('code');
+      if (!emailParam) emailParam = hashParams.get('email') || '';
+    }
+
+    if (emailParam) {
+      setUserEmail(emailParam);
     }
 
     if (code) {

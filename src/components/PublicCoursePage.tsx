@@ -16,6 +16,7 @@ interface PublicCoursePageProps {
   allModules: Module[];
   allChapters: Chapter[];
   currentUser: User | null;
+  allUsers?: User[];
   onNavigateToCatalog: () => void;
   onNavigateToLogin: () => void;
   onOpenCheckout?: (course: Course) => void;
@@ -27,6 +28,7 @@ export default function PublicCoursePage({
   allModules,
   allChapters,
   currentUser,
+  allUsers,
   onNavigateToCatalog,
   onNavigateToLogin,
   onOpenCheckout,
@@ -355,18 +357,32 @@ export default function PublicCoursePage({
             </p>
 
             {/* Formateur Card */}
-            <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-3.5 rounded-2xl max-w-md">
-              <img
-                src={course.trainerPhoto || 'https://cdn-icons-png.flaticon.com/512/3177/3177465.png'}
-                alt={course.trainerName}
-                className="w-12 h-12 rounded-full object-cover border-2 border-indigo-500/40 shrink-0"
-              />
-              <div>
-                <p className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest">Formateur & Instructeur</p>
-                <h3 className="text-sm font-bold text-white">{course.trainerName}</h3>
-                <p className="text-xs text-slate-400">Expert référent Dekel Formation</p>
-              </div>
-            </div>
+            {(() => {
+              const trainerUser = allUsers?.find(u => 
+                (course.trainerId && u.id === course.trainerId) ||
+                (course.trainerName && u.name?.toLowerCase() === course.trainerName?.toLowerCase())
+              );
+              const resolvedPhoto = (trainerUser?.avatarUrl && !trainerUser.avatarUrl.includes('flaticon'))
+                ? trainerUser.avatarUrl
+                : (course.trainerPhoto && !course.trainerPhoto.includes('flaticon'))
+                  ? course.trainerPhoto
+                  : (trainerUser?.avatarUrl || course.trainerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150');
+
+              return (
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-3.5 rounded-2xl max-w-md">
+                  <img
+                    src={resolvedPhoto}
+                    alt={course.trainerName}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-indigo-500/40 shrink-0"
+                  />
+                  <div>
+                    <p className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-widest">Formateur & Instructeur</p>
+                    <h3 className="text-sm font-bold text-white">{trainerUser?.name || course.trainerName}</h3>
+                    <p className="text-xs text-slate-400">Expert référent Dekel Formation</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Quick Metrics Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">

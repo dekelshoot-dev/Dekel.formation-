@@ -25,13 +25,13 @@ export default function VerifyEmail({ onBackToLogin, onGoToDashboard, currentUse
   useEffect(() => {
     // Extract parameters from URL query string or hash
     const searchParams = new URLSearchParams(window.location.search);
-    let code = searchParams.get('oobCode');
-    let emailParam = searchParams.get('email') || '';
+    let code = searchParams.get('oobCode') || searchParams.get('token') || searchParams.get('code');
+    let emailParam = searchParams.get('email') || searchParams.get('user') || '';
 
-    if (!code && window.location.hash.includes('oobCode=')) {
+    if (!code && (window.location.hash.includes('oobCode=') || window.location.hash.includes('token=') || window.location.hash.includes('code='))) {
       const hashQuery = window.location.hash.split('?')[1] || window.location.hash;
       const hashParams = new URLSearchParams(hashQuery);
-      code = hashParams.get('oobCode');
+      code = hashParams.get('oobCode') || hashParams.get('token') || hashParams.get('code');
       if (!emailParam) emailParam = hashParams.get('email') || '';
     }
 

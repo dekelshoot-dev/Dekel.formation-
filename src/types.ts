@@ -390,3 +390,82 @@ export interface CustomHtmlPage {
   viewsCount?: number;
 }
 
+export interface FooterLink {
+  label: string;
+  url: string;
+  isExternal?: boolean;
+}
+
+export interface FooterSocialLinks {
+  facebook?: string;
+  instagram?: string;
+  linkedin?: string;
+  twitter?: string;
+  youtube?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  telegram?: string;
+}
+
+export interface FooterContactInfo {
+  email?: string;
+  phone?: string;
+  address?: string;
+  hours?: string;
+}
+
+export interface FooterConfig {
+  logoUrl?: string;
+  brandName?: string;
+  description?: string;
+  usefulLinks?: FooterLink[];
+  legalLinks?: FooterLink[];
+  contactInfo?: FooterContactInfo;
+  socialLinks?: FooterSocialLinks;
+  copyrightText?: string;
+  newsletterEnabled?: boolean;
+  newsletterTitle?: string;
+  newsletterSubtitle?: string;
+}
+
+export const DEFAULT_FOOTER_CONFIG: FooterConfig = {
+  logoUrl: '',
+  brandName: 'Dekel.Formation',
+  description: 'Dekel.Formation est une plateforme moderne de formation en ligne permettant aux formateurs de partager leurs connaissances et aux étudiants d\'apprendre à leur rythme.',
+  usefulLinks: [
+    { label: 'Accueil', url: '/' },
+    { label: 'Marketplace', url: '/marketplace' },
+    { label: 'Toutes les formations', url: '/marketplace' },
+    { label: 'Tous les formateurs', url: '/formateurs' },
+    { label: 'FAQ', url: '/faq' },
+    { label: 'Centre d\'aide', url: '/centre-aide' },
+    { label: 'Contact', url: '/contact' }
+  ],
+  legalLinks: [
+    { label: 'Conditions d\'utilisation', url: '/p/terms' },
+    { label: 'Politique de confidentialité', url: '/p/privacy' },
+    { label: 'Politique des cookies', url: '/p/cookies' },
+    { label: 'Mentions légales', url: '/p/legal' }
+  ],
+  contactInfo: {
+    email: 'support@dekel-formation.com',
+    phone: '+237 6 00 00 00 00',
+    address: 'Douala, Cameroun',
+    hours: 'Lun - Ven : 08h00 - 18h00'
+  },
+  socialLinks: {
+    facebook: 'https://facebook.com',
+    instagram: 'https://instagram.com',
+    linkedin: 'https://linkedin.com',
+    twitter: 'https://twitter.com',
+    youtube: 'https://youtube.com',
+    tiktok: 'https://tiktok.com',
+    whatsapp: 'https://wa.me/237600000000',
+    telegram: 'https://t.me/dekelformation'
+  },
+  copyrightText: 'Dekel.Formation — Tous droits réservés.',
+  newsletterEnabled: true,
+  newsletterTitle: 'Abonnez-vous à notre Newsletter',
+  newsletterSubtitle: 'Recevez nos dernières offres, actualités et conseils directement dans votre boîte mail.'
+};
+

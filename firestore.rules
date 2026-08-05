@@ -120,6 +120,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // 21. Newsletter Subscribers
+    match /newsletter_subscribers/{subId} {
+      allow read, write: if true;
+    }
+
     // Catch-all safety net
     match /{document=**} {
       allow read, write: if false;

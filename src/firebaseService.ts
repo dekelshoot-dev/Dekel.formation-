@@ -3,7 +3,7 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { 
-  User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage 
+  User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage, FooterConfig 
 } from './types';
 import { 
   INITIAL_USERS, INITIAL_COURSES, INITIAL_MODULES, INITIAL_CHAPTERS, 
@@ -343,4 +343,139 @@ export async function incrementCustomPageViewCount(pageId: string) {
     console.warn('Could not increment page view count:', error);
   }
 }
+
+/**
+ * Settings & Footer Mutations
+ */
+export async function saveFooterSettings(config: FooterConfig) {
+  const path = 'settings/footer';
+  try {
+    await setDoc(doc(db, 'settings', 'footer'), cleanUndefined(config));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  subscribedAt: string;
+}
+
+export async function subscribeNewsletter(email: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) return;
+  const subId = `sub-${sanitizeId(cleanEmail)}`;
+  const path = `newsletter_subscribers/${subId}`;
+  const now = new Date().toISOString();
+
+  // Local Storage backup
+  try {
+    const localSaved = localStorage.getItem('sio_newsletter_subscribers');
+    let list: NewsletterSubscriber[] = localSaved ? JSON.parse(localSaved) : [];
+    if (!list.some(s => s.email.toLowerCase() === cleanEmail)) {
+      list.push({ id: subId, email: cleanEmail, subscribedAt: now });
+      localStorage.setItem('sio_newsletter_subscribers', JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('LocalStorage error in subscribeNewsletter:', e);
+  }
+
+  // API sync
+  try {
+    fetch('/api/newsletter/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail })
+    }).catch(() => {});
+  } catch (e) {}
+
+  // Firestore sync
+  try {
+    await setDoc(doc(db, 'newsletter_subscribers', subId), {
+      email: cleanEmail,
+      subscribedAt: now
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export async function unsubscribeNewsletter(email: string) {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail) return;
+  const subId = `sub-${sanitizeId(cleanEmail)}`;
+  const path = `newsletter_subscribers/${subId}`;
+
+  // Local Storage backup
+  try {
+    const localSaved = localStorage.getItem('sio_newsletter_subscribers');
+    if (localSaved) {
+      let list: NewsletterSubscriber[] = JSON.parse(localSaved);
+      list = list.filter(s => s.email.toLowerCase() !== cleanEmail);
+      localStorage.setItem('sio_newsletter_subscribers', JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('LocalStorage error in unsubscribeNewsletter:', e);
+  }
+
+  // API sync
+  try {
+    fetch('/api/newsletter/unsubscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail })
+    }).catch(() => {});
+  } catch (e) {}
+
+  // Firestore sync
+  try {
+    await deleteDoc(doc(db, 'newsletter_subscribers', subId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export async function getNewsletterSubscribers(): Promise<NewsletterSubscriber[]> {
+  const result: NewsletterSubscriber[] = [];
+
+  try {
+    const snapshot = await getDocs(collection(db, 'newsletter_subscribers'));
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      result.push({
+        id: docSnap.id,
+        email: data.email || '',
+        subscribedAt: data.subscribedAt || new Date().toISOString()
+      });
+    });
+    if (result.length > 0) {
+      localStorage.setItem('sio_newsletter_subscribers', JSON.stringify(result));
+      return result;
+    }
+  } catch (err) {
+    console.warn('Firestore fetch subscribers fallback:', err);
+  }
+
+  // Fallback to local storage or initial defaults
+  try {
+    const localSaved = localStorage.getItem('sio_newsletter_subscribers');
+    if (localSaved) {
+      const parsed = JSON.parse(localSaved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
+  // Initial seed defaults if none exist
+  const initialSeed: NewsletterSubscriber[] = [
+    { id: 'sub-demo-1', email: 'etudiant@exemple.com', subscribedAt: new Date(Date.now() - 86400000 * 5).toISOString() },
+    { id: 'sub-demo-2', email: 'sophie.martin@gmail.com', subscribedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
+    { id: 'sub-demo-3', email: 'alexandre.dubois@yahoo.fr', subscribedAt: new Date(Date.now() - 86400000 * 1).toISOString() }
+  ];
+  localStorage.setItem('sio_newsletter_subscribers', JSON.stringify(initialSeed));
+  return initialSeed;
+}
+
 

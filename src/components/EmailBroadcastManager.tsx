@@ -28,13 +28,15 @@ import {
   ChevronRight, 
   Tag, 
   FileText,
-  Clock
+  Clock,
+  UserX,
+  Download
 } from 'lucide-react';
 import { showToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { cleanUndefined } from '../firebaseService';
+import { cleanUndefined, getNewsletterSubscribers, unsubscribeNewsletter, subscribeNewsletter, NewsletterSubscriber } from '../firebaseService';
 
 interface EmailBroadcastManagerProps {
   allUsers: User[];
@@ -227,10 +229,15 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   // Recipient Selection State
-  const [recipientTarget, setRecipientTarget] = useState<'all_students' | 'all_trainers' | 'all_users' | 'selected_users' | 'custom_emails'>('all_students');
+  const [recipientTarget, setRecipientTarget] = useState<'all_students' | 'all_trainers' | 'all_users' | 'selected_users' | 'custom_emails' | 'newsletter_subscribers'>('all_students');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [customEmailInput, setCustomEmailInput] = useState<string>('');
   const [userSearchQuery, setUserSearchQuery] = useState('');
+
+  // Newsletter Subscribers State
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
+  const [subscriberSearchQuery, setSubscriberSearchQuery] = useState('');
+  const [newSubEmail, setNewSubEmail] = useState('');
 
   // Send Progress & Confirmation
   const [isSending, setIsSending] = useState(false);
@@ -254,6 +261,35 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
   });
 
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+  // Load Newsletter Subscribers
+  useEffect(() => {
+    getNewsletterSubscribers().then(list => {
+      if (list && list.length > 0) {
+        setNewsletterSubscribers(list);
+      }
+    });
+
+    const unsub = onSnapshot(collection(db, 'newsletter_subscribers'), (snapshot) => {
+      const items: NewsletterSubscriber[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        items.push({
+          id: docSnap.id,
+          email: data.email || '',
+          subscribedAt: data.subscribedAt || new Date().toISOString()
+        });
+      });
+      if (items.length > 0) {
+        setNewsletterSubscribers(items);
+        localStorage.setItem('sio_newsletter_subscribers', JSON.stringify(items));
+      }
+    }, (err) => {
+      console.warn('Firestore subscription fallback for newsletter subscribers:', err);
+    });
+
+    return () => unsub();
+  }, []);
 
   // Load Custom Templates from Firestore
   useEffect(() => {
@@ -365,6 +401,13 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
 
   // Calculate target recipients
   const getResolvedRecipients = (): { email: string; name: string; role: string }[] => {
+    if (recipientTarget === 'newsletter_subscribers') {
+      return newsletterSubscribers.map(sub => ({
+        email: sub.email,
+        name: sub.email.split('@')[0],
+        role: 'Abonné Newsletter'
+      }));
+    }
     if (recipientTarget === 'all_students') {
       return allUsers
         .filter(u => u.role === 'student' && u.email)
@@ -403,6 +446,7 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
     const todayStr = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
     const nameParts = recipient.name.split(' ');
     const prenom = recipient.name ? nameParts[0] : recipient.email.split('@')[0];
+    const unsubscribeUrl = `${window.location.origin}/unsubscribe?email=${encodeURIComponent(recipient.email)}`;
 
     return rawText
       .replace(/\{prenom\}/g, prenom)
@@ -410,7 +454,8 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
       .replace(/\{email\}/g, recipient.email)
       .replace(/\{role\}/g, recipient.role)
       .replace(/\{date\}/g, todayStr)
-      .replace(/\{nom_plateforme\}/g, 'Dekel.Formation');
+      .replace(/\{nom_plateforme\}/g, 'Dekel.Formation')
+      .replace(/\{lien_desabonnement\}/g, unsubscribeUrl);
   };
 
   // Dispatch Broadcast Email
@@ -445,7 +490,18 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
         for (let i = 0; i < total; i++) {
           const rec = resolvedRecipients[i];
           const personalizedSubj = renderPersonalizedContent(rec, templateSubject);
-          const personalizedHtml = renderPersonalizedContent(rec, templateHtml);
+          let personalizedHtml = renderPersonalizedContent(rec, templateHtml);
+          const unsubscribeUrl = `${window.location.origin}/unsubscribe?email=${encodeURIComponent(rec.email)}`;
+
+          // Always ensure an unsubscribe footer link is present in marketing/newsletter emails
+          const lowerHtml = personalizedHtml.toLowerCase();
+          if (!lowerHtml.includes('unsubscribe') && !lowerHtml.includes('desinscri') && !lowerHtml.includes('désinscri')) {
+            personalizedHtml += `
+<div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #94a3b8; font-family: 'Segoe UI', Arial, sans-serif;">
+  Vous recevez cet e-mail car vous êtes abonné à notre newsletter Dekel.Formation.<br/>
+  Si vous ne souhaitez plus recevoir nos communications, <a href="${unsubscribeUrl}" style="color: #6366f1; font-weight: 700; text-decoration: underline;">cliquez ici pour vous désinscrire</a>.
+</div>`;
+          }
 
           try {
             // Trigger server endpoint
@@ -686,6 +742,26 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
               {/* Recipient Radio options */}
               <div className="grid grid-cols-1 gap-2">
                 <label className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                  recipientTarget === 'newsletter_subscribers' ? 'border-indigo-600 bg-indigo-50/50 font-bold' : 'border-slate-200 hover:bg-slate-50'
+                }`}>
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="radio"
+                      name="recipientTarget"
+                      checked={recipientTarget === 'newsletter_subscribers'}
+                      onChange={() => setRecipientTarget('newsletter_subscribers')}
+                      className="accent-indigo-600"
+                    />
+                    <span className="text-xs text-slate-800 flex items-center gap-1.5 font-bold">
+                      📰 Abonnés à la Newsletter ({newsletterSubscribers.length})
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full">
+                    {newsletterSubscribers.length} inscrits
+                  </span>
+                </label>
+
+                <label className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
                   recipientTarget === 'all_students' ? 'border-indigo-600 bg-indigo-50/50 font-bold' : 'border-slate-200 hover:bg-slate-50'
                 }`}>
                   <div className="flex items-center gap-2.5">
@@ -845,6 +921,121 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
                 </div>
               )}
 
+              {/* Sub-panel for Newsletter Subscribers List & Management */}
+              {recipientTarget === 'newsletter_subscribers' && (
+                <div className="pt-3 space-y-3 border-t border-slate-100 animate-fade-in">
+                  {/* Search and Add Subscriber controls */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher un abonné..."
+                        value={subscriberSearchQuery}
+                        onChange={(e) => setSubscriberSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="email"
+                        placeholder="Ajouter email..."
+                        value={newSubEmail}
+                        onChange={(e) => setNewSubEmail(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 min-w-[140px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (newSubEmail && newSubEmail.includes('@')) {
+                            await subscribeNewsletter(newSubEmail);
+                            showToast(`Abonné "${newSubEmail}" ajouté avec succès !`, 'success');
+                            setNewSubEmail('');
+                          } else {
+                            showToast('Veuillez entrer une adresse email valide.', 'error');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                      >
+                        Ajouter
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List header with stats & Export */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                    <span>
+                      {newsletterSubscribers.filter(s => s.email.toLowerCase().includes(subscriberSearchQuery.toLowerCase())).length} abonné(s) affiché(s)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const csvContent = "data:text/csv;charset=utf-8," + ["Email,DateInscription", ...newsletterSubscribers.map(s => `"${s.email}","${s.subscribedAt}"`)].join("\n");
+                        const encodedUri = encodeURI(csvContent);
+                        const link = document.createElement("a");
+                        link.setAttribute("href", encodedUri);
+                        link.setAttribute("download", `newsletter_abonnees_${new Date().toISOString().slice(0,10)}.csv`);
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        showToast('Export CSV téléchargé !', 'success');
+                      }}
+                      className="text-indigo-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Exporter (CSV)</span>
+                    </button>
+                  </div>
+
+                  {/* Subscribers Scrollable List */}
+                  <div className="max-h-52 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-2 bg-slate-50">
+                    {newsletterSubscribers.length === 0 ? (
+                      <div className="text-center py-6 text-slate-400 text-xs">
+                        <Mail className="w-6 h-6 mx-auto stroke-1 mb-1 text-slate-400" />
+                        <p>Aucun abonné inscrit pour le moment.</p>
+                      </div>
+                    ) : (
+                      newsletterSubscribers
+                        .filter(s => s.email.toLowerCase().includes(subscriberSearchQuery.toLowerCase()))
+                        .map(sub => (
+                          <div
+                            key={sub.id}
+                            className="p-2 rounded-lg bg-white border border-slate-200 hover:border-slate-300 flex items-center justify-between text-xs transition-all"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-800 truncate">{sub.email}</p>
+                              <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                Inscrit le {new Date(sub.subscribedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: 'Désinscrire l\'abonné',
+                                  message: `Voulez-vous retirer l'adresse "${sub.email}" de la newsletter ?`,
+                                  confirmText: 'Désinscrire',
+                                  onConfirm: async () => {
+                                    await unsubscribeNewsletter(sub.email);
+                                    showToast(`Abonné ${sub.email} désinscrit.`, 'info');
+                                    closeConfirmModal();
+                                  }
+                                });
+                              }}
+                              title="Désinscrire cet abonné"
+                              className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors cursor-pointer shrink-0 ml-2"
+                            >
+                              <UserX className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Sub-panel for Custom Manual Email input */}
               {recipientTarget === 'custom_emails' && (
                 <div className="pt-2 space-y-2 border-t border-slate-100 animate-fade-in">
@@ -935,6 +1126,13 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
                     className="px-2 py-1 bg-white border border-slate-200 hover:border-indigo-300 rounded-lg text-slate-700 font-mono text-[11px] font-bold cursor-pointer"
                   >
                     + &#123;nom_plateforme&#125;
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertVariableTag('{lien_desabonnement}', 'html')}
+                    className="px-2 py-1 bg-indigo-50 border border-indigo-200 hover:border-indigo-400 text-indigo-700 font-mono text-[11px] font-bold cursor-pointer"
+                  >
+                    + &#123;lien_desabonnement&#125;
                   </button>
                 </div>
               </div>

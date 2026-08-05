@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { User, UserRole, Course, Enrollment, SimulatedEmail, CustomHtmlPage } from '../types';
-import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag, FileCode, Globe } from 'lucide-react';
+import { User, UserRole, Course, Enrollment, SimulatedEmail, CustomHtmlPage, FooterConfig, DEFAULT_FOOTER_CONFIG } from '../types';
+import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag, FileCode, Globe, LayoutTemplate, Link as LinkIcon, Share2, Sparkles, ShieldCheck } from 'lucide-react';
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
 import CustomPagesManager from './CustomPagesManager';
@@ -16,6 +16,8 @@ interface AdminDashboardProps {
   allEnrollments: Enrollment[];
   categories?: string[];
   customPages?: CustomHtmlPage[];
+  footerConfig?: FooterConfig;
+  onSaveFooterConfig?: (config: FooterConfig) => void;
   onAddCategory?: (cat: string) => void;
   onDeleteCategory?: (cat: string) => void;
   onToggleCourseStatus: (courseId: string) => void;
@@ -42,6 +44,8 @@ export default function AdminDashboard({
   allEnrollments,
   categories = ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'],
   customPages = [],
+  footerConfig = DEFAULT_FOOTER_CONFIG,
+  onSaveFooterConfig,
   onAddCategory,
   onDeleteCategory,
   onToggleCourseStatus,
@@ -113,6 +117,26 @@ export default function AdminDashboard({
   const [supportEmail, setSupportEmail] = useState('support@dekel-formation.com');
   const [allowPublicSignup, setAllowPublicSignup] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Footer Settings State
+  const [footerForm, setFooterForm] = useState<FooterConfig>(footerConfig);
+  const [newUsefulLabel, setNewUsefulLabel] = useState('');
+  const [newUsefulUrl, setNewUsefulUrl] = useState('');
+  const [newLegalLabel, setNewLegalLabel] = useState('');
+  const [newLegalUrl, setNewLegalUrl] = useState('');
+
+  React.useEffect(() => {
+    if (footerConfig) {
+      setFooterForm(footerConfig);
+    }
+  }, [footerConfig]);
+
+  const handleSaveFooter = () => {
+    if (onSaveFooterConfig) {
+      onSaveFooterConfig(footerForm);
+      showToast('Configuration du Footer enregistrée avec succès !', 'success');
+    }
+  };
 
   // Edit Profile Form
   const [profileName, setProfileName] = useState(currentUser.name);
@@ -1080,7 +1104,7 @@ Adresse e-mail attribuée : ${emailTrimmed}
                         return (
                           <tr key={t.id} className="hover:bg-slate-50/50">
                             <td className="px-4 py-3.5 flex items-center gap-3">
-                              <img src={t.avatarUrl} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                              <img src={t.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} className="w-8 h-8 rounded-full object-cover border border-slate-200" alt={t.name} />
                               <div>
                                 <p className="font-bold text-slate-800">{t.name}</p>
                                 <p className="text-[10px] text-slate-400">{t.email}</p>
@@ -1449,6 +1473,437 @@ Adresse e-mail attribuée : ${emailTrimmed}
                     <CheckCircle className="w-4 h-4" /> Les paramètres ont été mis à jour avec succès.
                   </p>
                 )}
+              </div>
+
+              {/* Footer Configuration Block */}
+              <div className="border border-slate-200 rounded-2xl p-6 bg-white space-y-6 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <LayoutTemplate className="w-5 h-5 text-red-600" />
+                    <div>
+                      <h3 className="text-sm font-black uppercase tracking-wider">Configuration du Footer (Pied de page public)</h3>
+                      <p className="text-xs text-slate-500">Personnalisez toutes les informations du footer affiché sur les pages publiques (Marketplace, formations...).</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveFooter}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition-all shadow-md shadow-red-100 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Enregistrer le Footer</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Brand & Presentation */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-1.5 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-indigo-600" />
+                      1. Présentation & Marque
+                    </h4>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Nom de la marque</label>
+                      <input
+                        type="text"
+                        value={footerForm.brandName || ''}
+                        onChange={(e) => setFooterForm(prev => ({ ...prev, brandName: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">URL du Logo (Optionnel)</label>
+                      <input
+                        type="url"
+                        value={footerForm.logoUrl || ''}
+                        onChange={(e) => setFooterForm(prev => ({ ...prev, logoUrl: e.target.value }))}
+                        placeholder="https://..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Description courte de la plateforme</label>
+                      <textarea
+                        rows={3}
+                        value={footerForm.description || ''}
+                        onChange={(e) => setFooterForm(prev => ({ ...prev, description: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500 resize-y"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Texte de Copyright</label>
+                      <input
+                        type="text"
+                        value={footerForm.copyrightText || ''}
+                        onChange={(e) => setFooterForm(prev => ({ ...prev, copyrightText: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Coordonnées & Contact */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-1.5 flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-emerald-600" />
+                      2. Coordonnées de Contact
+                    </h4>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">E-mail de support</label>
+                      <input
+                        type="email"
+                        value={footerForm.contactInfo?.email || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          contactInfo: { ...(prev.contactInfo || {}), email: e.target.value }
+                        }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Téléphone de contact</label>
+                      <input
+                        type="text"
+                        value={footerForm.contactInfo?.phone || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          contactInfo: { ...(prev.contactInfo || {}), phone: e.target.value }
+                        }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Adresse géographique</label>
+                      <input
+                        type="text"
+                        value={footerForm.contactInfo?.address || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          contactInfo: { ...(prev.contactInfo || {}), address: e.target.value }
+                        }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Horaires de disponibilité</label>
+                      <input
+                        type="text"
+                        value={footerForm.contactInfo?.hours || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          contactInfo: { ...(prev.contactInfo || {}), hours: e.target.value }
+                        }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:bg-white focus:ring-2 focus:ring-red-100 focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Share2 className="w-4 h-4 text-purple-600" />
+                    3. Liens Réseaux Sociaux
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Facebook</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.facebook || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), facebook: e.target.value }
+                        }))}
+                        placeholder="https://facebook.com/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Instagram</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.instagram || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), instagram: e.target.value }
+                        }))}
+                        placeholder="https://instagram.com/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">LinkedIn</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.linkedin || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), linkedin: e.target.value }
+                        }))}
+                        placeholder="https://linkedin.com/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">X (Twitter)</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.twitter || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), twitter: e.target.value }
+                        }))}
+                        placeholder="https://twitter.com/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">YouTube</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.youtube || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), youtube: e.target.value }
+                        }))}
+                        placeholder="https://youtube.com/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">TikTok</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.tiktok || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), tiktok: e.target.value }
+                        }))}
+                        placeholder="https://tiktok.com/@..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.whatsapp || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), whatsapp: e.target.value }
+                        }))}
+                        placeholder="https://wa.me/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Telegram</label>
+                      <input
+                        type="url"
+                        value={footerForm.socialLinks?.telegram || ''}
+                        onChange={(e) => setFooterForm(prev => ({
+                          ...prev,
+                          socialLinks: { ...(prev.socialLinks || {}), telegram: e.target.value }
+                        }))}
+                        placeholder="https://t.me/..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:bg-white focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Newsletter Configuration */}
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      4. Section Newsletter
+                    </h4>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={footerForm.newsletterEnabled ?? true}
+                        onChange={(e) => setFooterForm(prev => ({ ...prev, newsletterEnabled: e.target.checked }))}
+                        className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500"
+                      />
+                      <span>Activer la section Newsletter dans le Footer</span>
+                    </label>
+                  </div>
+
+                  {footerForm.newsletterEnabled !== false && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Titre de la Newsletter</label>
+                        <input
+                          type="text"
+                          value={footerForm.newsletterTitle || ''}
+                          onChange={(e) => setFooterForm(prev => ({ ...prev, newsletterTitle: e.target.value }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-red-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Sous-titre / Description</label>
+                        <input
+                          type="text"
+                          value={footerForm.newsletterSubtitle || ''}
+                          onChange={(e) => setFooterForm(prev => ({ ...prev, newsletterSubtitle: e.target.value }))}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-red-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Useful Links & Legal Links Managers */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                  {/* Useful Links Manager */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <LinkIcon className="w-4 h-4 text-indigo-600" />
+                      5. Liens Utiles ({footerForm.usefulLinks?.length || 0})
+                    </h4>
+
+                    <div className="space-y-2">
+                      {footerForm.usefulLinks?.map((link, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                          <div>
+                            <p className="font-bold text-slate-800">{link.label}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{link.url}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFooterForm(prev => ({
+                                ...prev,
+                                usefulLinks: prev.usefulLinks?.filter((_, i) => i !== idx)
+                              }));
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Libellé (ex: Support)"
+                        value={newUsefulLabel}
+                        onChange={(e) => setNewUsefulLabel(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:bg-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="URL (ex: /support)"
+                        value={newUsefulUrl}
+                        onChange={(e) => setNewUsefulUrl(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newUsefulLabel && newUsefulUrl) {
+                            setFooterForm(prev => ({
+                              ...prev,
+                              usefulLinks: [...(prev.usefulLinks || []), { label: newUsefulLabel, url: newUsefulUrl }]
+                            }));
+                            setNewUsefulLabel('');
+                            setNewUsefulUrl('');
+                          }
+                        }}
+                        className="bg-indigo-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs hover:bg-indigo-700 cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Legal Links Manager */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      6. Liens Légaux ({footerForm.legalLinks?.length || 0})
+                    </h4>
+
+                    <div className="space-y-2">
+                      {footerForm.legalLinks?.map((link, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                          <div>
+                            <p className="font-bold text-slate-800">{link.label}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{link.url}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFooterForm(prev => ({
+                                ...prev,
+                                legalLinks: prev.legalLinks?.filter((_, i) => i !== idx)
+                              }));
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Libellé (ex: Mentions légales)"
+                        value={newLegalLabel}
+                        onChange={(e) => setNewLegalLabel(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:bg-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="URL (ex: /p/legal)"
+                        value={newLegalUrl}
+                        onChange={(e) => setNewLegalUrl(e.target.value)}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newLegalLabel && newLegalUrl) {
+                            setFooterForm(prev => ({
+                              ...prev,
+                              legalLinks: [...(prev.legalLinks || []), { label: newLegalLabel, url: newLegalUrl }]
+                            }));
+                            setNewLegalLabel('');
+                            setNewLegalUrl('');
+                          }
+                        }}
+                        className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs hover:bg-emerald-700 cursor-pointer"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleSaveFooter}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all shadow-md shadow-red-100 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Enregistrer la configuration du Footer</span>
+                  </button>
+                </div>
               </div>
 
               {/* Category Management Block */}

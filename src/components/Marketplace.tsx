@@ -11,6 +11,7 @@ interface MarketplaceProps {
   allChapters: Chapter[];
   allEnrollments: Enrollment[];
   currentUser: User | null;
+  allUsers?: User[];
   categories?: string[];
   onAddCategory?: (cat: string) => void;
   onDeleteCategory?: (cat: string) => void;
@@ -28,6 +29,7 @@ export default function Marketplace({
   allChapters,
   allEnrollments,
   currentUser,
+  allUsers,
   categories: categoriesProp,
   onAddCategory,
   onDeleteCategory,
@@ -371,14 +373,28 @@ export default function Marketplace({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <img
-                        src={course.trainerPhoto}
-                        className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-white/10"
-                        alt={course.trainerName}
-                      />
-                      <span className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">{course.trainerName}</span>
-                    </div>
+                    {(() => {
+                      const trainerUser = allUsers?.find(u => 
+                        (course.trainerId && u.id === course.trainerId) ||
+                        (course.trainerName && u.name?.toLowerCase() === course.trainerName?.toLowerCase())
+                      );
+                      const resolvedPhoto = (trainerUser?.avatarUrl && !trainerUser.avatarUrl.includes('flaticon'))
+                        ? trainerUser.avatarUrl
+                        : (course.trainerPhoto && !course.trainerPhoto.includes('flaticon'))
+                          ? course.trainerPhoto
+                          : (trainerUser?.avatarUrl || course.trainerPhoto || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150');
+
+                      return (
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <img
+                            src={resolvedPhoto}
+                            className="w-4 h-4 sm:w-5 sm:h-5 rounded-full object-cover border border-white/10"
+                            alt={course.trainerName}
+                          />
+                          <span className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">{trainerUser?.name || course.trainerName}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Modules preview program outline (Desktop only to keep mobile cards clean) */}

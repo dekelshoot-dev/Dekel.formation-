@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage } from './types';
+import { User, Course, Module, Chapter, Enrollment, StudentProgress, SimulatedEmail, PreRegisteredStudent, CustomHtmlPage, FooterConfig, DEFAULT_FOOTER_CONFIG } from './types';
 import { 
   INITIAL_USERS, INITIAL_COURSES, INITIAL_MODULES, INITIAL_CHAPTERS, 
   INITIAL_ENROLLMENTS, INITIAL_PROGRESS, INITIAL_EMAILS, INITIAL_PRE_REGISTERED,
@@ -18,6 +18,9 @@ import Marketplace from './components/Marketplace';
 import UserProfile from './components/UserProfile';
 import CustomPageViewer from './components/CustomPageViewer';
 import PublicCoursePage from './components/PublicCoursePage';
+import NewsletterUnsubscribePage from './components/NewsletterUnsubscribePage';
+import { LegalPages, TrainersPage, FaqPage, HelpCenterPage, ContactPage } from './components/PublicFooterPages';
+import Footer from './components/Footer';
 import NotFoundPage from './components/NotFoundPage';
 import ForbiddenPage from './components/ForbiddenPage';
 import { ToastContainer, showToast } from './components/Toast';
@@ -38,7 +41,7 @@ import {
   saveModule, saveModuleList, deleteModule, saveChapter, saveChapterList, 
   deleteChapter, saveEnrollment, deleteEnrollment, saveStudentProgress, 
   saveSimulatedEmail, clearSimulatedEmails, savePreRegistered, deletePreRegistered,
-  saveCustomPage, deleteCustomPage
+  saveCustomPage, deleteCustomPage, saveFooterSettings
 } from './firebaseService';
 
 // Safe localStorage JSON parser helper to prevent white screen crashes from corrupt cache
@@ -130,11 +133,12 @@ export default function App() {
     if (!pages || pages.length === 0) return null;
     let slug = '';
     const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const SYSTEM_RESERVED_SLUGS = ['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'verify', 'verifier-email', 'reset-password', 'mot-de-passe-oublie', 'connexion', 'login', 'inscription', 'register', 'dashboard', 'api', 'unsubscribe', 'desabonnement', 'desinscription'];
     
     // 1. Pathname check (e.g. /p/offre-speciale or /offre-speciale)
     if (pathParts.length >= 2 && pathParts[0] === 'p') {
       slug = pathParts[1];
-    } else if (pathParts.length === 1 && !['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'reset-password', 'api'].includes(pathParts[0])) {
+    } else if (pathParts.length === 1 && !SYSTEM_RESERVED_SLUGS.includes(pathParts[0].toLowerCase())) {
       slug = pathParts[0];
     }
 
@@ -176,9 +180,10 @@ export default function App() {
     const pages: CustomHtmlPage[] = safeJsonStorage('sio_custom_pages', INITIAL_CUSTOM_PAGES);
     let slug = '';
     const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const SYSTEM_RESERVED_SLUGS = ['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'verify', 'verifier-email', 'reset-password', 'mot-de-passe-oublie', 'connexion', 'login', 'inscription', 'register', 'dashboard', 'api', 'unsubscribe', 'desabonnement', 'desinscription'];
     if (pathParts.length >= 2 && pathParts[0] === 'p') {
       slug = pathParts[1];
-    } else if (pathParts.length === 1 && !['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'reset-password', 'api'].includes(pathParts[0])) {
+    } else if (pathParts.length === 1 && !SYSTEM_RESERVED_SLUGS.includes(pathParts[0].toLowerCase())) {
       slug = pathParts[0];
     }
     if (!slug) {
@@ -201,22 +206,27 @@ export default function App() {
     return null;
   });
 
-  // Sync Custom Pages with Firestore
+  // --- Footer Settings State & Realtime Firestore Sync ---
+  const [footerConfig, setFooterConfig] = useState<FooterConfig>(() => safeJsonStorage('sio_footer_settings', DEFAULT_FOOTER_CONFIG));
+
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'custom_pages'), (snapshot) => {
-      if (!snapshot.empty) {
-        const list: CustomHtmlPage[] = [];
-        snapshot.forEach(docSnap => {
-          list.push(docSnap.data() as CustomHtmlPage);
-        });
-        setAllCustomPages(list);
-        localStorage.setItem('sio_custom_pages', JSON.stringify(list));
+    const unsub = onSnapshot(doc(db, 'settings', 'footer'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as FooterConfig;
+        setFooterConfig(data);
+        localStorage.setItem('sio_footer_settings', JSON.stringify(data));
       }
     }, (err) => {
-      console.warn('Custom pages snapshot warning:', err.message);
+      console.warn('Footer settings subscription restricted:', err.message);
     });
     return () => unsub();
   }, []);
+
+  const handleSaveFooterConfig = async (newConfig: FooterConfig) => {
+    setFooterConfig(newConfig);
+    localStorage.setItem('sio_footer_settings', JSON.stringify(newConfig));
+    await saveFooterSettings(newConfig);
+  };
 
   const handleSaveCustomPage = async (page: CustomHtmlPage) => {
     const exists = allCustomPages.some(p => p.id === page.id);
@@ -296,6 +306,29 @@ export default function App() {
       window.removeEventListener('hashchange', handleLocationChange);
     };
   }, []);
+
+  // --- Auto-redirect logged in users accessing login/register routes directly to their dashboard ---
+  useEffect(() => {
+    if (currentUser && !authLoading) {
+      const rawPath = currentPath.split('?')[0].split('#')[0] || '/';
+      const cleanPath = rawPath.endsWith('/') && rawPath.length > 1 ? rawPath.slice(0, -1) : rawPath;
+      const lowerPath = cleanPath.toLowerCase();
+
+      if (['/connexion', '/auth', '/login', '/inscription', '/register', '/signup'].includes(lowerPath)) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const redirectUrl = searchParams.get('redirect');
+        if (redirectUrl) {
+          navigateTo(redirectUrl, true);
+        } else if (currentUser.role === 'admin') {
+          navigateTo('/admin', true);
+        } else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') {
+          navigateTo('/trainer', true);
+        } else {
+          navigateTo('/dashboard', true);
+        }
+      }
+    }
+  }, [currentUser, authLoading, currentPath]);
 
   // Sync document title and canonical link on route changes
   useEffect(() => {
@@ -775,6 +808,32 @@ Bon apprentissage.`,
     await saveUserProfile(user);
   };
 
+  const handleUpdateUser = async (updatedUser: User) => {
+    setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    if (currentUser?.id === updatedUser.id) {
+      setCurrentUser(updatedUser);
+    }
+    await saveUserProfile(updatedUser);
+
+    if (updatedUser.avatarUrl) {
+      setAllCourses(prevCourses => {
+        let changed = false;
+        const updatedCourses = prevCourses.map(c => {
+          if ((c.trainerId && c.trainerId === updatedUser.id) || (c.trainerName && c.trainerName.toLowerCase() === updatedUser.name?.toLowerCase())) {
+            if (c.trainerPhoto !== updatedUser.avatarUrl) {
+              changed = true;
+              const updatedCourse = { ...c, trainerPhoto: updatedUser.avatarUrl };
+              saveCourse(updatedCourse);
+              return updatedCourse;
+            }
+          }
+          return c;
+        });
+        return changed ? updatedCourses : prevCourses;
+      });
+    }
+  };
+
   const handleEnrollStudent = async (email: string, courseId: string) => {
     const emailTrimmed = email.trim().toLowerCase();
     
@@ -961,6 +1020,11 @@ Bon apprentissage.`,
     }
     const pathname = rawPath.toLowerCase();
 
+    const queryString = currentPath.includes('?') ? currentPath.split('?')[1].split('#')[0] : '';
+    const searchParams = new URLSearchParams(queryString);
+    const modeParam = (searchParams.get('mode') || '').toLowerCase();
+    const hasResetCode = searchParams.has('oobCode') || searchParams.has('token') || searchParams.has('code');
+
     // 1. Preview mode for Custom Pages in modal
     if (previewingCustomPage) {
       return (
@@ -968,6 +1032,112 @@ Bon apprentissage.`,
           page={previewingCustomPage} 
           isPreviewMode={true}
           onClosePreview={() => setPreviewingCustomPage(null)} 
+        />
+      );
+    }
+
+    // 1b. Email Action Routes & Query Overrides (Password reset, email verification, auth, etc.)
+    if (
+      pathname === '/reset-password' ||
+      pathname === '/mot-de-passe-oublie' ||
+      pathname === '/auth/reset-password' ||
+      modeParam === 'resetpassword' ||
+      modeParam === 'reset_password' ||
+      modeParam === 'reset' ||
+      (hasResetCode && !pathname.includes('verify') && !modeParam.includes('verify'))
+    ) {
+      return (
+        <ResetPassword
+          allUsers={allUsers}
+          onBackToLogin={() => navigateTo('/connexion')}
+          onSendEmail={handleSendEmail}
+        />
+      );
+    }
+
+    if (
+      pathname === '/verify-email' ||
+      pathname === '/verifier-email' ||
+      pathname === '/verify' ||
+      pathname === '/auth/verify-email' ||
+      pathname === '/auth/verify' ||
+      modeParam === 'verifyemail' ||
+      modeParam === 'verify_email' ||
+      modeParam === 'verify'
+    ) {
+      return (
+        <VerifyEmail
+          currentUser={currentUser}
+          onBackToLogin={() => navigateTo('/connexion')}
+          onGoToDashboard={() => navigateTo('/dashboard')}
+        />
+      );
+    }
+
+    if (
+      pathname === '/connexion' ||
+      pathname === '/auth' ||
+      pathname === '/login' ||
+      modeParam === 'login' ||
+      modeParam === 'connexion'
+    ) {
+      if (currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4">
+            <p className="text-white font-bold">Vous êtes déjà connecté(e).</p>
+            <button 
+              onClick={() => {
+                if (currentUser.role === 'admin') navigateTo('/admin');
+                else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') navigateTo('/trainer');
+                else navigateTo('/dashboard');
+              }} 
+              className="accent-gradient text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+            >
+              Accéder à mon espace
+            </button>
+          </div>
+        );
+      }
+      return (
+        <Auth
+          allUsers={allUsers}
+          onLogin={handleLogin}
+          onAddUser={handleAddUser}
+          onSendEmail={handleSendEmail}
+        />
+      );
+    }
+
+    if (
+      pathname === '/inscription' ||
+      pathname === '/register' ||
+      pathname === '/signup' ||
+      modeParam === 'register' ||
+      modeParam === 'inscription'
+    ) {
+      if (currentUser) {
+        return (
+          <div className="text-center py-12 space-y-4">
+            <p className="text-white font-bold">Vous êtes déjà connecté(e).</p>
+            <button 
+              onClick={() => {
+                if (currentUser.role === 'admin') navigateTo('/admin');
+                else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') navigateTo('/trainer');
+                else navigateTo('/dashboard');
+              }} 
+              className="accent-gradient text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
+            >
+              Accéder à mon espace
+            </button>
+          </div>
+        );
+      }
+      return (
+        <Auth
+          allUsers={allUsers}
+          onLogin={handleLogin}
+          onAddUser={handleAddUser}
+          onSendEmail={handleSendEmail}
         />
       );
     }
@@ -987,6 +1157,7 @@ Bon apprentissage.`,
               return mod?.courseId === course.id;
             })}
             currentUser={currentUser}
+            allUsers={allUsers}
             onNavigateToCatalog={() => navigateTo('/marketplace')}
             onNavigateToLogin={() => navigateTo('/connexion')}
             isEnrolled={currentUser ? allEnrollments.some(e => e.studentEmail.toLowerCase() === currentUser.email.toLowerCase() && e.courseId === course.id && e.status === 'active') : false}
@@ -1001,8 +1172,8 @@ Bon apprentissage.`,
     const customPageMatch = pathname.match(/^\/(p|page|pages)\/([^/]+)/i);
     const targetSlug = customPageMatch ? customPageMatch[2] : (pathname.startsWith('/') ? pathname.slice(1) : '');
     
-    if (targetSlug && !['', 'marketplace', 'catalogue', 'admin', 'student', 'trainer', 'auth', 'connexion', 'inscription', 'register', 'dashboard', 'reset-password', 'verify-email', 'api'].includes(targetSlug)) {
-      const matchedPage = allCustomPages.find(p => p.slug?.toLowerCase() === targetSlug || p.id?.toLowerCase() === targetSlug);
+    if (targetSlug && !['', 'marketplace', 'catalogue', 'admin', 'student', 'trainer', 'auth', 'connexion', 'inscription', 'register', 'dashboard', 'reset-password', 'verify-email', 'api', 'formateurs', 'trainers', 'faq', 'centre-aide', 'help', 'contact', 'unsubscribe', 'desabonnement', 'desinscription'].includes(targetSlug.toLowerCase())) {
+      const matchedPage = allCustomPages.find(p => p.slug?.toLowerCase() === targetSlug.toLowerCase() || p.id?.toLowerCase() === targetSlug.toLowerCase());
       if (matchedPage && (matchedPage.status === 'published' || currentUser?.role === 'admin')) {
         return (
           <CustomPageViewer
@@ -1011,6 +1182,36 @@ Bon apprentissage.`,
           />
         );
       }
+    }
+
+    // 3b. Public Footer Pages (Legal, Formateurs, FAQ, Centre d'Aide, Contact)
+    const lowerPath = pathname.toLowerCase();
+    if (lowerPath === '/p/terms' || lowerPath === '/terms' || lowerPath === '/conditions-utilisation') {
+      return <LegalPages initialDoc="terms" onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/p/privacy' || lowerPath === '/privacy' || lowerPath === '/politique-confidentialite') {
+      return <LegalPages initialDoc="privacy" onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/p/cookies' || lowerPath === '/cookies' || lowerPath === '/politique-cookies') {
+      return <LegalPages initialDoc="cookies" onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/p/legal' || lowerPath === '/legal' || lowerPath === '/mentions-legales') {
+      return <LegalPages initialDoc="legal" onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/formateurs' || lowerPath === '/trainers' || lowerPath === '/tous-les-formateurs') {
+      return <TrainersPage allUsers={allUsers} allCourses={allCourses} allEnrollments={allEnrollments} onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/faq') {
+      return <FaqPage onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/centre-aide' || lowerPath === '/help') {
+      return <HelpCenterPage onNavigate={navigateTo} />;
+    }
+    if (lowerPath === '/contact') {
+      return <ContactPage onSendEmail={handleSendEmail} onNavigate={navigateTo} />;
+    }
+    if (lowerPath.startsWith('/unsubscribe') || lowerPath.startsWith('/desabonnement') || lowerPath.startsWith('/desinscription')) {
+      return <NewsletterUnsubscribePage onNavigate={navigateTo} />;
     }
 
     // 4. Public Pages
@@ -1074,11 +1275,7 @@ Bon apprentissage.`,
             onDeleteEnrollment={(id) => { setAllEnrollments(prev => prev.filter(e => e.id !== id)); deleteEnrollment(id); }}
             onAddPreRegistered={(p) => { setPreRegistered(prev => [...prev, p]); savePreRegistered(p); }}
             onSendEmail={handleSendEmail}
-            onUpdateUser={(u) => {
-              setAllUsers(prev => prev.map(x => x.id === u.id ? u : x));
-              setCurrentUser(u);
-              saveUserProfile(u);
-            }}
+            onUpdateUser={handleUpdateUser}
             onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
             onAddUser={handleAddUser}
             customPages={allCustomPages}
@@ -1121,16 +1318,14 @@ Bon apprentissage.`,
             onDeleteUser={(id) => { setAllUsers(prev => prev.filter(u => u.id !== id)); deleteUserProfile(id); }}
             onAddUser={handleAddUser}
             onSendEmail={handleSendEmail}
-            onUpdateUser={(updatedUser) => {
-              setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-              if (currentUser?.id === updatedUser.id) setCurrentUser(updatedUser);
-              saveUserProfile(updatedUser);
-            }}
+            onUpdateUser={handleUpdateUser}
             onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
             categories={categories}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
             customPages={allCustomPages}
+            footerConfig={footerConfig}
+            onSaveFooterConfig={handleSaveFooterConfig}
             onSaveCustomPage={handleSaveCustomPage}
             onDeleteCustomPage={handleDeleteCustomPage}
             onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}
@@ -1146,6 +1341,7 @@ Bon apprentissage.`,
             allChapters={allChapters}
             allEnrollments={allEnrollments}
             currentUser={null}
+            allUsers={allUsers}
             categories={categories}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
@@ -1168,6 +1364,7 @@ Bon apprentissage.`,
           allChapters={allChapters}
           allEnrollments={allEnrollments}
           currentUser={currentUser}
+          allUsers={allUsers}
           categories={categories}
           onAddCategory={handleAddCategory}
           onDeleteCategory={handleDeleteCategory}
@@ -1177,82 +1374,6 @@ Bon apprentissage.`,
           autoOpenSlug={autoOpenCourseSlug}
           onClearAutoOpen={() => setAutoOpenCourseSlug('')}
           onOpenPublicPage={(course) => navigateTo(`/formation/${course.seoSlug || course.id}`)}
-        />
-      );
-    }
-
-    if (pathname === '/connexion' || pathname === '/auth' || pathname === '/login') {
-      if (currentUser) {
-        return (
-          <div className="text-center py-12 space-y-4">
-            <p className="text-white font-bold">Vous êtes déjà connecté(e) en tant que {currentUser.name}.</p>
-            <button 
-              onClick={() => {
-                if (currentUser.role === 'admin') navigateTo('/admin');
-                else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') navigateTo('/trainer');
-                else navigateTo('/dashboard');
-              }} 
-              className="accent-gradient text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
-            >
-              Accéder à mon espace
-            </button>
-          </div>
-        );
-      }
-      return (
-        <Auth
-          allUsers={allUsers}
-          onLogin={handleLogin}
-          onAddUser={handleAddUser}
-          onSendEmail={handleSendEmail}
-        />
-      );
-    }
-
-    if (pathname === '/inscription' || pathname === '/register' || pathname === '/signup') {
-      if (currentUser) {
-        return (
-          <div className="text-center py-12 space-y-4">
-            <p className="text-white font-bold">Vous êtes déjà connecté(e).</p>
-            <button 
-              onClick={() => {
-                if (currentUser.role === 'admin') navigateTo('/admin');
-                else if (currentUser.role === 'trainer' || currentUser.role === 'assistant') navigateTo('/trainer');
-                else navigateTo('/dashboard');
-              }} 
-              className="accent-gradient text-white font-bold px-4 py-2 rounded-xl text-xs cursor-pointer"
-            >
-              Accéder à mon espace
-            </button>
-          </div>
-        );
-      }
-      return (
-        <Auth
-          allUsers={allUsers}
-          onLogin={handleLogin}
-          onAddUser={handleAddUser}
-          onSendEmail={handleSendEmail}
-        />
-      );
-    }
-
-    if (pathname === '/mot-de-passe-oublie' || pathname === '/reset-password') {
-      return (
-        <ResetPassword
-          allUsers={allUsers}
-          onBackToLogin={() => navigateTo('/connexion')}
-          onSendEmail={handleSendEmail}
-        />
-      );
-    }
-
-    if (pathname === '/verifier-email' || pathname === '/verify-email') {
-      return (
-        <VerifyEmail
-          currentUser={currentUser}
-          onBackToLogin={() => navigateTo('/connexion')}
-          onGoToDashboard={() => navigateTo('/dashboard')}
         />
       );
     }
@@ -1313,11 +1434,7 @@ Bon apprentissage.`,
         return (
           <UserProfile
             currentUser={currentUser}
-            onUpdateUser={(updatedUser) => {
-              setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-              setCurrentUser(updatedUser);
-              saveUserProfile(updatedUser);
-            }}
+            onUpdateUser={handleUpdateUser}
           />
         );
       }
@@ -1330,6 +1447,7 @@ Bon apprentissage.`,
             allChapters={allChapters}
             allEnrollments={allEnrollments}
             currentUser={currentUser}
+            allUsers={allUsers}
             categories={categories}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
@@ -1462,11 +1580,7 @@ Bon apprentissage.`,
             savePreRegistered(newPre);
           }}
           onSendEmail={handleSendEmail}
-          onUpdateUser={(updatedUser) => {
-            setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-            setCurrentUser(updatedUser);
-            saveUserProfile(updatedUser);
-          }}
+          onUpdateUser={handleUpdateUser}
           onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
           onAddUser={handleAddUser}
           customPages={allCustomPages}
@@ -1547,13 +1661,7 @@ Bon apprentissage.`,
           }}
           onAddUser={handleAddUser}
           onSendEmail={handleSendEmail}
-          onUpdateUser={(updatedUser) => {
-            setAllUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-            if (currentUser?.id === updatedUser.id) {
-              setCurrentUser(updatedUser);
-            }
-            saveUserProfile(updatedUser);
-          }}
+          onUpdateUser={handleUpdateUser}
           onPreviewCourse={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
           categories={categories}
           onAddCategory={handleAddCategory}
@@ -1750,6 +1858,14 @@ Bon apprentissage.`,
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-5 md:py-8">
         {renderCurrentRoute()}
       </main>
+
+      {/* Public Footer (Hidden on Student, Trainer, Admin & Course Player Dashboards) */}
+      {!['/dashboard', '/student', '/trainer', '/admin', '/learn'].some(prefix => {
+        const p = currentPath.split('?')[0].split('#')[0].toLowerCase();
+        return p.startsWith(prefix);
+      }) && (
+        <Footer config={footerConfig} onNavigate={navigateTo} />
+      )}
 
       {/* Mobile Offcanvas Sidebar Drawer */}
       {isMobileDrawerOpen && (

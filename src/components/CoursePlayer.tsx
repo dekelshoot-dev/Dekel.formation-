@@ -231,36 +231,45 @@ export default function CoursePlayer({
     <div className="glass rounded-3xl border border-white/10 shadow-2xl relative text-white">
       
       {/* Top Navbar */}
-      <div className="glass-light border-b border-white/10 py-3.5 px-6 flex items-center justify-between gap-4 z-20 shrink-0 text-white sticky top-[60px] md:top-[72px] rounded-t-3xl backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      <div className="glass-light border-b border-white/10 py-3.5 px-4 sm:px-6 flex items-center justify-between gap-3 z-20 shrink-0 text-white sticky top-[60px] md:top-[72px] rounded-t-3xl backdrop-blur-md min-w-0 w-full overflow-hidden max-w-full">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden">
+          {/* Menu button ALWAYS on the left */}
           <button
-            onClick={onBack}
-            className="p-2 hover:bg-white/10 rounded-xl text-slate-300 hover:text-white transition-colors"
+            type="button"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 bg-white/10 hover:bg-white/15 active:scale-95 rounded-xl text-white shrink-0 flex items-center justify-center border border-white/10 cursor-pointer"
+            title={sidebarOpen ? "Fermer le programme" : "Ouvrir le menu de la formation"}
           >
-            <ArrowLeft className="w-4 h-4" />
+            {sidebarOpen ? <X className="w-4 h-4 shrink-0" /> : <Menu className="w-4 h-4 shrink-0" />}
+          </button>
+
+          {/* Back button */}
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-2 hover:bg-white/10 active:scale-95 rounded-xl text-slate-300 hover:text-white transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+            title="Retourner au catalogue"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" />
           </button>
           
-          <div className="truncate flex flex-col text-left items-start">
-            <h1 className="text-xs font-black text-white truncate text-left w-full">{course.title}</h1>
-            <p className="text-[10px] text-slate-400 font-semibold truncate font-sans text-left w-full mt-0.5">Formateur : {course.trainerName}</p>
+          <div className="min-w-0 flex-1 flex flex-col text-left items-start overflow-hidden">
+            <h1 className="text-xs sm:text-sm font-black text-white truncate text-left w-full overflow-hidden text-ellipsis whitespace-nowrap" title={course.title}>
+              {course.title}
+            </h1>
+            <p className="text-[10px] text-slate-400 font-semibold truncate font-sans text-left w-full mt-0.5" title={`Formateur : ${course.trainerName}`}>
+              Formateur : {course.trainerName}
+            </p>
           </div>
         </div>
 
         {/* Global Progression Tracker bar */}
-        <div className="hidden sm:flex items-center gap-3 bg-white/5 border border-white/10 py-1.5 px-4 rounded-full max-w-xs w-60">
-          <div className="flex-1 bg-white/15 h-2 rounded-full overflow-hidden">
+        <div className="hidden sm:flex items-center gap-3 bg-white/5 border border-white/10 py-1.5 px-4 rounded-full max-w-xs shrink-0">
+          <div className="w-24 sm:w-32 bg-white/15 h-2 rounded-full overflow-hidden shrink-0">
             <div className="h-full rounded-full transition-all duration-500 accent-gradient" style={{ width: `${progressPercent}%` }}></div>
           </div>
-          <span className="text-[10px] font-bold text-slate-300 shrink-0 font-sans">{progressPercent}% Terminé ({completedCount}/{totalChapters})</span>
+          <span className="text-[10px] font-bold text-slate-300 shrink-0 font-sans">{progressPercent}% ({completedCount}/{totalChapters})</span>
         </div>
-
-        {/* Small screen drawer trigger */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="lg:hidden p-2 bg-white/10 hover:bg-white/15 rounded-xl text-white"
-        >
-          {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-        </button>
       </div>
 
       {/* Primary Layout */}
@@ -290,7 +299,7 @@ export default function CoursePlayer({
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2 text-white sticky top-0 bg-[#161a20] lg:bg-[#161a20]/90 backdrop-blur-sm z-10 py-1">
               <div className="flex items-center gap-1.5">
-                <GraduationCap className="w-4 h-4 text-indigo-400 animate-pulse" />
+                <BookOpen className="w-4 h-4 text-indigo-400" />
                 <span className="text-xs font-bold text-white font-sans uppercase tracking-wide">Programme</span>
               </div>
               
@@ -660,18 +669,6 @@ export default function CoursePlayer({
         </div>
 
       </div>
-
-      {/* Floating Graduation Cap button at bottom of mobile screen */}
-      {!sidebarOpen && (
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          className="lg:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shadow-2xl z-40 border border-indigo-400/25 transition-all duration-200 active:scale-95 hover:scale-105"
-          title="Ouvrir le programme de formation"
-        >
-          <GraduationCap className="w-6 h-6 text-white" />
-        </button>
-      )}
 
       {/* Congratulations Modal when Course is Completed */}
       {showCongrats && (

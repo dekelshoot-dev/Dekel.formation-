@@ -110,7 +110,14 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
       const found = allUsers.find(u => u.email.toLowerCase() === trimmedEmail);
       const recipientName = found ? found.name : trimmedEmail.split('@')[0];
 
-      // Dispatch real email via backend SMTP server & record in database history
+      // 1. Send official Firebase Auth password reset link
+      try {
+        await sendPasswordResetEmail(auth, trimmedEmail);
+      } catch (fbErr: any) {
+        console.warn('Firebase password reset email warning:', fbErr);
+      }
+
+      // 2. Dispatch real email via backend SMTP server & record in database history
       const res = await fetch('/api/auth/request-password-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,7 +188,17 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
     setIsResetting(true);
 
     try {
-      // 1. Send password reset request to backend server
+      let fbUpdated = false;
+
+      // 1. Update password directly in Firebase Auth if code is a Firebase action code
+      try {
+        await confirmPasswordReset(auth, oobCode, newPassword);
+        fbUpdated = true;
+      } catch (fbErr: any) {
+        console.warn('Firebase confirmPasswordReset notice:', fbErr);
+      }
+
+      // 2. Send password reset notification to backend server
       const serverRes = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,19 +207,12 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
 
       const serverData = await serverRes.json();
 
-      // 2. If it was also a Firebase code, update Firebase auth password
-      try {
-        await confirmPasswordReset(auth, oobCode, newPassword);
-      } catch (fbErr) {
-        // Ignored if server token was used
-      }
-
-      if (!serverRes.ok && serverData.status === 'error') {
-        throw new Error(serverData.message || 'Échec de la réinitialisation du mot de passe.');
+      if (!fbUpdated && (!serverRes.ok || serverData.status === 'error')) {
+        throw new Error(serverData.message || 'Échec de la mise à jour du mot de passe.');
       }
 
       setResetSuccess(true);
-      showToast('Votre mot de passe a été réinitialisé avec succès !', 'success');
+      showToast('Votre mot de passe a été réinitialisé avec succès ! Connectez-vous avec votre nouveau mot de passe.', 'success');
       
       // Clean up search query string in URL
       if (window.history && window.history.replaceState) {

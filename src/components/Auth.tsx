@@ -219,7 +219,14 @@ L'équipe Dekel.Formation`,
     const recipientName = foundUser ? foundUser.name : trimmedEmail.split('@')[0];
 
     try {
-      // Dispatch password reset via backend SMTP server (service@dekel-dev.com)
+      // 1. Trigger official Firebase Auth password reset email
+      try {
+        await sendPasswordResetEmail(auth, trimmedEmail);
+      } catch (fbErr: any) {
+        console.warn('Firebase password reset email notice:', fbErr);
+      }
+
+      // 2. Dispatch password reset via backend SMTP server (service@dekel-dev.com)
       // Generates server-managed oobCode token & stores transaction log in DB
       const res = await fetch('/api/auth/request-password-reset', {
         method: 'POST',

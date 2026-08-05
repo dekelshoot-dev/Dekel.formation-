@@ -15,6 +15,7 @@ import {
   writeDb as writeEmailDb 
 } from "./server/emailServerService";
 import { EMAIL_TEMPLATE_DEFINITIONS } from "./src/services/emailTemplates";
+import { generateCourseSeoMeta } from "./src/utils/seo";
 
 // Read Firebase config safely from json file or environment
 let firebaseConfig: any = {};
@@ -803,6 +804,19 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
   const baseUrl = origin || `${req.protocol}://${req.get('host')}`;
   const resetUrl = `${baseUrl}/reset-password?oobCode=${oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
 
+  // Also trigger Firebase Auth password reset oobCode via Identity Toolkit API
+  if (firebaseConfig?.apiKey) {
+    try {
+      await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestType: "PASSWORD_RESET", email: trimmedEmail })
+      });
+    } catch (fbOobErr) {
+      console.warn("Firebase Identity Toolkit sendOobCode warning:", fbOobErr);
+    }
+  }
+
   try {
     const queuedEmail = queueTransactionalEmail({
       to: trimmedEmail,
@@ -1104,9 +1118,34 @@ app.get(["/p/:slug", "/p/:slug/*", "/page/:slug", "/pages/:slug"], async (req, r
   next();
 });
 
+// Static Branding Files (Favicon & Social Media Thumbnail)
+app.get(["/favicon.png", "/favicon.ico"], (req, res) => {
+  const faviconPath = path.join(process.cwd(), "favicon.png");
+  if (fs.existsSync(faviconPath)) {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Content-Type", req.path.endsWith(".ico") ? "image/x-icon" : "image/png");
+    return res.sendFile(faviconPath);
+  }
+  res.status(404).end();
+});
+
+app.get(["/og-image.jpg", "/og-image.png", "/dekel-social-thumbnail.jpg"], (req, res) => {
+  const imagePath = path.join(process.cwd(), "og-image.jpg");
+  if (fs.existsSync(imagePath)) {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Content-Type", "image/jpeg");
+    return res.sendFile(imagePath);
+  }
+  res.status(404).end();
+});
+
 // SEO: Dynamic Robots.txt Route
 app.get("/robots.txt", (req, res) => {
-  const hostUrl = `${req.protocol}://${req.get("host")}`;
+  const host = req.get("host");
+  const hostUrl = (host && host.includes("localhost"))
+    ? `${req.protocol}://${host}`
+    : "https://formation.dekel-dev.com";
+
   const robotsTxt = `User-agent: *
 Disallow: /admin
 Disallow: /admin/
@@ -1137,7 +1176,10 @@ Sitemap: ${hostUrl}/sitemap.xml
 
 // SEO: Dynamic Sitemap.xml Generator
 app.get("/sitemap.xml", async (req, res) => {
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const host = req.get("host");
+  const baseUrl = (host && host.includes("localhost"))
+    ? `${req.protocol}://${host}`
+    : "https://formation.dekel-dev.com";
   const now = new Date().toISOString().split("T")[0];
 
   const courseUrls: string[] = [];
@@ -1199,20 +1241,39 @@ app.get("/sitemap.xml", async (req, res) => {
     console.warn("Sitemap database generation notice:", err);
   }
 
+  // Fallback to sample courses if database returned zero courses
+  if (courseUrls.length === 0) {
+    MOCK_COURSES_SEO_FALLBACK.forEach((c) => {
+      courseUrls.push(`  <url>
+    <loc>${baseUrl}/formation/${encodeURIComponent(c.seoSlug)}</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>`);
+    });
+  }
+
+  const staticPages = [
+    { path: "", priority: "1.0", changefreq: "daily" },
+    { path: "marketplace", priority: "0.9", changefreq: "daily" },
+    { path: "catalogue", priority: "0.9", changefreq: "daily" },
+    { path: "connexion", priority: "0.5", changefreq: "monthly" },
+    { path: "inscription", priority: "0.5", changefreq: "monthly" },
+    { path: "faq", priority: "0.6", changefreq: "monthly" },
+    { path: "contact", priority: "0.6", changefreq: "monthly" },
+    { path: "centre-aide", priority: "0.6", changefreq: "monthly" }
+  ];
+
+  const staticUrls = staticPages.map((p) => `  <url>
+    <loc>${baseUrl}/${p.path}</loc>
+    <lastmod>${now}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`);
+
   const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${baseUrl}/</loc>
-    <lastmod>${now}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/marketplace</loc>
-    <lastmod>${now}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
+${staticUrls.join("\n")}
 ${courseUrls.join("\n")}
 ${categoryUrls.join("\n")}
 ${customPageUrls.join("\n")}
@@ -1264,6 +1325,7 @@ const MOCK_COURSES_SEO_FALLBACK = [
 async function renderHtmlWithSeoMeta(req: express.Request, meta: {
   title?: string;
   description?: string;
+  keywords?: string;
   image?: string;
   url?: string;
   type?: string;
@@ -1282,7 +1344,7 @@ async function renderHtmlWithSeoMeta(req: express.Request, meta: {
 
   const cleanTitle = meta.title || "Dekel.Formation | Plateforme de formations en ligne";
   const cleanDesc = meta.description || "Dekel.Formation est une plateforme moderne de formation en ligne permettant aux étudiants d'apprendre auprès de formateurs professionnels grâce à des vidéos, quiz, certificats et un suivi de progression.";
-  const cleanImage = meta.image || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80";
+  const cleanImage = meta.image || "https://formation.dekel-dev.com/og-image.jpg";
   const cleanUrl = meta.url || `${req.protocol}://${req.get("host")}${req.originalUrl}`;
 
   // Replace default title tag
@@ -1290,15 +1352,18 @@ async function renderHtmlWithSeoMeta(req: express.Request, meta: {
 
   // Strip existing default meta tags from index.html so social crawlers read only the exact target tags
   html = html.replace(/<meta\s+name=["']description["'].*?>/gi, "");
+  html = html.replace(/<meta\s+name=["']keywords["'].*?>/gi, "");
   html = html.replace(/<meta\s+property=["']og:.*?["'].*?>/gi, "");
   html = html.replace(/<meta\s+name=["']twitter:.*?["'].*?>/gi, "");
   html = html.replace(/<link\s+rel=["']canonical["'].*?>/gi, "");
 
   const safeTitle = cleanTitle.replace(/"/g, '&quot;');
   const safeDesc = cleanDesc.replace(/"/g, '&quot;');
+  const safeKeywords = meta.keywords ? meta.keywords.replace(/"/g, '&quot;') : '';
 
   const metaTags = `
     <meta name="description" content="${safeDesc}" />
+    ${safeKeywords ? `<meta name="keywords" content="${safeKeywords}" />` : ''}
     <link rel="canonical" href="${cleanUrl}" />
     <meta name="robots" content="index, follow" />
     <meta property="og:site_name" content="Dekel.Formation" />
@@ -1354,39 +1419,20 @@ app.get(["/formation/:slug", "/course/:slug", "/f/:slug"], async (req, res, next
     }
 
     if (courseData) {
-      const title = `${courseData.seoTitle || courseData.title} | Dekel.Formation`;
-      const description = courseData.seoDescription || courseData.description || `Découvrez la formation ${courseData.title} sur Dekel.Formation.`;
-      const image = courseData.seoShareImage || courseData.coverImage || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80";
-      const url = `${req.protocol}://${req.get("host")}/formation/${courseData.seoSlug || courseId}`;
+      const host = req.get("host");
+      const baseUrl = (host && host.includes("localhost"))
+        ? `${req.protocol}://${host}`
+        : "https://formation.dekel-dev.com";
 
-      const courseJsonLd = {
-        "@context": "https://schema.org",
-        "@type": "Course",
-        "name": courseData.seoTitle || courseData.title,
-        "description": description,
-        "provider": {
-          "@type": "EducationalOrganization",
-          "name": "Dekel.Formation",
-          "sameAs": `${req.protocol}://${req.get("host")}`
-        },
-        "author": {
-          "@type": "Person",
-          "name": courseData.trainerName || "Formateur Dekel"
-        },
-        "offers": {
-          "@type": "Offer",
-          "category": "Paid",
-          "price": courseData.promoPrice && courseData.promoPrice > 0 ? courseData.promoPrice : courseData.price || 0,
-          "priceCurrency": "XAF"
-        }
-      };
+      const seoData = generateCourseSeoMeta(courseData, { baseUrl });
 
       const htmlWithSeo = await renderHtmlWithSeoMeta(req, {
-        title,
-        description,
-        image,
-        url,
-        jsonLd: courseJsonLd
+        title: seoData.title,
+        description: seoData.description,
+        keywords: seoData.keywords,
+        image: seoData.image,
+        url: seoData.canonicalUrl,
+        jsonLd: seoData.jsonLd
       });
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");

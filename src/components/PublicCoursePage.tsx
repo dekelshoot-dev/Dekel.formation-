@@ -4,6 +4,7 @@ import { Course, Module, Chapter, CustomPaymentButton, User } from '../types';
 import ShareModal from './ShareModal';
 import Breadcrumbs from './Breadcrumbs';
 import { showToast } from './Toast';
+import { generateCourseSeoMeta } from '../utils/seo';
 import { 
   BookOpen, Clock, Award, CheckCircle, ShieldCheck, PlayCircle, Lock, 
   Share2, ArrowLeft, ArrowRight, MessageSquare, Smartphone, Coins, 
@@ -63,7 +64,9 @@ export default function PublicCoursePage({
   // Update document title, canonical link, robots, and dynamic SEO meta tags on mount
   useEffect(() => {
     const originalTitle = document.title;
-    document.title = `${course.seoTitle || course.title} | Formation Dekel`;
+    const seoData = generateCourseSeoMeta(course, { baseUrl: window.location.origin });
+
+    document.title = seoData.title;
 
     // 1. Inject/Update Meta Description
     let metaDesc = document.querySelector('meta[name="description"]');
@@ -73,20 +76,29 @@ export default function PublicCoursePage({
       document.head.appendChild(metaDesc);
     }
     const previousDesc = metaDesc.getAttribute('content');
-    metaDesc.setAttribute('content', course.seoDescription || course.description);
+    metaDesc.setAttribute('content', seoData.description);
 
-    // 2. Inject/Update Canonical Link
+    // 2. Inject/Update Meta Keywords
+    let metaKeywords = document.querySelector('meta[name="keywords"]');
+    if (!metaKeywords && seoData.keywords) {
+      metaKeywords = document.createElement('meta');
+      metaKeywords.setAttribute('name', 'keywords');
+      document.head.appendChild(metaKeywords);
+    }
+    if (metaKeywords && seoData.keywords) {
+      metaKeywords.setAttribute('content', seoData.keywords);
+    }
+
+    // 3. Inject/Update Canonical Link
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
     if (!canonical) {
       canonical = document.createElement('link');
       canonical.setAttribute('rel', 'canonical');
       document.head.appendChild(canonical);
     }
-    const cleanSlug = course.seoSlug || course.id;
-    const currentCanonicalUrl = `${window.location.origin}/formation/${cleanSlug}`;
-    canonical.setAttribute('href', currentCanonicalUrl);
+    canonical.setAttribute('href', seoData.canonicalUrl);
 
-    // 3. Inject/Update Robots Meta
+    // 4. Inject/Update Robots Meta
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) {
       robots = document.createElement('meta');
@@ -95,18 +107,18 @@ export default function PublicCoursePage({
     }
     robots.setAttribute('content', 'index, follow');
 
-    // 4. Inject/Update OpenGraph & Twitter Meta Tags
+    // 5. Inject/Update OpenGraph & Twitter Meta Tags
     const ogTags = [
-      { property: 'og:title', content: course.seoTitle || course.title },
-      { property: 'og:description', content: course.seoDescription || course.description },
-      { property: 'og:image', content: course.seoShareImage || course.coverImage || '' },
+      { property: 'og:title', content: seoData.title },
+      { property: 'og:description', content: seoData.description },
+      { property: 'og:image', content: seoData.image },
       { property: 'og:type', content: 'website' },
-      { property: 'og:url', content: currentCanonicalUrl },
+      { property: 'og:url', content: seoData.canonicalUrl },
       { property: 'og:site_name', content: 'Dekel.Formation' },
       { property: 'twitter:card', content: 'summary_large_image' },
-      { property: 'twitter:title', content: course.seoTitle || course.title },
-      { property: 'twitter:description', content: course.seoDescription || course.description },
-      { property: 'twitter:image', content: course.seoShareImage || course.coverImage || '' }
+      { property: 'twitter:title', content: seoData.title },
+      { property: 'twitter:description', content: seoData.description },
+      { property: 'twitter:image', content: seoData.image }
     ];
 
     const createdTags: HTMLMetaElement[] = [];

@@ -19,6 +19,7 @@ try {
 
 export const db = dbInstance;
 export const auth = getAuth(app);
+auth.languageCode = 'fr';
 
 export enum OperationType {
   CREATE = 'create',

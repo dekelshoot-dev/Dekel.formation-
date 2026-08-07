@@ -67,11 +67,17 @@ export default function Auth({ allUsers, onLogin, onAddUser, onSendEmail }: Auth
       console.error(err);
       let errMsg = 'Échec de la connexion. Veuillez vérifier vos identifiants.';
       if (err.code === 'auth/user-not-found') {
-        errMsg = 'Adresse e-mail non enregistrée.';
+        errMsg = 'Adresse e-mail non enregistrée. Veuillez créer un compte ou vérifier la saisie.';
       } else if (err.code === 'auth/wrong-password') {
-        errMsg = 'Mot de passe incorrect.';
+        errMsg = 'Mot de passe incorrect. Vous pouvez réinitialiser votre mot de passe ci-dessous.';
       } else if (err.code === 'auth/invalid-credential') {
-        errMsg = 'Identifiants incorrects.';
+        errMsg = 'Adresse e-mail ou mot de passe incorrect (Identifiants Firebase Auth invalides).';
+      } else if (err.code === 'auth/invalid-email') {
+        errMsg = "L'adresse e-mail saisie est au format invalide.";
+      } else if (err.code === 'auth/user-disabled') {
+        errMsg = 'Ce compte a été désactivé par un administrateur.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errMsg = 'Trop de tentatives de connexion échouées. Réessayez dans quelques minutes ou réinitialisez votre mot de passe.';
       } else if (err.code === 'auth/operation-not-allowed') {
         errMsg = "La méthode de connexion par E-mail/Mot de passe n'est pas activée dans votre console Firebase Authentication. Veuillez l'activer sous l'onglet 'Sign-in method'.";
       } else {
@@ -221,51 +227,44 @@ L'équipe Dekel.Formation`,
     try {
       // 1. Trigger official Firebase Auth password reset email
       try {
-        await sendPasswordResetEmail(auth, trimmedEmail);
+        await sendPasswordResetEmail(auth, trimmedEmail, {
+          url: `${window.location.origin}/reset-password`
+        });
       } catch (fbErr: any) {
-        console.warn('Firebase password reset email notice:', fbErr);
+        await sendPasswordResetEmail(auth, trimmedEmail);
       }
 
-      // 2. Dispatch password reset via backend SMTP server (service@dekel-dev.com)
-      // Generates server-managed oobCode token & stores transaction log in DB
-      const res = await fetch('/api/auth/request-password-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          recipientName,
-          origin: window.location.origin
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || data.status === 'error') {
-        throw new Error(data.message || 'Échec de l\'envoi du lien par le serveur SMTP.');
+      // 2. Dispatch notification email via backend SMTP server (service@dekel-dev.com)
+      try {
+        await fetch('/api/auth/request-password-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: trimmedEmail,
+            recipientName,
+            origin: window.location.origin
+          })
+        });
+      } catch (srvErr) {
+        console.warn('Backend notification email warning:', srvErr);
       }
 
-      const generatedResetUrl = data.resetUrl || `${window.location.origin}?mode=resetPassword&oobCode=${data.oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
+      if (onSendEmail) {
+        const resetEmail: SimulatedEmail = {
+          id: `em-${Date.now()}`,
+          to: trimmedEmail,
+          subject: 'Réinitialisation de votre mot de passe - Dekel.Formation',
+          body: `Bonjour ${recipientName},\n\nUne demande de réinitialisation de mot de passe a été effectuée pour votre compte.\nUn e-mail de sécurité officiel de Firebase Authentication contenant le lien direct vous a été transmis.\n\nCordialement,\nL'équipe Dekel.Formation`,
+          sentAt: new Date().toISOString()
+        };
+        onSendEmail(resetEmail);
+      }
 
-      const resetEmail: SimulatedEmail = {
-        id: `em-${Date.now()}`,
-        to: trimmedEmail,
-        subject: 'Réinitialisation de votre mot de passe - Dekel.Formation',
-        body: `Bonjour ${recipientName},
-
-Une demande de réinitialisation de mot de passe a été effectuée pour votre compte.
-Veuillez cliquer sur le lien ci-dessous pour configurer un nouveau mot de passe :
-
-${generatedResetUrl}
-
-Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.`,
-        sentAt: new Date().toISOString()
-      };
-      onSendEmail(resetEmail);
-
-      showToast('E-mail de réinitialisation avec jeton sécurisé envoyé par le serveur SMTP !', 'success');
-      setMessage('Lien de réinitialisation généré et envoyé via le serveur SMTP (enregistré en base de données).');
-    } catch (smtpErr: any) {
-      console.error(smtpErr);
-      const errMsg = smtpErr.message || 'Adresse e-mail non reconnue.';
+      showToast('E-mail de réinitialisation envoyé avec succès par Firebase !', 'success');
+      setMessage('Un e-mail de sécurité contenant votre lien officiel Firebase Authentication a été transmis à votre adresse e-mail.');
+    } catch (fbErr: any) {
+      console.error(fbErr);
+      const errMsg = fbErr.message || 'Adresse e-mail non reconnue ou échec de l\'envoi.';
       setError(errMsg);
       showToast(errMsg, 'error');
     } finally {
@@ -303,7 +302,18 @@ Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mai
         {error && (
           <div className="mb-4 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-2.5 text-xs text-rose-300">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <div>{error}</div>
+            <div className="flex-1">
+              <p>{error}</p>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => setMode('forgot')}
+                  className="mt-1.5 text-[11px] font-semibold text-indigo-300 hover:text-indigo-200 underline cursor-pointer inline-flex items-center gap-1"
+                >
+                  Mot de passe oublié ? Réinitialiser mon mot de passe
+                </button>
+              )}
+            </div>
           </div>
         )}
 

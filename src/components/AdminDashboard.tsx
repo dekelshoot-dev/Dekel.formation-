@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, UserRole, Course, Enrollment, SimulatedEmail, CustomHtmlPage, FooterConfig, DEFAULT_FOOTER_CONFIG } from '../types';
+import { User, UserRole, Course, Enrollment, SimulatedEmail, CustomHtmlPage, FooterConfig, DEFAULT_FOOTER_CONFIG, Module, Chapter } from '../types';
 import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag, FileCode, Globe, LayoutTemplate, Link as LinkIcon, Share2, Sparkles, ShieldCheck } from 'lucide-react';
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
@@ -14,6 +14,8 @@ interface AdminDashboardProps {
   allUsers: User[];
   allCourses: Course[];
   allEnrollments: Enrollment[];
+  allModules?: Module[];
+  allChapters?: Chapter[];
   categories?: string[];
   customPages?: CustomHtmlPage[];
   footerConfig?: FooterConfig;
@@ -42,6 +44,8 @@ export default function AdminDashboard({
   allUsers,
   allCourses,
   allEnrollments,
+  allModules = [],
+  allChapters = [],
   categories = ['Développement', 'E-commerce', 'Design', 'Marketing', 'Montage Vidéo', 'Miniatures', 'Flyers'],
   customPages = [],
   footerConfig = DEFAULT_FOOTER_CONFIG,
@@ -67,6 +71,75 @@ export default function AdminDashboard({
   const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile'>(
     (initialTab as any) || 'stats'
   );
+
+  const handleExportCourseJSON = (courseToExport: Course) => {
+    const courseModules = (allModules || [])
+      .filter(m => m.courseId === courseToExport.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    const courseChapters = (allChapters || [])
+      .filter(c => c.courseId === courseToExport.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    const structuredModules = courseModules.map(mod => {
+      const modChapters = courseChapters.filter(ch => ch.moduleId === mod.id);
+      return {
+        id: mod.id,
+        title: mod.title,
+        order: mod.order,
+        description: mod.description,
+        chapters: modChapters.map(ch => ({
+          id: ch.id,
+          title: ch.title,
+          order: ch.order,
+          videoSource: ch.videoSource,
+          videoUrl: ch.videoUrl,
+          richText: ch.richText,
+          imageUrl: ch.imageUrl,
+          pdfUrl: ch.pdfUrl,
+          downloadableFiles: ch.downloadableFiles || [],
+          externalLinks: ch.externalLinks || [],
+          linkButton: ch.linkButton,
+          isFree: ch.isFree,
+          duration: ch.duration,
+          status: ch.status
+        }))
+      };
+    });
+
+    const exportData = {
+      exportVersion: '2.0',
+      exportedAt: new Date().toISOString(),
+      format: 'dekel_formation_export',
+      course: courseToExport,
+      modules: structuredModules,
+      rawModules: courseModules,
+      rawChapters: courseChapters,
+      summary: {
+        totalModules: courseModules.length,
+        totalChapters: courseChapters.length
+      }
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeTitle = courseToExport.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .substring(0, 35);
+
+    a.href = url;
+    a.download = `formation_${safeTitle || 'export'}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast(`Export JSON complet de "${courseToExport.title}" téléchargé avec succès !`, 'success');
+  };
 
   React.useEffect(() => {
     if (initialTab && initialTab !== activeTab) {
@@ -124,6 +197,7 @@ export default function AdminDashboard({
   const [newUsefulUrl, setNewUsefulUrl] = useState('');
   const [newLegalLabel, setNewLegalLabel] = useState('');
   const [newLegalUrl, setNewLegalUrl] = useState('');
+  const [isSavingFooter, setIsSavingFooter] = useState(false);
 
   React.useEffect(() => {
     if (footerConfig) {
@@ -131,10 +205,42 @@ export default function AdminDashboard({
     }
   }, [footerConfig]);
 
-  const handleSaveFooter = () => {
-    if (onSaveFooterConfig) {
-      onSaveFooterConfig(footerForm);
+  const handleSaveFooter = async () => {
+    setIsSavingFooter(true);
+    let updatedForm = { ...footerForm };
+
+    // Automatically append useful link if user typed both label and URL but forgot to click '+'
+    if (newUsefulLabel.trim() && newUsefulUrl.trim()) {
+      updatedForm = {
+        ...updatedForm,
+        usefulLinks: [...(updatedForm.usefulLinks || []), { label: newUsefulLabel.trim(), url: newUsefulUrl.trim() }]
+      };
+      setNewUsefulLabel('');
+      setNewUsefulUrl('');
+    }
+
+    // Automatically append legal link if user typed both label and URL but forgot to click '+'
+    if (newLegalLabel.trim() && newLegalUrl.trim()) {
+      updatedForm = {
+        ...updatedForm,
+        legalLinks: [...(updatedForm.legalLinks || []), { label: newLegalLabel.trim(), url: newLegalUrl.trim() }]
+      };
+      setNewLegalLabel('');
+      setNewLegalUrl('');
+    }
+
+    setFooterForm(updatedForm);
+
+    try {
+      if (onSaveFooterConfig) {
+        await onSaveFooterConfig(updatedForm);
+      }
       showToast('Configuration du Footer enregistrée avec succès !', 'success');
+    } catch (err) {
+      console.error('Erreur sauvegarde footer:', err);
+      showToast('Erreur lors de l\'enregistrement de la configuration du footer', 'error');
+    } finally {
+      setIsSavingFooter(false);
     }
   };
 
@@ -1240,6 +1346,15 @@ Adresse e-mail attribuée : ${emailTrimmed}
                               )}
                             </td>
                             <td className="px-4 py-3.5 text-right space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleExportCourseJSON(c)}
+                                className="text-[10px] font-semibold px-2 py-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all inline-flex items-center gap-1 cursor-pointer"
+                                title="Exporter tout le contenu de la formation au format JSON"
+                              >
+                                <FileCode className="w-3 h-3 text-indigo-600" />
+                                <span>Export JSON</span>
+                              </button>
                               {onPreviewCourse && (
                                 <button
                                   type="button"
@@ -1488,10 +1603,11 @@ Adresse e-mail attribuée : ${emailTrimmed}
                   <button
                     type="button"
                     onClick={handleSaveFooter}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition-all shadow-md shadow-red-100 flex items-center gap-1.5 cursor-pointer"
+                    disabled={isSavingFooter}
+                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition-all shadow-md shadow-red-100 flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Settings className="w-4 h-4" />
-                    <span>Enregistrer le Footer</span>
+                    <Settings className={`w-4 h-4 ${isSavingFooter ? 'animate-spin' : ''}`} />
+                    <span>{isSavingFooter ? 'Enregistrement...' : 'Enregistrer le Footer'}</span>
                   </button>
                 </div>
 
@@ -1898,10 +2014,11 @@ Adresse e-mail attribuée : ${emailTrimmed}
                   <button
                     type="button"
                     onClick={handleSaveFooter}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all shadow-md shadow-red-100 flex items-center gap-2 cursor-pointer"
+                    disabled={isSavingFooter}
+                    className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl text-xs transition-all shadow-md shadow-red-100 flex items-center gap-2 cursor-pointer"
                   >
-                    <Settings className="w-4 h-4" />
-                    <span>Enregistrer la configuration du Footer</span>
+                    <Settings className={`w-4 h-4 ${isSavingFooter ? 'animate-spin' : ''}`} />
+                    <span>{isSavingFooter ? 'Enregistrement...' : 'Enregistrer la configuration du Footer'}</span>
                   </button>
                 </div>
               </div>

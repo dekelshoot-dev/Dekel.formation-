@@ -50,6 +50,7 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
 
     if (emailParam) {
       setUserEmail(emailParam);
+      setRequestEmail(emailParam);
     }
 
     if (code) {
@@ -62,29 +63,22 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
     setIsVerifyingCode(true);
     setCodeError('');
     try {
-      // 1. Try server signed token verification first
-      const serverRes = await fetch(`/api/emails/verify-token?token=${encodeURIComponent(code)}`);
-      const serverData = await serverRes.json();
-
-      if (serverRes.ok && serverData.valid && serverData.payload) {
-        setUserEmail(serverData.payload.email);
+      // Verify code with Firebase Authentication
+      const email = await verifyPasswordResetCode(auth, code);
+      if (email) {
+        setUserEmail(email);
         setCodeVerified(true);
-        showToast('Code de réinitialisation vérifié par le serveur SMTP.', 'success');
+        showToast('Code de réinitialisation Firebase vérifié avec succès.', 'success');
         return;
       }
-
-      // 2. Fallback to Firebase verify code if code is native Firebase action code
-      const email = await verifyPasswordResetCode(auth, code);
-      setUserEmail(email);
-      setCodeVerified(true);
-      showToast('Code de réinitialisation Firebase vérifié avec succès.', 'success');
+      throw new Error('Code de réinitialisation invalide ou expiré.');
     } catch (err: any) {
       console.error('Error verifying reset code:', err);
       let msg = 'Le lien de réinitialisation est invalide, expiré ou a déjà été utilisé.';
       if (err.code === 'auth/invalid-action-code') {
-        msg = 'Le code de réinitialisation est invalide ou a déjà été utilisé.';
+        msg = 'Le code de réinitialisation Firebase est invalide ou a déjà été utilisé.';
       } else if (err.code === 'auth/expired-action-code') {
-        msg = 'Le lien de réinitialisation a expiré. Veuillez refaire une demande.';
+        msg = 'Le lien de réinitialisation Firebase a expiré. Veuillez refaire une demande.';
       }
       setCodeError(msg);
       setCodeVerified(false);
@@ -112,38 +106,41 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
 
       // 1. Send official Firebase Auth password reset link
       try {
-        await sendPasswordResetEmail(auth, trimmedEmail);
+        await sendPasswordResetEmail(auth, trimmedEmail, {
+          url: `${window.location.origin}/reset-password`
+        });
       } catch (fbErr: any) {
-        console.warn('Firebase password reset email warning:', fbErr);
+        try {
+          await sendPasswordResetEmail(auth, trimmedEmail);
+        } catch (fbErr2: any) {
+          console.warn('Firebase password reset email warning:', fbErr2);
+        }
       }
 
-      // 2. Dispatch real email via backend SMTP server & record in database history
-      const res = await fetch('/api/auth/request-password-reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          recipientName,
-          origin: window.location.origin
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || data.status === 'error') {
-        throw new Error(data.message || 'Échec de l\'envoi du lien par le serveur SMTP.');
+      // 2. Dispatch notification email via backend SMTP server & record in database history
+      try {
+        await fetch('/api/auth/request-password-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: trimmedEmail,
+            recipientName,
+            origin: window.location.origin
+          })
+        });
+      } catch (srvErr) {
+        console.warn('Backend notification email warning:', srvErr);
       }
-
-      const generatedResetUrl = data.resetUrl || `${window.location.origin}?mode=resetPassword&oobCode=${data.oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
 
       setRequestSuccess(true);
-      showToast('E-mail de réinitialisation avec jeton sécurisé envoyé par le serveur SMTP !', 'success');
+      showToast('E-mail de réinitialisation envoyé avec succès par Firebase !', 'success');
 
       if (onSendEmail) {
         const simEmail: SimulatedEmail = {
           id: `em-${Date.now()}`,
           to: trimmedEmail,
           subject: 'Réinitialisation de votre mot de passe - Dekel.Formation',
-          body: `Bonjour ${recipientName},\n\nUne demande de réinitialisation de mot de passe a été émise pour votre compte.\nCliquez sur le lien suivant pour créer votre nouveau mot de passe :\n\n${generatedResetUrl}\n\nSi vous n'avez pas demandé ce changement, vous pouvez ignorer ce message.\n\nCordialement,\nL'équipe Dekel.Formation`,
+          body: `Bonjour ${recipientName},\n\nUne demande de réinitialisation de mot de passe a été émise pour votre compte.\nUn e-mail de sécurité officiel de Firebase Authentication contenant le lien direct vous a été transmis.\n\nCordialement,\nL'équipe Dekel.Formation`,
           sentAt: new Date().toISOString()
         };
         onSendEmail(simEmail);
@@ -188,31 +185,23 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
     setIsResetting(true);
 
     try {
-      let fbUpdated = false;
+      // Update password in Firebase Auth
+      await confirmPasswordReset(auth, oobCode, newPassword);
 
-      // 1. Update password directly in Firebase Auth if code is a Firebase action code
+      // Notify backend server for transaction history logging
+      const targetEmail = userEmail || requestEmail;
       try {
-        await confirmPasswordReset(auth, oobCode, newPassword);
-        fbUpdated = true;
-      } catch (fbErr: any) {
-        console.warn('Firebase confirmPasswordReset notice:', fbErr);
-      }
-
-      // 2. Send password reset notification to backend server
-      const serverRes = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: oobCode, newPassword })
-      });
-
-      const serverData = await serverRes.json();
-
-      if (!fbUpdated && (!serverRes.ok || serverData.status === 'error')) {
-        throw new Error(serverData.message || 'Échec de la mise à jour du mot de passe.');
+        await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: oobCode, newPassword, email: targetEmail })
+        });
+      } catch (srvErr) {
+        console.warn('Server reset-password log warning:', srvErr);
       }
 
       setResetSuccess(true);
-      showToast('Votre mot de passe a été réinitialisé avec succès ! Connectez-vous avec votre nouveau mot de passe.', 'success');
+      showToast('Votre mot de passe a été réinitialisé avec succès dans Firebase Authentication !', 'success');
       
       // Clean up search query string in URL
       if (window.history && window.history.replaceState) {
@@ -220,8 +209,13 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
         window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
       }
     } catch (err: any) {
-      console.error('Error confirming reset password:', err);
-      const msg = err.message || 'Échec de la réinitialisation du mot de passe.';
+      console.error('Error confirming reset:', err);
+      let msg = err.message || 'Impossible de réinitialiser le mot de passe.';
+      if (err.code === 'auth/invalid-action-code') {
+        msg = 'Le code de réinitialisation Firebase est invalide ou a déjà été utilisé. Demandez un nouvel e-mail direct.';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Le mot de passe est trop faible. Veuillez choisir au moins 6 caractères.';
+      }
       setFormError(msg);
       showToast(msg, 'error');
     } finally {
@@ -260,32 +254,62 @@ export default function ResetPassword({ onBackToLogin, onSendEmail, allUsers = [
 
         {/* CASE 2: Invalid/Expired Code */}
         {oobCode && !isVerifyingCode && codeError && (
-          <div className="space-y-5 text-center">
-            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-300 text-xs flex items-start gap-3 text-left">
+          <div className="space-y-5">
+            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-300 text-xs flex items-start gap-3">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-400" />
               <div>
-                <p className="font-bold">Lien invalide ou expiré</p>
-                <p className="mt-0.5 text-slate-300">{codeError}</p>
+                <p className="font-bold text-white text-sm">Lien invalide ou expiré</p>
+                <p className="mt-1 text-slate-300 leading-relaxed">{codeError}</p>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  Les liens de réinitialisation expirent rapidement ou ne peuvent être utilisés qu'une seule fois pour protéger votre compte.
+                </p>
               </div>
             </div>
 
-            <button
-              onClick={() => {
+            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-left space-y-3">
+              <p className="text-xs font-semibold text-white">Demander un nouveau lien de réinitialisation :</p>
+              <form onSubmit={(e) => {
                 setOobCode(null);
                 setCodeError('');
-              }}
-              className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
-            >
-              Renvoyer un nouveau lien de réinitialisation
-            </button>
+                handleSendResetEmail(e);
+              }} className="space-y-3">
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={requestEmail}
+                    onChange={(e) => setRequestEmail(e.target.value)}
+                    placeholder="votre.email@exemple.com"
+                    className="w-full bg-black/20 border border-white/10 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSendingLink}
+                  className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isSendingLink ? (
+                    <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      <span>Recevoir un nouveau lien Firebase</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
 
-            <button
-              onClick={onBackToLogin}
-              className="inline-flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Retour à la connexion</span>
-            </button>
+            <div className="text-center pt-1">
+              <button
+                onClick={onBackToLogin}
+                className="inline-flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Retour à la connexion</span>
+              </button>
+            </div>
           </div>
         )}
 

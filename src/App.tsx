@@ -1293,6 +1293,8 @@ Bon apprentissage.`,
             allUsers={allUsers}
             allCourses={allCourses}
             allEnrollments={allEnrollments}
+            allModules={allModules}
+            allChapters={allChapters}
             onToggleCourseStatus={(id) => {
               const updated = allCourses.map(c => c.id === id ? { ...c, status: (c.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' } : c);
               setAllCourses(updated);
@@ -1630,6 +1632,8 @@ Bon apprentissage.`,
           allUsers={allUsers}
           allCourses={allCourses}
           allEnrollments={allEnrollments}
+          allModules={allModules}
+          allChapters={allChapters}
           onToggleCourseStatus={(courseId) => {
             const updated = allCourses.map(c => c.id === courseId ? { ...c, status: (c.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' } : c);
             setAllCourses(updated);
@@ -1667,6 +1671,8 @@ Bon apprentissage.`,
           onAddCategory={handleAddCategory}
           onDeleteCategory={handleDeleteCategory}
           customPages={allCustomPages}
+          footerConfig={footerConfig}
+          onSaveFooterConfig={handleSaveFooterConfig}
           onSaveCustomPage={handleSaveCustomPage}
           onDeleteCustomPage={handleDeleteCustomPage}
           onPreviewCustomPage={(page) => setPreviewingCustomPage(page)}

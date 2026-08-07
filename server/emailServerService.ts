@@ -61,9 +61,10 @@ export function createSmtpTransporter(configOverride?: Partial<EmailServerConfig
   const cfg = { ...(db.email_config || {}), ...(configOverride || {}) };
 
   const user = cfg.gmailUser || process.env.GMAIL_USER || cfg.senderEmail || 'service@dekel-dev.com';
-  const pass = cfg.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '';
+  const passRaw = cfg.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || '';
+  const pass = passRaw.replace(/\s+/g, '');
   const host = cfg.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(cfg.smtpPort || process.env.SMTP_PORT || 465);
+  const port = Number(cfg.smtpPort || process.env.SMTP_PORT || 587);
 
   if (!pass) {
     return { transporter: null, user, host, port, error: 'Mot de passe d\'application Gmail non configuré (GMAIL_APP_PASSWORD).' };

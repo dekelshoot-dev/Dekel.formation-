@@ -71,6 +71,9 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
+    try {
+      setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+    } catch (e) {}
 
     return res.status(400).json({
       status: "error",
@@ -176,6 +179,9 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
+    try {
+      setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+    } catch (e) {}
 
     return res.status(401).json({
       status: "error",
@@ -215,6 +221,9 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
         db.logs = db.logs.slice(0, 200);
       }
       writeDb(db);
+      try {
+        setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+      } catch (e) {}
 
       return res.status(400).json({
         status: "error",
@@ -253,6 +262,9 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
+    try {
+      setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+    } catch (e) {}
 
     return res.status(400).json({
       status: "error",
@@ -353,6 +365,9 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
+    try {
+      setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+    } catch (e) {}
 
     return res.status(400).json({
       status: "error",
@@ -416,6 +431,9 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
       db.logs = db.logs.slice(0, 200);
     }
     writeDb(db);
+    try {
+      setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+    } catch (e) {}
 
     return res.status(200).json({
       status: "success",
@@ -459,6 +477,9 @@ app.post("/api/webhooks/payment/:courseId", async (req, res) => {
   }
   db.enrollments.push(enrollmentRecord);
   writeDb(db);
+  try {
+    setDoc(doc(dbFirestore, "webhook_logs", logId), logEntry).catch(() => {});
+  } catch (e) {}
 
   // Automatically queue transactional email for webhook enrollment asynchronously
   try {
@@ -801,21 +822,11 @@ app.post("/api/auth/request-password-reset", async (req, res) => {
 
   // Generate signed server token (oobCode) valid for 1 hour (3600 seconds)
   const oobCode = generateSignedToken('reset_password', trimmedEmail, 3600);
-  const baseUrl = origin || `${req.protocol}://${req.get('host')}`;
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('host') || 'localhost:3000';
+  const rawOrigin = origin || `${proto}://${host}`;
+  const baseUrl = rawOrigin.startsWith('http') ? rawOrigin.replace(/\/$/, '') : `https://${rawOrigin.replace(/\/$/, '')}`;
   const resetUrl = `${baseUrl}/reset-password?oobCode=${oobCode}&email=${encodeURIComponent(trimmedEmail)}`;
-
-  // Also trigger Firebase Auth password reset oobCode via Identity Toolkit API
-  if (firebaseConfig?.apiKey) {
-    try {
-      await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestType: "PASSWORD_RESET", email: trimmedEmail })
-      });
-    } catch (fbOobErr) {
-      console.warn("Firebase Identity Toolkit sendOobCode warning:", fbOobErr);
-    }
-  }
 
   try {
     const queuedEmail = queueTransactionalEmail({
@@ -938,33 +949,83 @@ app.post("/api/emails/diagnostic", async (req, res) => {
 });
 
 // API: Read ALL webhook logs for the general administrator tab
-app.get("/api/webhooks/logs", (req, res) => {
+app.get("/api/webhooks/logs", async (req, res) => {
   const db = readDb();
-  res.json({ logs: db.logs || [] });
+  let firestoreLogs: any[] = [];
+  try {
+    const snap = await getDocs(collection(dbFirestore, "webhook_logs"));
+    firestoreLogs = snap.docs.map(doc => doc.data());
+  } catch (err) {}
+
+  const map = new Map();
+  for (const log of (db.logs || [])) {
+    if (log && log.id) map.set(log.id, log);
+  }
+  for (const log of firestoreLogs) {
+    if (log && log.id) map.set(log.id, log);
+  }
+
+  const logs = Array.from(map.values()).sort((a, b) => 
+    new Date(b.receivedAt || 0).getTime() - new Date(a.receivedAt || 0).getTime()
+  );
+
+  res.json({ logs });
 });
 
 // API: Clear ALL webhook logs
-app.delete("/api/webhooks/logs", (req, res) => {
+app.delete("/api/webhooks/logs", async (req, res) => {
   const db = readDb();
   db.logs = [];
   writeDb(db);
+  try {
+    const snap = await getDocs(collection(dbFirestore, "webhook_logs"));
+    for (const docSnap of snap.docs) {
+      await deleteDoc(doc(dbFirestore, "webhook_logs", docSnap.id));
+    }
+  } catch (err) {}
   res.json({ status: "success", message: "All webhook logs cleared" });
 });
 
 // API: Read recent webhook logs (Requirement 2 UI)
-app.get("/api/webhooks/logs/:courseId", (req, res) => {
+app.get("/api/webhooks/logs/:courseId", async (req, res) => {
   const { courseId } = req.params;
   const db = readDb();
-  const courseLogs = db.logs.filter((l: any) => l.courseId === courseId);
-  res.json({ logs: courseLogs });
+  let firestoreLogs: any[] = [];
+  try {
+    const q = query(collection(dbFirestore, "webhook_logs"), where("courseId", "==", courseId));
+    const snap = await getDocs(q);
+    firestoreLogs = snap.docs.map(doc => doc.data());
+  } catch (err) {}
+
+  const map = new Map();
+  const localCourseLogs = (db.logs || []).filter((l: any) => l.courseId === courseId);
+  for (const log of localCourseLogs) {
+    if (log && log.id) map.set(log.id, log);
+  }
+  for (const log of firestoreLogs) {
+    if (log && log.id) map.set(log.id, log);
+  }
+
+  const logs = Array.from(map.values()).sort((a, b) => 
+    new Date(b.receivedAt || 0).getTime() - new Date(a.receivedAt || 0).getTime()
+  );
+
+  res.json({ logs });
 });
 
 // API: Clear all webhook logs for a course (Requirement 2 UI)
-app.delete("/api/webhooks/logs/:courseId", (req, res) => {
+app.delete("/api/webhooks/logs/:courseId", async (req, res) => {
   const { courseId } = req.params;
   const db = readDb();
   db.logs = db.logs.filter((l: any) => l.courseId !== courseId);
   writeDb(db);
+  try {
+    const q = query(collection(dbFirestore, "webhook_logs"), where("courseId", "==", courseId));
+    const snap = await getDocs(q);
+    for (const docSnap of snap.docs) {
+      await deleteDoc(doc(dbFirestore, "webhook_logs", docSnap.id));
+    }
+  } catch (err) {}
   res.json({ status: "success", message: "Logs cleared" });
 });
 

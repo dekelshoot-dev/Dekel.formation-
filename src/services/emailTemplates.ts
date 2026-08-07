@@ -491,9 +491,11 @@ export function generateEmailHtml(type: EmailType, data: EmailRenderData & { cus
       title = 'Demande de réinitialisation de mot de passe';
       contentHtml = `
         <p>Bonjour <strong>${name}</strong>,</p>
-        <p>Nous avons reçu une demande de réinitialisation de votre mot de passe. Cliquez ci-dessous pour choisir un nouveau mot de passe :</p>
+        <p>Une demande de réinitialisation de votre mot de passe a été émise pour votre compte.</p>
+        <p>Un e-mail de sécurité officiel contenant votre lien de réinitialisation unique a été transmis à votre adresse par <strong>Firebase Authentication</strong>.</p>
+        <p>Veuillez consulter votre boîte de réception et cliquer sur le lien officiel reçu de Firebase Auth pour définir votre nouveau mot de passe en toute sécurité.</p>
       `;
-      callToActionText = 'Réinitialiser mon mot de passe';
+      callToActionText = 'Accéder à la page de réinitialisation';
       break;
 
     case 'auth_email_changed':

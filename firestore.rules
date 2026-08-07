@@ -105,8 +105,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // 18. Webhooks
+    // 18. Webhooks & Webhook Logs
     match /webhooks/{webhookId} {
+      allow read, write: if true;
+    }
+
+    match /webhook_logs/{logId} {
       allow read, write: if true;
     }
 

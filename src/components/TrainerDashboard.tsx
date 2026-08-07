@@ -559,6 +559,86 @@ export default function TrainerDashboard({
     triggerToast(`Export CSV réussi pour "${courseToExport.title}" (${courseEnrollments.length} élèves) !`, 'success');
   };
 
+  // Export Full Course Content (Course, Modules, Chapters, Quizzes) to JSON
+  const handleExportCourseJSON = (targetCourse?: Course) => {
+    const courseToExport = targetCourse || selectedCourse;
+    if (!courseToExport) {
+      triggerToast('Veuillez sélectionner une formation à exporter.', 'warning');
+      return;
+    }
+
+    const courseModules = allModules
+      .filter(m => m.courseId === courseToExport.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    const courseChapters = allChapters
+      .filter(c => c.courseId === courseToExport.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    const courseQuizzes = quizzes.filter(q => q.courseId === courseToExport.id);
+
+    const structuredModules = courseModules.map(mod => {
+      const modChapters = courseChapters.filter(ch => ch.moduleId === mod.id);
+      return {
+        id: mod.id,
+        title: mod.title,
+        order: mod.order,
+        description: mod.description,
+        chapters: modChapters.map(ch => ({
+          id: ch.id,
+          title: ch.title,
+          order: ch.order,
+          videoSource: ch.videoSource,
+          videoUrl: ch.videoUrl,
+          richText: ch.richText,
+          imageUrl: ch.imageUrl,
+          pdfUrl: ch.pdfUrl,
+          downloadableFiles: ch.downloadableFiles || [],
+          externalLinks: ch.externalLinks || [],
+          linkButton: ch.linkButton,
+          isFree: ch.isFree,
+          duration: ch.duration,
+          status: ch.status
+        }))
+      };
+    });
+
+    const exportData = {
+      exportVersion: '2.0',
+      exportedAt: new Date().toISOString(),
+      format: 'dekel_formation_export',
+      course: courseToExport,
+      modules: structuredModules,
+      rawModules: courseModules,
+      rawChapters: courseChapters,
+      quizzes: courseQuizzes,
+      summary: {
+        totalModules: courseModules.length,
+        totalChapters: courseChapters.length,
+        totalQuizzes: courseQuizzes.length
+      }
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeTitle = courseToExport.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .substring(0, 35);
+
+    a.href = url;
+    a.download = `formation_${safeTitle || 'export'}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    triggerToast(`Export JSON complet de la formation "${courseToExport.title}" téléchargé !`, 'success');
+  };
+
   const handleExportFilteredStudentsCSV = (filterCourseId: string) => {
     if (filterCourseId && filterCourseId !== 'all') {
       const c = trainerCourses.find(course => course.id === filterCourseId);
@@ -644,8 +724,17 @@ export default function TrainerDashboard({
   const parseJsonCourse = (text: string): ParsedImportCourse | null => {
     try {
       const data = JSON.parse(text);
-      const item = Array.isArray(data) ? data[0] : data;
+      let item = Array.isArray(data) ? data[0] : data;
       if (!item || typeof item !== 'object') return null;
+
+      // If wrapped in export metadata { course: {...}, modules: [...] }
+      if (item.course && typeof item.course === 'object') {
+        const courseData = item.course;
+        item = {
+          ...courseData,
+          modules: item.modules || courseData.modules
+        };
+      }
 
       return {
         title: item.title || item.titre || 'Formation importée',
@@ -664,7 +753,7 @@ export default function TrainerDashboard({
             videoUrl: ch.videoUrl || ch.urlVideo || '',
             richText: ch.richText || ch.content || ch.contenu || '',
             duration: ch.duration || ch.duree || '15 min',
-            freePreview: Boolean(ch.freePreview || ch.gratuit)
+            freePreview: Boolean(ch.freePreview || ch.gratuit || ch.isFree)
           })) : []
         })) : []
       };
@@ -1293,6 +1382,23 @@ export default function TrainerDashboard({
       }
     });
   };
+
+  // Real-time listener for webhook_logs stored in Firestore BD
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'webhook_logs'), (snap) => {
+      const logsList: any[] = [];
+      snap.forEach(docSnap => {
+        logsList.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      logsList.sort((a, b) => new Date(b.receivedAt || 0).getTime() - new Date(a.receivedAt || 0).getTime());
+      if (logsList.length > 0) {
+        setGlobalWebhookLogs(logsList);
+      }
+    }, (err) => {
+      console.warn("Snapshot listener for webhook_logs warning:", err.message);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'webhooks') {
@@ -2247,14 +2353,24 @@ Le support Dekel.Formation`,
                           <p className="text-[9px] text-slate-400 text-right">{completedStudentsCount} sur {enrolledCount} ont tout terminé</p>
                         </div>
 
-                        <button
-                          onClick={() => handleExportCourseStudentsCSV(course)}
-                          className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shrink-0"
-                          title="Télécharger la liste des étudiants en CSV"
-                        >
-                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Export CSV</span>
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleExportCourseJSON(course)}
+                            className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                            title="Exporter tout le contenu de la formation au format JSON"
+                          >
+                            <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Export JSON</span>
+                          </button>
+                          <button
+                            onClick={() => handleExportCourseStudentsCSV(course)}
+                            className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold px-2.5 py-1.5 rounded-xl text-[10px] flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap"
+                            title="Télécharger la liste des étudiants en CSV"
+                          >
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Export CSV</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -2642,6 +2758,14 @@ Le support Dekel.Formation`,
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-right space-x-1.5">
+                          <button
+                            onClick={() => handleExportCourseJSON(course)}
+                            title="Exporter tout le contenu de la formation au format JSON"
+                            className="text-[10px] font-semibold px-2 py-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <FileCode className="w-3 h-3 text-indigo-600" />
+                            <span>Export JSON</span>
+                          </button>
                           <button
                             onClick={() => handleExportCourseStudentsCSV(course)}
                             title="Exporter la liste des élèves au format CSV"
@@ -3976,10 +4100,138 @@ Le support Dekel.Formation`,
       )}
 
       {/* Tab: Webhook Journal */}
-      {activeTab === 'webhooks' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Section: Webhooks Enregistrés dans la Base de Données */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+      {activeTab === 'webhooks' && (() => {
+        const trainerCourseIds = new Set(trainerCourses.map(c => c.id));
+        const trainerWebhookLogs = globalWebhookLogs.filter(log => 
+          currentUser.role === 'admin' || trainerCourseIds.has(log.courseId) || log.courseId === 'malformed_json_payload'
+        );
+
+        const totalLogs = trainerWebhookLogs.length;
+        const successCount = trainerWebhookLogs.filter(l => l.status === 'success').length;
+        const failedLogs = trainerWebhookLogs.filter(l => l.status !== 'success');
+        const failedCount = failedLogs.length;
+        const conversionRate = totalLogs > 0 ? Math.round((successCount / totalLogs) * 100) : 0;
+
+        const alreadyEnrolledCount = failedLogs.filter(l => 
+          l.status === 'ignored_already_enrolled' || 
+          (l.error && (l.error.toLowerCase().includes('déjà') || l.error.toLowerCase().includes('déja'))) ||
+          (l.errorMessage && (l.errorMessage.toLowerCase().includes('déjà') || l.errorMessage.toLowerCase().includes('déja')))
+        ).length;
+
+        const unavailableCount = failedLogs.filter(l => 
+          l.status === 'course_not_found' || l.status === 'course_inactive' ||
+          (l.error && (l.error.toLowerCase().includes('cours') || l.error.toLowerCase().includes('formation'))) ||
+          (l.errorMessage && (l.errorMessage.toLowerCase().includes('cours') || l.errorMessage.toLowerCase().includes('formation')))
+        ).length;
+
+        const payloadErrorCount = failedLogs.filter(l => 
+          l.status === 'invalid_payload' || l.status === 'missing_email' ||
+          (l.error && (l.error.toLowerCase().includes('payload') || l.error.toLowerCase().includes('email'))) ||
+          (l.errorMessage && (l.errorMessage.toLowerCase().includes('payload') || l.errorMessage.toLowerCase().includes('email')))
+        ).length;
+
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {/* Widgets de Statistiques Rapides pour Webhooks */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Widget 1: Taux de Conversion */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50/50 rounded-bl-full pointer-events-none -mr-4 -mt-4"></div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Taux de Conversion</span>
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                    <BarChart3 className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-slate-900">{conversionRate}%</span>
+                    <span className="text-xs font-semibold text-slate-400">réussis</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full mt-2 overflow-hidden flex">
+                    <div 
+                      className="bg-emerald-500 h-full transition-all duration-500" 
+                      style={{ width: `${conversionRate}%` }}
+                      title={`Succès: ${conversionRate}%`}
+                    ></div>
+                    <div 
+                      className="bg-rose-400 h-full transition-all duration-500" 
+                      style={{ width: `${100 - conversionRate}%` }}
+                      title={`Échecs: ${100 - conversionRate}%`}
+                    ></div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">Inscriptions validées vs. échecs de traitement</p>
+              </div>
+
+              {/* Widget 2: Inscriptions Réussies */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Inscriptions Réussies</span>
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-emerald-600">{successCount}</span>
+                    <span className="text-xs text-slate-400 font-medium">/ {totalLogs} reçus</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                    ⚡ Compte créé & accès délivré automatiquement
+                  </p>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">Paiements validés par webhook</p>
+              </div>
+
+              {/* Widget 3: Échecs & Refus */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Échecs & Refus</span>
+                  <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+                    <AlertCircle className="w-4 h-4" />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black text-rose-600">{failedCount}</span>
+                    <span className="text-xs text-slate-400 font-medium">requêtes</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                    Ignorées ou non qualifiées
+                  </p>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">Analyse détaillée ci-dessous</p>
+              </div>
+
+              {/* Widget 4: Motifs de Refus */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Motifs de Refus</span>
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="space-y-1 my-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-600 truncate">Déjà inscrit / Email existant</span>
+                    <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.2 rounded">{alreadyEnrolledCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-600 truncate">Cours indisponible / inactif</span>
+                    <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.2 rounded">{unavailableCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-600 truncate">Format payload / email invalide</span>
+                    <span className="font-bold text-slate-800 bg-slate-100 px-1.5 py-0.2 rounded">{payloadErrorCount}</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400">Synthèse automatique des erreurs</p>
+              </div>
+            </div>
+
+            {/* Section: Webhooks Enregistrés dans la Base de Données */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -4209,7 +4461,12 @@ Le support Dekel.Formation`,
           <div className="space-y-3">
             {(() => {
               // Apply filters
+              const trainerCourseIds = new Set(trainerCourses.map(c => c.id));
               const filteredLogs = globalWebhookLogs.filter(log => {
+                // Ensure trainer only sees webhook logs for their courses (or all if admin)
+                if (currentUser.role !== 'admin' && !trainerCourseIds.has(log.courseId) && log.courseId !== 'malformed_json_payload') {
+                  return false;
+                }
                 const searchLower = globalWebhookSearch.toLowerCase();
                 const matchesSearch = !globalWebhookSearch ||
                   (log.detectedEmail && log.detectedEmail.toLowerCase().includes(searchLower)) ||
@@ -4390,7 +4647,8 @@ Le support Dekel.Formation`,
             })()}
           </div>
         </div>
-      )}
+      );
+    })()}
 
       {/* Tab 5: Course Editor curriculum (Modules & Chapters) (Section 8) */}
       {activeTab === 'course-editor' && selectedCourse && (
@@ -4405,6 +4663,15 @@ Le support Dekel.Formation`,
             </button>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-black text-slate-800 truncate max-w-xs sm:max-w-md">Contenu de : {selectedCourse.title}</h2>
+              <button
+                type="button"
+                onClick={() => handleExportCourseJSON(selectedCourse)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm shadow-indigo-100"
+                title="Exporter tout le contenu de la formation au format JSON"
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Exporter JSON (Contenu)</span>
+              </button>
               <button
                 type="button"
                 onClick={() => handleExportCourseStudentsCSV(selectedCourse)}

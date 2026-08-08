@@ -1,7 +1,10 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, setLogLevel } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, getFirestore, doc, getDocFromServer, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
+
+// Silence non-critical SDK internal gRPC idle stream warnings
+setLogLevel('error');
 
 const app = initializeApp(firebaseConfig);
 

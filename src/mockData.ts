@@ -68,7 +68,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'Développement Web',
     price: 150000,
     level: 'Débutant',
-    duration: '30 heures'
+    duration: '30 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-2',
@@ -86,7 +88,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'E-commerce & Marketing',
     price: 250000,
     level: 'Intermédiaire',
-    duration: '20 heures'
+    duration: '20 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-3',
@@ -104,7 +108,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'Design UI/UX',
     price: 125000,
     level: 'Tous niveaux',
-    duration: '15 heures'
+    duration: '15 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-4',
@@ -122,7 +128,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'Marketing d\'Influence',
     price: 75000,
     level: 'Débutant',
-    duration: '8 heures'
+    duration: '8 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-5',
@@ -140,7 +148,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'Montage Vidéo',
     price: 95000,
     level: 'Débutant',
-    duration: '12 heures'
+    duration: '12 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-6',
@@ -158,7 +168,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'Miniatures',
     price: 45000,
     level: 'Tous niveaux',
-    duration: '6 heures'
+    duration: '6 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-7',
@@ -176,7 +188,9 @@ export const INITIAL_COURSES: Course[] = [
     type: 'Flyers',
     price: 60000,
     level: 'Débutant',
-    duration: '8 heures'
+    duration: '8 heures',
+    whatsappNumber: '+221771234567',
+    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   }
 ];
 

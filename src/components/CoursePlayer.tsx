@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Markdown from 'react-markdown';
 import { Course, Module, Chapter, StudentProgress, User } from '../types';
 import { 
   Play, CheckCircle2, ChevronRight, ChevronDown, Download, ExternalLink, 
   ArrowLeft, FileText, Globe, Sparkles, BookOpen, Menu, X, Check, Lock, Unlock,
-  GraduationCap, Search
+  GraduationCap, Search, MessageCircle
 } from 'lucide-react';
 import { 
   ChapterBookmarks, 
@@ -48,44 +48,43 @@ export default function CoursePlayer({
     return parentMod && ch.active !== false && matchesSearch;
   });
 
+  // Sorted list of all chapters for sequential navigation
+  const sortedModules = [...activeModules].sort((a, b) => a.order - b.order);
+  const allSortedChapters: Chapter[] = [];
+  sortedModules.forEach(mod => {
+    const modChaps = activeChapters
+      .filter(ch => ch.moduleId === mod.id)
+      .sort((a, b) => a.order - b.order);
+    allSortedChapters.push(...modChaps);
+  });
+
+  const completedChapterIds = progress?.completedChapterIds || [];
+  // Find the first chapter that is NOT marked as completed, or fallback to the first chapter
+  const firstUncompletedChapter = allSortedChapters.find(ch => !completedChapterIds.includes(ch.id)) || allSortedChapters[0];
+
   const [activeChapterId, setActiveChapterId] = useState<string | null>(() => {
-    // Default to first active chapter of first active module
-    const sortedMods = [...activeModules].sort((a, b) => a.order - b.order);
-    if (sortedMods.length > 0) {
-      const firstModChaps = activeChapters
-        .filter(ch => ch.moduleId === sortedMods[0].id)
-        .sort((a, b) => a.order - b.order);
-      if (firstModChaps.length > 0) {
-        return firstModChaps[0].id;
-      }
-    }
-    return activeChapters[0]?.id || null;
+    return firstUncompletedChapter?.id || null;
   });
 
   // Track which modules are currently expanded (dropdown / accordion style)
   const [expandedModuleIds, setExpandedModuleIds] = useState<Record<string, boolean>>(() => {
-    // Expand the active chapter's parent module by default
     const initial: Record<string, boolean> = {};
-    const sortedMods = [...activeModules].sort((a, b) => a.order - b.order);
-    let defaultActiveId: string | null = null;
-    if (sortedMods.length > 0) {
-      const firstModChaps = activeChapters
-        .filter(ch => ch.moduleId === sortedMods[0].id)
-        .sort((a, b) => a.order - b.order);
-      if (firstModChaps.length > 0) {
-        defaultActiveId = firstModChaps[0].id;
-      }
-    }
-    const initialActiveChapterId = activeChapters[0]?.id || null;
-    const resolvedActiveId = defaultActiveId || initialActiveChapterId;
-    if (resolvedActiveId) {
-      const activeCh = activeChapters.find(ch => ch.id === resolvedActiveId);
-      if (activeCh) {
-        initial[activeCh.moduleId] = true;
-      }
+    if (firstUncompletedChapter) {
+      initial[firstUncompletedChapter.moduleId] = true;
     }
     return initial;
   });
+
+  // Ensure active chapter is set when course changes or if initial active chapter is invalid
+  useEffect(() => {
+    if (firstUncompletedChapter && (!activeChapterId || !allSortedChapters.some(ch => ch.id === activeChapterId))) {
+      setActiveChapterId(firstUncompletedChapter.id);
+      setExpandedModuleIds(prev => ({
+        ...prev,
+        [firstUncompletedChapter.moduleId]: true
+      }));
+    }
+  }, [course.id]);
 
   const toggleModuleExpanded = (moduleId: string) => {
     setExpandedModuleIds(prev => ({
@@ -97,21 +96,10 @@ export default function CoursePlayer({
   const activeChapter = activeChapters.find(ch => ch.id === activeChapterId);
   const activeModule = activeChapter ? activeModules.find(m => m.id === activeChapter.moduleId) : null;
 
-  // Sorted list of all chapters for sequential navigation
-  const sortedModules = [...activeModules].sort((a, b) => a.order - b.order);
-  const allSortedChapters: Chapter[] = [];
-  sortedModules.forEach(mod => {
-    const modChaps = activeChapters
-      .filter(ch => ch.moduleId === mod.id)
-      .sort((a, b) => a.order - b.order);
-    allSortedChapters.push(...modChaps);
-  });
-
   const activeIndex = allSortedChapters.findIndex(ch => ch.id === activeChapterId);
   const prevChapter = activeIndex > 0 ? allSortedChapters[activeIndex - 1] : null;
   const nextChapter = activeIndex < allSortedChapters.length - 1 ? allSortedChapters[activeIndex + 1] : null;
 
-  const completedChapterIds = progress?.completedChapterIds || [];
   const completedCount = completedChapterIds.length;
   const totalChapters = activeChapters.length;
   const progressPercent = totalChapters > 0 ? Math.round((completedCount / totalChapters) * 100) : 0;
@@ -202,15 +190,14 @@ export default function CoursePlayer({
 
   const activeTheme = themeColors[course.themeColor] || themeColors.indigo;
 
-  // Single button flow: marks current chapter complete and automatically redirects to the next.
+  // Single button flow: marks current chapter complete, updates progress, and automatically redirects to the next if available.
+  const isCurrentCompleted = activeChapterId ? completedChapterIds.includes(activeChapterId) : false;
+
   const handleMarkComplete = () => {
     if (!activeChapterId) return;
     
-    // Mark as completed
-    const isAlreadyCompleted = completedChapterIds.includes(activeChapterId);
-    if (!isAlreadyCompleted) {
-      onToggleChapterComplete(activeChapterId);
-    }
+    // Toggle/mark as completed
+    onToggleChapterComplete(activeChapterId);
 
     if (nextChapter) {
       setTimeout(() => {
@@ -263,12 +250,31 @@ export default function CoursePlayer({
           </div>
         </div>
 
-        {/* Global Progression Tracker bar */}
-        <div className="hidden sm:flex items-center gap-3 bg-white/5 border border-white/10 py-1.5 px-4 rounded-full max-w-xs shrink-0">
-          <div className="w-24 sm:w-32 bg-white/15 h-2 rounded-full overflow-hidden shrink-0">
-            <div className="h-full rounded-full transition-all duration-500 accent-gradient" style={{ width: `${progressPercent}%` }}></div>
+        {/* Global Progression Tracker bar & WhatsApp button */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="hidden sm:flex items-center gap-3 bg-white/5 border border-white/10 py-1.5 px-4 rounded-full max-w-xs shrink-0">
+            <div className="w-24 sm:w-32 bg-white/15 h-2 rounded-full overflow-hidden shrink-0">
+              <div className="h-full rounded-full transition-all duration-500 accent-gradient" style={{ width: `${progressPercent}%` }}></div>
+            </div>
+            <span className="text-[10px] font-bold text-slate-300 shrink-0 font-sans">{progressPercent}% ({completedCount}/{totalChapters})</span>
           </div>
-          <span className="text-[10px] font-bold text-slate-300 shrink-0 font-sans">{progressPercent}% ({completedCount}/{totalChapters})</span>
+
+          {(() => {
+            const cleanNumber = course.whatsappNumber ? course.whatsappNumber.replace(/[^0-9]/g, '') : '221771234567';
+            const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Bonjour, je suis étudiant dans votre formation "${course.title}".`)}`;
+            return (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Contacter ${course.trainerName} sur WhatsApp`}
+                className="bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/35 text-emerald-400 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shrink-0 shadow-sm"
+              >
+                <MessageCircle className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
+                <span className="hidden md:inline">WhatsApp Formateur</span>
+              </a>
+            );
+          })()}
         </div>
       </div>
 
@@ -529,10 +535,14 @@ export default function CoursePlayer({
                     {/* SINGLE BUTTON labeled "Marquer comme terminé" replaces all navigation buttons */}
                     <button
                       onClick={handleMarkComplete}
-                      className="py-2.5 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-lg flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-95"
+                      className={`py-2.5 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-lg flex items-center gap-1.5 cursor-pointer ${
+                        isCurrentCompleted
+                          ? 'bg-emerald-600 hover:bg-emerald-700'
+                          : 'bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-95'
+                      }`}
                     >
                       <Check className="w-4 h-4" />
-                      <span>Marquer comme terminé</span>
+                      <span>{isCurrentCompleted ? 'Terminé (Recliquer pour dévalider)' : 'Marquer comme terminé'}</span>
                     </button>
                   </div>
                 </div>
@@ -619,6 +629,24 @@ export default function CoursePlayer({
                   </div>
                 )}
 
+                {/* Bottom action bar with 'Marquer comme terminé' button */}
+                <div className="pt-6 border-t border-white/10 flex items-center justify-between gap-4">
+                  <span className="text-xs text-slate-400 font-sans">
+                    {isCurrentCompleted ? '✓ Ce chapitre est validé' : 'Avez-vous terminé la lecture/visionnage de ce chapitre ?'}
+                  </span>
+                  <button
+                    onClick={handleMarkComplete}
+                    className={`py-2.5 px-5 rounded-xl text-white text-xs font-bold transition-all shadow-lg flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                      isCurrentCompleted
+                        ? 'bg-emerald-600 hover:bg-emerald-700'
+                        : 'bg-gradient-to-r from-emerald-500 to-indigo-600 hover:opacity-95'
+                    }`}
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>{isCurrentCompleted ? 'Terminé (Recliquer pour dévalider)' : 'Marquer comme terminé'}</span>
+                  </button>
+                </div>
+
                 {/* MODULAR INTERACTIVE FEATURES (Student view: bookmarks, quizzes, assignments, certificate & Q&A) */}
                 {currentUser && isEnrolled && (
                   <div className="border-t border-white/10 pt-6 space-y-6">
@@ -673,7 +701,7 @@ export default function CoursePlayer({
       {/* Congratulations Modal when Course is Completed */}
       {showCongrats && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1b2028] border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-fade-in text-white">
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full text-center space-y-6 shadow-2xl animate-fade-in text-white">
             <div className="w-20 h-20 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-lg">
               <Sparkles className="w-10 h-10 text-amber-400 animate-pulse" />
             </div>

@@ -897,11 +897,19 @@ Bon apprentissage.`,
     }
   };
 
-  const handleToggleChapterComplete = async (chapterId: string) => {
-    if (!currentUser || !activeCoursePlayer) return;
+  const handleToggleChapterComplete = async (chapterId: string, overrideCourseId?: string) => {
+    if (!currentUser) return;
+
+    // Find chapter to resolve courseId if needed
+    const chapter = allChapters.find(ch => ch.id === chapterId);
+    const module = chapter ? allModules.find(m => m.id === chapter.moduleId) : null;
+    const targetCourseId = overrideCourseId || module?.courseId || activeCoursePlayer?.id;
+    if (!targetCourseId) return;
+
+    const targetCourse = allCourses.find(c => c.id === targetCourseId) || activeCoursePlayer;
 
     const existingIdx = allProgress.findIndex(
-      p => p.studentEmail.toLowerCase() === currentUser.email.toLowerCase() && p.courseId === activeCoursePlayer.id
+      p => p.studentEmail.toLowerCase() === currentUser.email.toLowerCase() && p.courseId === targetCourseId
     );
 
     const now = new Date().toISOString();
@@ -922,7 +930,7 @@ Bon apprentissage.`,
     } else {
       updatedProgress = {
         studentEmail: currentUser.email.toLowerCase(),
-        courseId: activeCoursePlayer.id,
+        courseId: targetCourseId,
         completedChapterIds: [chapterId],
         lastAccessedAt: now,
         completedModuleEmailsSent: [],
@@ -934,10 +942,10 @@ Bon apprentissage.`,
     const isAddingChapter = existingIdx === -1 || !allProgress[existingIdx].completedChapterIds.includes(chapterId);
 
     if (isAddingChapter) {
-      const courseModules = allModules.filter(m => m.courseId === activeCoursePlayer.id);
+      const courseModules = allModules.filter(m => m.courseId === targetCourseId);
       const courseChapters = allChapters.filter(ch => {
         const mod = allModules.find(m => m.id === ch.moduleId);
-        return mod?.courseId === activeCoursePlayer.id;
+        return mod?.courseId === targetCourseId;
       });
 
       // Find module for this chapter
@@ -953,7 +961,7 @@ Bon apprentissage.`,
             emailTriggers.moduleCompleted(
               currentUser.email,
               currentUser.name,
-              activeCoursePlayer.title,
+              targetCourse?.title || 'Formation',
               targetModule.title
             );
 
@@ -961,9 +969,9 @@ Bon apprentissage.`,
             sendRealtimeNotification({
               userEmail: currentUser.email,
               title: `🌟 Module « ${targetModule.title} » validé !`,
-              message: `Félicitations ! Vous avez validé toutes les leçons du module dans "${activeCoursePlayer.title}".`,
+              message: `Félicitations ! Vous avez validé toutes les leçons du module dans "${targetCourse?.title || 'Formation'}".`,
               type: 'module_completed',
-              courseId: activeCoursePlayer.id
+              courseId: targetCourseId
             });
 
             updatedProgress = {
@@ -981,23 +989,23 @@ Bon apprentissage.`,
         emailTriggers.courseCompleted(
           currentUser.email,
           currentUser.name,
-          activeCoursePlayer.title
+          targetCourse?.title || 'Formation'
         );
 
         // Send Realtime Notification
         sendRealtimeNotification({
           userEmail: currentUser.email,
           title: `🎉 Formation 100% terminée !`,
-          message: `Bravo ! Vous avez terminé 100% de la formation "${activeCoursePlayer.title}". Vous pouvez commander votre certificat officiel.`,
+          message: `Bravo ! Vous avez terminé 100% de la formation "${targetCourse?.title || 'Formation'}". Vous pouvez commander votre certificat officiel.`,
           type: 'course_completed',
-          courseId: activeCoursePlayer.id
+          courseId: targetCourseId
         });
 
         updatedProgress = {
           ...updatedProgress,
           courseCompletedEmailSent: true
         };
-        showToast(`🎉 Bravo ! Vous avez terminé 100% de la formation « ${activeCoursePlayer.title} ». Un e-mail vous a été envoyé !`, 'success');
+        showToast(`🎉 Bravo ! Vous avez terminé 100% de la formation « ${targetCourse?.title || 'Formation'} ». Un e-mail vous a été envoyé !`, 'success');
       }
     }
 
@@ -1225,6 +1233,7 @@ Bon apprentissage.`,
             allChapters={allChapters}
             allEnrollments={allEnrollments}
             allProgress={allProgress}
+            footerConfig={footerConfig}
             onOpenCoursePlayer={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
             onOpenCatalog={() => navigateTo('/marketplace')}
             onOpenPublicPage={(c) => navigateTo(`/formation/${c.seoSlug || c.id}`)}
@@ -1471,6 +1480,7 @@ Bon apprentissage.`,
           allChapters={allChapters}
           allEnrollments={allEnrollments}
           allProgress={allProgress}
+          footerConfig={footerConfig}
           onOpenCoursePlayer={(c) => navigateTo(`/dashboard/formation/${c.id}`)}
           onOpenCatalog={() => navigateTo('/marketplace')}
           onOpenPublicPage={(c) => navigateTo(`/formation/${c.seoSlug || c.id}`)}

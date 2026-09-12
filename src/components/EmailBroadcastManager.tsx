@@ -576,6 +576,21 @@ export default function EmailBroadcastManager({ allUsers, currentUser, onSendEma
     ? resolvedRecipients[0] 
     : { email: 'eleve.demo@dekel-formation.com', name: 'Amadou Diallo', role: 'Étudiant' };
 
+  // Strict role enforcement: Only administrator is authorized
+  if (currentUser?.role !== 'admin') {
+    return (
+      <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-sm max-w-lg mx-auto">
+        <div className="inline-flex p-3 bg-red-50 text-red-600 rounded-full mb-3">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900">Accès strictement réservé à l'Administrateur</h3>
+        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          Seul l'administrateur de la plateforme est autorisé à accéder à la diffusion d'e-mails et aux templates. Ni les formateurs ni les étudiants ne peuvent accéder à cette section.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}

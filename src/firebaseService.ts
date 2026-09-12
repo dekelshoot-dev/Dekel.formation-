@@ -36,84 +36,86 @@ export function cleanUndefined<T>(obj: T): T {
 }
 
 /**
- * Auto-seeds the Firestore database with initial mock data if the courses collection is empty.
+ * Auto-seeds or updates the Firestore database with the 3 real platform courses:
+ * - Monter des vidéos avec l'ordinateur
+ * - Monter des vidéos avec le téléphone
+ * - Cash Nation
  */
 export async function seedDatabaseIfEmpty() {
   let currentStep = 'check seeding doc';
   try {
-    const seedingDocRef = doc(db, 'metadata', 'seeding_hierarchical');
+    const seedingDocRef = doc(db, 'metadata', 'seeding_v4_three_courses');
     const seedingSnap = await getDoc(seedingDocRef);
     if (seedingSnap.exists()) {
-      console.log('Database already seeded.');
+      console.log('Database already synchronized with the 3 platform courses.');
       return;
     }
 
-    console.log('Seeding Firestore database with initial mock data...');
+    console.log('Syncing Firestore database with the 3 official platform courses...');
 
-        // Seed Users
+    // 1. Seed/Update Users (including trainer Ibrahim Touré u-6)
     currentStep = 'users';
     for (const u of INITIAL_USERS) {
-      console.log('Seeding user:', u.id);
-      await setDoc(doc(db, 'users', u.id), cleanUndefined(u));
+      console.log('Syncing user:', u.id);
+      await setDoc(doc(db, 'users', u.id), cleanUndefined(u), { merge: true });
     }
 
-    // Seed Courses
+    // 2. Remove obsolete mock courses if present in database
+    currentStep = 'cleanup obsolete courses';
+    const obsoleteCourseIds = ['c-4', 'c-5', 'c-6', 'c-7'];
+    for (const oldId of obsoleteCourseIds) {
+      try {
+        await deleteDoc(doc(db, 'courses', oldId));
+      } catch (err) {
+        // Non-critical if not existing
+      }
+    }
+
+    // 3. Seed/Update the 3 platform Courses
     currentStep = 'courses';
     for (const c of INITIAL_COURSES) {
-      console.log('Seeding course:', c.id);
+      console.log('Syncing course:', c.id, c.title);
       await setDoc(doc(db, 'courses', c.id), cleanUndefined(c));
     }
 
-    // Seed Modules
+    // 4. Seed Modules
     currentStep = 'modules';
     for (const m of INITIAL_MODULES) {
-      console.log('Seeding module:', m.id);
+      console.log('Syncing module:', m.id);
       await setDoc(doc(db, 'courses', m.courseId, 'modules', m.id), cleanUndefined(m));
     }
 
-    // Seed Chapters
+    // 5. Seed Chapters
     currentStep = 'chapters';
     for (const ch of INITIAL_CHAPTERS) {
-      console.log('Seeding chapter:', ch.id);
+      console.log('Syncing chapter:', ch.id);
       await setDoc(doc(db, 'courses', ch.courseId, 'modules', ch.moduleId, 'chapters', ch.id), cleanUndefined(ch));
     }
 
-    // Seed Enrollments
+    // 6. Seed Enrollments
     currentStep = 'enrollments';
     for (const e of INITIAL_ENROLLMENTS) {
-      console.log('Seeding enrollment:', e.id);
-      await setDoc(doc(db, 'enrollments', e.id), cleanUndefined(e));
+      await setDoc(doc(db, 'enrollments', e.id), cleanUndefined(e), { merge: true });
     }
 
-    // Seed Progress
+    // 7. Seed Progress
     currentStep = 'progress';
     for (const p of INITIAL_PROGRESS) {
       const pid = `progress-${p.courseId}-${sanitizeId(p.studentEmail)}`;
-      console.log('Seeding progress:', pid);
-      await setDoc(doc(db, 'progress', pid), cleanUndefined(p));
+      await setDoc(doc(db, 'progress', pid), cleanUndefined(p), { merge: true });
     }
 
-    // Seed Emails
-    currentStep = 'emails';
-    for (const em of INITIAL_EMAILS) {
-      console.log('Seeding email:', em.id);
-      await setDoc(doc(db, 'emails', em.id), cleanUndefined(em));
+    // 8. Seed Custom HTML Pages
+    currentStep = 'custom_pages';
+    for (const page of INITIAL_CUSTOM_PAGES) {
+      await setDoc(doc(db, 'custom_pages', page.id), cleanUndefined(page), { merge: true });
     }
 
-    // Seed Pre-registered
-    currentStep = 'preregistered';
-    for (const pr of INITIAL_PRE_REGISTERED) {
-      const prid = `prereg-${sanitizeId(pr.email)}`;
-      console.log('Seeding preregistered:', prid);
-      await setDoc(doc(db, 'preregistered', prid), cleanUndefined(pr));
-    }
-
-    // Mark Seeding as Completed
+    // 9. Mark Seeding as Completed
     currentStep = 'mark seeding completed';
-    console.log('Seeding metadata...');
-    await setDoc(seedingDocRef, { completed: true });
+    await setDoc(seedingDocRef, { completed: true, timestamp: new Date().toISOString() });
 
-    console.log('Seeding completed successfully!');
+    console.log('Firestore synchronized successfully with the 3 platform courses!');
   } catch (error) {
     console.warn(`Database seeding notice at step "${currentStep}":`, error);
   }
@@ -332,15 +334,38 @@ export async function deleteCustomPage(pageId: string) {
   }
 }
 
-export async function incrementCustomPageViewCount(pageId: string) {
+export async function incrementCustomPageViewCount(pageId: string, pageData?: CustomHtmlPage): Promise<number> {
   const path = `custom_pages/${pageId}`;
   try {
-    await updateDoc(doc(db, 'custom_pages', pageId), {
-      viewsCount: increment(1)
-    });
+    const pageRef = doc(db, 'custom_pages', pageId);
+    const snap = await getDoc(pageRef);
+    if (snap.exists()) {
+      await updateDoc(pageRef, {
+        viewsCount: increment(1),
+        lastVisitedAt: new Date().toISOString()
+      });
+      const updatedSnap = await getDoc(pageRef);
+      return updatedSnap.data()?.viewsCount || (pageData?.viewsCount || 0) + 1;
+    } else {
+      // Document does not exist yet in Firestore; create with initial payload and incremented count
+      const currentViews = pageData?.viewsCount || 0;
+      const initialPayload = pageData ? {
+        ...cleanUndefined(pageData),
+        viewsCount: currentViews + 1,
+        lastVisitedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      } : {
+        id: pageId,
+        viewsCount: 1,
+        lastVisitedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(pageRef, initialPayload, { merge: true });
+      return currentViews + 1;
+    }
   } catch (error) {
-    // If updateDoc fails because document doesn't exist yet or lacks viewsCount
-    console.warn('Could not increment page view count:', error);
+    console.warn('Could not increment page view count in Firestore:', error);
+    return (pageData?.viewsCount || 0) + 1;
   }
 }
 

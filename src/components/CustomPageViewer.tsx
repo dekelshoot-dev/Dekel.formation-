@@ -8,22 +8,30 @@ interface CustomPageViewerProps {
   isPreviewMode?: boolean;
   onClosePreview?: () => void;
   onEditPage?: (page: CustomHtmlPage) => void;
+  onIncrementView?: (pageId: string) => void;
 }
 
 export default function CustomPageViewer({
   page,
   isPreviewMode = false,
   onClosePreview,
-  onEditPage
+  onEditPage,
+  onIncrementView
 }: CustomPageViewerProps) {
   const [deviceViewport, setDeviceViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const hasTrackedRef = React.useRef<string | null>(null);
 
   // Increment view counter when loaded live (not preview mode)
   useEffect(() => {
-    if (!isPreviewMode && page?.id) {
-      incrementCustomPageViewCount(page.id);
+    if (!isPreviewMode && page?.id && hasTrackedRef.current !== page.id) {
+      hasTrackedRef.current = page.id;
+      if (onIncrementView) {
+        onIncrementView(page.id);
+      } else {
+        incrementCustomPageViewCount(page.id, page);
+      }
     }
-  }, [page?.id, isPreviewMode]);
+  }, [page?.id, isPreviewMode, onIncrementView]);
 
   // Inject Meta Title & Meta Description on host page as well for SEO
   useEffect(() => {

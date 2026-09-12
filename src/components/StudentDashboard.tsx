@@ -319,35 +319,14 @@ export default function StudentDashboard({
                             </p>
                           </div>
 
-                          {/* Contact & Actions */}
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => onOpenCoursePlayer(course)}
-                                className="flex-1 bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold py-2 rounded-xl text-xs text-center flex items-center justify-center gap-1.5 transition-all"
-                              >
-                                <Play className="w-3.5 h-3.5 text-indigo-400 fill-indigo-400" />
-                                <span>{pct > 0 ? 'Continuer' : 'Commencer'}</span>
-                              </button>
-                              {(() => {
-                                const rawWhatsapp = course.whatsappNumber || footerConfig?.socialLinks?.whatsapp || footerConfig?.contactInfo?.phone || '+221771234567';
-                                const cleanNumber = rawWhatsapp.replace(/[^0-9]/g, '') || '221771234567';
-                                const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(`Bonjour, je suis étudiant dans votre formation "${course.title}".`)}`;
-                                return (
-                                  <a
-                                    href={whatsappUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    title={`Contacter ${course.trainerName} sur WhatsApp (${course.whatsappNumber || '+221 77 123 45 67'})`}
-                                    className="bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/35 text-emerald-400 hover:text-emerald-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shrink-0"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
-                                    <span>WhatsApp</span>
-                                  </a>
-                                );
-                              })()}
-                            </div>
-                          </div>
+                          {/* Actions */}
+                          <button
+                            onClick={() => onOpenCoursePlayer(course)}
+                            className="w-full bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold py-2 rounded-xl text-xs text-center flex items-center justify-center gap-1.5 transition-all"
+                          >
+                            <Play className="w-3.5 h-3.5 text-indigo-400 fill-indigo-400" />
+                            <span>{pct > 0 ? 'Continuer le cours' : 'Commencer le cours'}</span>
+                          </button>
                         </div>
                       </div>
                     );

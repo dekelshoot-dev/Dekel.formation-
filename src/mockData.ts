@@ -27,8 +27,18 @@ export const INITIAL_USERS: User[] = [
     name: 'Marie Laurent',
     role: 'trainer',
     avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    bio: 'Experte en e-commerce et marketing digital. Créatrice de 3 marques à succès sur Shopify.',
+    bio: 'Formatrice en création vidéo mobile et storytelling pour réseaux sociaux. Formatrice sur "Monter des vidéos avec le téléphone".',
     createdAt: '2026-02-01T14:30:00Z',
+    status: 'active'
+  },
+  {
+    id: 'u-6',
+    email: 'ibrahim.toure@gmail.com',
+    name: 'Ibrahim Touré',
+    role: 'trainer',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
+    bio: 'Fondateur de Cash Nation. Expert en business digital, monétisation et génération de revenus.',
+    createdAt: '2026-01-05T09:00:00Z',
     status: 'active'
   },
   {
@@ -54,164 +64,80 @@ export const INITIAL_USERS: User[] = [
 export const INITIAL_COURSES: Course[] = [
   {
     id: 'c-1',
-    title: 'Devenir Développeur Web Moderne',
+    title: "Monter des vidéos avec l'ordinateur",
     trainerId: 'u-2',
     trainerName: 'Jean Dupont',
     language: 'Français',
-    description: 'Apprenez le HTML, CSS, JavaScript, React et Node.js pour créer des applications web professionnelles de A à Z. Aucun prérequis nécessaire !',
+    description: 'La formation de référence pour maîtriser le montage vidéo professionnel sur PC et Mac avec Premiere Pro, DaVinci Resolve et CapCut Desktop. Découpage, effets, transitions et étalonnage.',
     themeColor: 'indigo',
     trainerPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1547082299-de196ea013d6?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800',
+    logoUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=100',
+    coverImage: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800',
     status: 'published',
     createdAt: '2026-01-15T12:00:00Z',
-    type: 'Développement Web',
-    price: 150000,
-    level: 'Débutant',
-    duration: '30 heures',
+    type: 'Montage Vidéo sur PC & Mac',
+    price: 35000,
+    level: 'Tous niveaux',
+    duration: '25 heures',
     whatsappNumber: '+221771234567',
     contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
     id: 'c-2',
-    title: 'E-Commerce Extrême : De Zéro à 5 000 000 FCFA/mois',
+    title: 'Monter des vidéos avec le téléphone',
     trainerId: 'u-3',
     trainerName: 'Marie Laurent',
     language: 'Français',
-    description: 'Le plan d\'action complet pour lancer votre boutique en ligne sans stock, trouver des produits gagnants et générer des ventes grâce aux réseaux sociaux.',
+    description: 'Créez des vidéos captivantes, dynamiques et virales pour TikTok, Instagram Reels et YouTube Shorts directement avec votre smartphone (CapCut Mobile & VN).',
     themeColor: 'emerald',
     trainerPhoto: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+    logoUrl: 'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=100',
+    coverImage: 'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=800',
     status: 'published',
     createdAt: '2026-02-05T15:00:00Z',
-    type: 'E-commerce & Marketing',
-    price: 250000,
-    level: 'Intermédiaire',
-    duration: '20 heures',
-    whatsappNumber: '+221771234567',
-    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
-  },
-  {
-    id: 'c-3',
-    title: 'Masterclass Design UX/UI & Figma',
-    trainerId: 'u-2',
-    trainerName: 'Jean Dupont',
-    language: 'Français',
-    description: 'Maîtrisez l\'outil de design Figma et concevez des interfaces mobiles et desktop sublimes, ergonomiques et prêtes à être codées.',
-    themeColor: 'rose',
-    trainerPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?w=800',
-    status: 'published',
-    createdAt: '2026-03-01T09:00:00Z',
-    type: 'Design UI/UX',
-    price: 125000,
-    level: 'Tous niveaux',
+    type: 'Montage Vidéo Mobile',
+    price: 5000,
+    level: 'Débutant',
     duration: '15 heures',
     whatsappNumber: '+221771234567',
     contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   },
   {
-    id: 'c-4',
-    title: 'Bâtir son Audience Instagram Organique',
-    trainerId: 'u-3',
-    trainerName: 'Marie Laurent',
+    id: 'c-3',
+    title: 'Cash Nation',
+    trainerId: 'u-6',
+    trainerName: 'Ibrahim Touré',
     language: 'Français',
-    description: 'La méthode pas-à-pas pour attirer 10 000 abonnés qualifiés sans dépenser un seul centime en publicité et monétiser son compte dès le premier jour.',
+    description: 'Le programme ultime de Cash Nation pour transformer vos compétences en machine à cash, lancer des business en ligne rentables et générer des revenus récurrents en Afrique et à l\'international.',
     themeColor: 'amber',
-    trainerPhoto: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=800',
-    status: 'draft',
-    createdAt: '2026-04-10T17:30:00Z',
-    type: 'Marketing d\'Influence',
-    price: 75000,
-    level: 'Débutant',
-    duration: '8 heures',
-    whatsappNumber: '+221771234567',
-    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
-  },
-  {
-    id: 'c-5',
-    title: 'Montage Vidéo de Pro : De CapCut à Premiere Pro',
-    trainerId: 'u-2',
-    trainerName: 'Jean Dupont',
-    language: 'Français',
-    description: 'Maîtrisez les techniques de montage vidéo professionnelles. Apprenez à couper, rythmer, étalonner, ajouter des effets sonores et exporter des vidéos captivantes pour YouTube, TikTok et Instagram.',
-    themeColor: 'sky',
-    trainerPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800',
+    trainerPhoto: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
+    logoUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=100',
+    coverImage: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800',
     status: 'published',
-    createdAt: '2026-05-01T10:00:00Z',
-    type: 'Montage Vidéo',
-    price: 95000,
-    level: 'Débutant',
-    duration: '12 heures',
-    whatsappNumber: '+221771234567',
-    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
-  },
-  {
-    id: 'c-6',
-    title: 'L\'Art des Miniatures YouTube Explosives',
-    trainerId: 'u-2',
-    trainerName: 'Jean Dupont',
-    language: 'Français',
-    description: 'La méthode complète pour concevoir des miniatures (thumbnails) qui maximisent le taux de clic (CTR). Maîtrisez le cadrage, la théorie des couleurs, le détourage et l\'intégration de textes impactants sur Photoshop et Canva.',
-    themeColor: 'rose',
-    trainerPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1626379616459-b2ce1d9decbc?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1626379616459-b2ce1d9decbc?w=800',
-    status: 'published',
-    createdAt: '2026-05-10T14:00:00Z',
-    type: 'Miniatures',
-    price: 45000,
+    createdAt: '2026-03-01T09:00:00Z',
+    type: 'Business & Monétisation',
+    price: 25000,
     level: 'Tous niveaux',
-    duration: '6 heures',
-    whatsappNumber: '+221771234567',
-    contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
-  },
-  {
-    id: 'c-7',
-    title: 'Conception de Flyers & Identités Visuelles d\'Impact',
-    trainerId: 'u-3',
-    trainerName: 'Marie Laurent',
-    language: 'Français',
-    description: 'Créez des flyers promotionnels professionnels, des affiches publicitaires et des visuels pour réseaux sociaux qui captent l\'attention. Idéal pour freelances, créateurs de contenu et entreprises.',
-    themeColor: 'emerald',
-    trainerPhoto: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150',
-    logoUrl: 'https://images.unsplash.com/photo-1542744094-3a31f103e35f?w=100',
-    coverImage: 'https://images.unsplash.com/photo-1542744094-3a31f103e35f?w=800',
-    status: 'published',
-    createdAt: '2026-05-15T09:00:00Z',
-    type: 'Flyers',
-    price: 60000,
-    level: 'Débutant',
-    duration: '8 heures',
+    duration: '20 heures',
     whatsappNumber: '+221771234567',
     contactInfo: 'WhatsApp: +221 77 123 45 67\nE-mail: support@dekel-formation.com'
   }
 ];
 
 export const INITIAL_MODULES: Module[] = [
-  // Modules for Course 1 (c-1)
-  { id: 'm-1', courseId: 'c-1', title: 'Module 1 : Introduction & Préparatifs', order: 1 },
-  { id: 'm-2', courseId: 'c-1', title: 'Module 2 : Les bases du HTML5', order: 2 },
-  { id: 'm-3', courseId: 'c-1', title: 'Module 3 : Styliser avec CSS3', order: 3 },
+  // Modules for Course 1 (c-1) - Monter des vidéos avec l'ordinateur
+  { id: 'm-1', courseId: 'c-1', title: 'Module 1 : Prise en main des logiciels (Premiere Pro & DaVinci)', order: 1 },
+  { id: 'm-2', courseId: 'c-1', title: 'Module 2 : Le dérushage, rythme et techniques de cut', order: 2 },
+  { id: 'm-3', courseId: 'c-1', title: 'Module 3 : Sound design, étalonnage et export haute qualité', order: 3 },
   
-  // Modules for Course 2 (c-2)
-  { id: 'm-4', courseId: 'c-2', title: 'Module 1 : Les bases de la niche', order: 1 },
-  { id: 'm-5', courseId: 'c-2', title: 'Module 2 : Créer sa boutique Shopify', order: 2 },
+  // Modules for Course 2 (c-2) - Monter des vidéos avec le téléphone
+  { id: 'm-4', courseId: 'c-2', title: 'Module 1 : Prise en main de CapCut Mobile', order: 1 },
+  { id: 'm-5', courseId: 'c-2', title: 'Module 2 : Sous-titres dynamiques, B-rolls et transitions virales', order: 2 },
 
-  // Modules for Course 5 (c-5)
-  { id: 'm-6', courseId: 'c-5', title: 'Module 1 : Maîtrise des logiciels de montage', order: 1 },
-
-  // Modules for Course 6 (c-6)
-  { id: 'm-7', courseId: 'c-6', title: 'Module 1 : Les règles d\'or de la Miniature', order: 1 },
-
-  // Modules for Course 7 (c-7)
-  { id: 'm-8', courseId: 'c-7', title: 'Module 1 : Fondations du Graphisme & Flyers', order: 1 }
+  // Modules for Course 3 (c-3) - Cash Nation
+  { id: 'm-6', courseId: 'c-3', title: 'Module 1 : Mindset & Fondations de Cash Nation', order: 1 },
+  { id: 'm-7', courseId: 'c-3', title: 'Module 2 : Création d\'offres irrésistibles et closing', order: 2 },
+  { id: 'm-8', courseId: 'c-3', title: 'Module 3 : Automatisation et scalabilité de vos revenus', order: 3 }
 ];
 
 export const INITIAL_CHAPTERS: Chapter[] = [
@@ -377,55 +303,48 @@ Nous utilisons des outils gratuits comme Google Trends pour valider nos hypothè
   {
     id: 'ch-9',
     moduleId: 'm-6',
-    courseId: 'c-5',
-    title: 'Les bases du montage : Découpe, rythme et transition',
+    courseId: 'c-3',
+    title: 'Mindset & Vision : Les secrets de Cash Nation',
     order: 1,
     videoSource: 'youtube',
     videoUrl: 'https://www.youtube.com/watch?v=Ke90Tje7VS0',
-    richText: `Dans ce cours, nous allons poser les bases du montage vidéo.
-
-### Ce que vous allez apprendre :
-* Comment organise votre timeline de projet.
-* L'art du "cut" pour éliminer les temps morts.
-* L'intégration de transitions fluides et professionnelles.
-
-Prenez vos fichiers d'entraînement ci-dessous et commencez à pratiquer en direct !`,
+    richText: `Bienvenue dans le programme Cash Nation !
+Dans ce module introductif, nous posons les piliers fondamentaux :
+* Comment passer d'une mentalité de consommateur à celle de créateur de richesses.
+* Identifier les besoins non satisfaits sur le marché digital.
+* Définir ses objectifs financiers mensuels et sa feuille de route stratégique.`,
     downloadableFiles: [
-      { id: 'df-3', name: 'Pack de Rushs d\'entraînement (Vlog & Facecam).zip', url: '#', size: '145 Mo' }
+      { id: 'df-3', name: 'Plan d\'action Cash Nation - Feuille de route.pdf', url: '#', size: '1.8 Mo' }
     ]
   },
   {
     id: 'ch-10',
     moduleId: 'm-7',
-    courseId: 'c-6',
-    title: 'La psychologie du clic : théorie des visages et couleurs',
+    courseId: 'c-3',
+    title: 'Créer une offre irrésistible & Closing WhatsApp',
     order: 1,
     videoSource: 'youtube',
     videoUrl: 'https://www.youtube.com/watch?v=M9mCHtIisdM',
-    richText: `Pourquoi un internaute clique-t-il sur une vidéo plutôt qu'une autre ?
-
-### Les secrets d'une miniature cliquable :
-1. **La règle des 3 éléments max** : Le cerveau humain doit comprendre le sujet de la vidéo en moins d'une seconde.
-2. **L'expression faciale exagérée** : Les visages génèrent de l'empathie et de la curiosité.
-3. **Le contraste fort** : Utiliser des contours lumineux et des textes à fort contraste (jaune, rouge, blanc sur fond sombre).`,
+    richText: `L'art du closing et de la conversion :
+1. **La proposition de valeur unique** : Pourquoi le prospect doit acheter chez vous maintenant.
+2. **Scripts de vente WhatsApp** : Comment convertir des prospects en clients payants sans forcer.
+3. **Moyens de paiement locaux** : Intégrer Orange Money, MTN MoMo et Wave pour lever toute friction.`,
     externalLinks: [
-      { id: 'el-3', title: 'Site de référence : Thumbsup.tv (Tester son design en direct)', url: 'https://thumbsup.tv' }
+      { id: 'el-3', title: 'Rejoindre le canal privé Telegram Cash Nation', url: 'https://t.me/cashnation' }
     ]
   },
   {
     id: 'ch-11',
     moduleId: 'm-8',
-    courseId: 'c-7',
-    title: 'Composer une affiche commerciale équilibrée',
+    courseId: 'c-3',
+    title: 'Automatiser ses ventes et scaler à plus de 1M FCFA/mois',
     order: 1,
     videoSource: 'youtube',
     videoUrl: 'https://www.youtube.com/watch?v=pQN-pnXPaVg',
-    richText: `Un flyer efficace doit guider l'œil du prospect.
-
-### Structure universelle d'un flyer :
-* **Accroche principale** : visible à plus de 2 mètres.
-* **L'offre ou la valeur ajoutée** : claire et chiffrée (ex: -20% sur tout).
-* **Call to action (Appel à l'action)** : QR Code, numéro de téléphone WhatsApp ou adresse de l'événement.`
+    richText: `Comment bâtir un système automatisé qui génère des revenus 24h/24 :
+* Tunnels de vente simples et efficaces.
+* Automatisation des accès après paiement Mobile Money.
+* Délégation et recrutement de partenaires affiliés.`
   }
 ];
 
@@ -504,6 +423,374 @@ export const INITIAL_CATEGORIES: string[] = [
 
 export const INITIAL_CUSTOM_PAGES: CustomHtmlPage[] = [
   {
+    id: 'page-video-ordinateur',
+    title: 'Formation Montage Vidéo sur PC - Masterclass Complète',
+    slug: 'video-ordinateur',
+    status: 'published',
+    seoTitle: 'Formation Montage Vidéo sur Ordinateur - Jean Dupont',
+    seoDescription: 'Apprenez le montage vidéo professionnel sur ordinateur de A à Z avec Premiere Pro et DaVinci Resolve.',
+    ogImage: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=1200',
+    createdAt: '2026-06-15T09:00:00Z',
+    updatedAt: '2026-08-10T14:30:00Z',
+    authorId: 'u-2',
+    authorName: 'Jean Dupont',
+    authorEmail: 'jean.dupont@gmail.com',
+    viewsCount: 268,
+    html: `<div class="container">
+  <div class="tag">Édition Spéciale 2026</div>
+  <h1>Maîtrisez le Montage Vidéo Pro sur Ordinateur</h1>
+  <p class="desc">Découvrez les secrets de montage des créateurs à succès : découpage rythmé, étalonnage cinéma, sound design et exports 4K.</p>
+  
+  <div class="stats-row">
+    <div class="stat-box"><strong>+350</strong><span>Élèves Formés</span></div>
+    <div class="stat-box"><strong>4.9/5</strong><span>Note Moyenne</span></div>
+    <div class="stat-box"><strong>100%</strong><span>Pratique</span></div>
+  </div>
+
+  <div class="offer-box">
+    <div class="price-tag">50 000 FCFA <span class="old-price">95 000 FCFA</span></div>
+    <a href="/formation/monter-des-videos-avec-l-ordinateur" class="btn-primary">Rejoindre la formation</a>
+    <p class="note">Accès instantané et illimité à vie • Assistance personnalisée</p>
+  </div>
+</div>`,
+    css: `body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background: #090d16;
+  color: #f1f5f9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.container {
+  max-width: 640px;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 24px;
+  padding: 40px 32px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+.tag {
+  display: inline-block;
+  background: #4f46e5;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 14px;
+  border-radius: 99px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+}
+h1 {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0 0 16px;
+  line-height: 1.3;
+}
+.desc {
+  color: #94a3b8;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.stat-box {
+  background: #1f2937;
+  padding: 14px 8px;
+  border-radius: 12px;
+}
+.stat-box strong {
+  display: block;
+  font-size: 20px;
+  color: #818cf8;
+}
+.stat-box span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.offer-box {
+  background: rgba(79, 70, 229, 0.1);
+  border: 1px solid rgba(79, 70, 229, 0.3);
+  padding: 24px;
+  border-radius: 16px;
+}
+.price-tag {
+  font-size: 26px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+.old-price {
+  font-size: 16px;
+  color: #64748b;
+  text-decoration: line-through;
+  margin-left: 8px;
+}
+.btn-primary {
+  display: block;
+  width: 100%;
+  background: #4f46e5;
+  color: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 16px;
+  transition: 0.2s;
+}
+.btn-primary:hover {
+  background: #4338ca;
+}
+.note {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 12px;
+  margin-bottom: 0;
+}`,
+    js: `console.log("Page de vente Montage PC initialisée.");`
+  },
+  {
+    id: 'page-video-smartphone',
+    title: 'Formation Montage Vidéo sur Smartphone - Créateurs Mobiles',
+    slug: 'video-telephone',
+    status: 'published',
+    seoTitle: 'Formation Montage Vidéo Smartphone - Marie Laurent',
+    seoDescription: 'Créez des vidéos virales pour TikTok, Reels et Shorts directement depuis votre téléphone avec CapCut.',
+    ogImage: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=1200',
+    createdAt: '2026-06-20T10:30:00Z',
+    updatedAt: '2026-08-12T16:00:00Z',
+    authorId: 'u-3',
+    authorName: 'Marie Laurent',
+    authorEmail: 'marie.laurent@gmail.com',
+    viewsCount: 195,
+    html: `<div class="phone-card">
+  <div class="mobile-badge">📱 100% Smartphone</div>
+  <h2>Devenez Viral Grâce au Montage sur Téléphone</h2>
+  <p class="lead">Pas besoin d'ordinateur coûteux ! Apprenez à monter des vidéos percutantes qui captivent l'attention dès les 3 premières secondes.</p>
+
+  <div class="bullet-list">
+    <div class="bullet-item">✨ Les transitions dynamiques CapCut</div>
+    <div class="bullet-item">🔥 Le sous-titrage automatique animé</div>
+    <div class="bullet-item">🎵 Le mixage audio et effets sonores</div>
+  </div>
+
+  <div class="checkout-box">
+    <span class="cost">30 000 FCFA</span>
+    <a href="/formation/monter-des-videos-avec-le-telephone" class="join-btn">S'inscrire maintenant</a>
+  </div>
+</div>`,
+    css: `body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+.phone-card {
+  max-width: 500px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 24px;
+  padding: 36px 28px;
+  text-align: center;
+}
+.mobile-badge {
+  background: #ec4899;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 18px;
+}
+h2 {
+  font-size: 24px;
+  margin: 0 0 12px;
+}
+.lead {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.bullet-list {
+  text-align: left;
+  background: #0f172a;
+  padding: 16px 20px;
+  border-radius: 14px;
+  margin-bottom: 24px;
+}
+.bullet-item {
+  font-size: 13px;
+  color: #e2e8f0;
+  padding: 6px 0;
+}
+.checkout-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cost {
+  font-size: 24px;
+  font-weight: 800;
+  color: #38bdf8;
+}
+.join-btn {
+  background: #ec4899;
+  color: #fff;
+  text-decoration: none;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 15px;
+  transition: 0.2s;
+}
+.join-btn:hover {
+  background: #db2777;
+}`,
+    js: `console.log("Page Smartphone chargée.");`
+  },
+  {
+    id: 'page-cash-nation-vip',
+    title: 'Cash Nation - Programme Privé d\'Accompagnement',
+    slug: 'cash-nation',
+    status: 'published',
+    seoTitle: 'Cash Nation - Accompagnement Exclusif Ibrahim Touré',
+    seoDescription: 'Développez des sources de revenus durables en Afrique et à l\'international grâce aux stratégies Cash Nation.',
+    ogImage: 'https://images.unsplash.com/photo-1553729459-efe14ef6055d?w=1200',
+    createdAt: '2026-07-05T08:00:00Z',
+    updatedAt: '2026-08-14T11:20:00Z',
+    authorId: 'u-6',
+    authorName: 'Ibrahim Touré',
+    authorEmail: 'ibrahim.toure@gmail.com',
+    viewsCount: 312,
+    html: `<div class="gold-box">
+  <div class="gold-badge">💎 PROGRAMME EXCLUSIF</div>
+  <h1>Cash Nation : Bâtir son Écosystème Financier</h1>
+  <p class="intro">La méthode concrète étape par étape pour monétiser vos compétences et structurer des revenus récurrents.</p>
+
+  <div class="highlight-grid">
+    <div class="highlight-card">
+      <h3>🚀 Stratégies Éprouvées</h3>
+      <p>Modèles validés sur le terrain avec études de cas réelles.</p>
+    </div>
+    <div class="highlight-card">
+      <h3>🤝 Réseau d'Élite</h3>
+      <p>Accès au canal privé des membres actifs de Cash Nation.</p>
+    </div>
+  </div>
+
+  <div class="price-container">
+    <div class="tarification">45 000 FCFA <small>/ Accès Complet</small></div>
+    <a href="/formation/cash-nation" class="btn-gold">Intégrer Cash Nation</a>
+  </div>
+</div>`,
+    css: `body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background: #030712;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.gold-box {
+  max-width: 600px;
+  background: #0f172a;
+  border: 1px solid #ca8a04;
+  border-radius: 24px;
+  padding: 40px 32px;
+  text-align: center;
+  box-shadow: 0 0 30px rgba(202, 138, 4, 0.15);
+}
+.gold-badge {
+  background: linear-gradient(90deg, #ca8a04, #eab308);
+  color: #000;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 5px 14px;
+  border-radius: 99px;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+h1 {
+  font-size: 26px;
+  margin: 0 0 14px;
+}
+.intro {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+.highlight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+.highlight-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  padding: 16px;
+  border-radius: 14px;
+}
+.highlight-card h3 {
+  font-size: 14px;
+  margin: 0 0 6px;
+  color: #fde047;
+}
+.highlight-card p {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.4;
+}
+.tarification {
+  font-size: 28px;
+  font-weight: 900;
+  color: #fde047;
+  margin-bottom: 14px;
+}
+.tarification small {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.btn-gold {
+  display: block;
+  width: 100%;
+  background: linear-gradient(90deg, #ca8a04, #eab308);
+  color: #000;
+  font-weight: 800;
+  padding: 16px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 16px;
+  transition: 0.2s;
+}
+.btn-gold:hover {
+  opacity: 0.9;
+}`,
+    js: `console.log("Cash Nation VIP chargé.");`
+  },
+  {
     id: 'page-offre-speciale',
     title: 'Offre Spéciale Lancement',
     slug: 'offre-speciale',
@@ -513,6 +800,9 @@ export const INITIAL_CUSTOM_PAGES: CustomHtmlPage[] = [
     ogImage: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200',
     createdAt: '2026-07-01T10:00:00Z',
     updatedAt: '2026-07-15T14:20:00Z',
+    authorId: 'u-2',
+    authorName: 'Jean Dupont',
+    authorEmail: 'jean.dupont@gmail.com',
     viewsCount: 342,
     html: `<div class="hero-container">
   <div class="badge">🔥 Offre Exclusive Limitée</div>
@@ -669,6 +959,9 @@ document.getElementById('claimBtn')?.addEventListener('click', function(e) {
     ogImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200',
     createdAt: '2026-07-20T11:00:00Z',
     updatedAt: '2026-07-22T09:15:00Z',
+    authorId: 'u-1',
+    authorName: 'Dekel Formation',
+    authorEmail: 'service@dekel-dev.com',
     viewsCount: 189,
     html: `<div class="wrapper">
   <div class="card">

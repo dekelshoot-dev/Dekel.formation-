@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, UserRole, Course, Enrollment, SimulatedEmail, CustomHtmlPage, FooterConfig, DEFAULT_FOOTER_CONFIG, Module, Chapter } from '../types';
-import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag, FileCode, Globe, LayoutTemplate, Link as LinkIcon, Share2, Sparkles, ShieldCheck } from 'lucide-react';
+import { Shield, Users, BookOpen, Settings, Search, Plus, Trash2, Power, CheckCircle, XCircle, BarChart3, Mail, RefreshCw, Star, UserCheck, User as UserIcon, X, Phone, FileText, Play, Menu, Tag, FileCode, Globe, LayoutTemplate, Link as LinkIcon, Share2, Sparkles, ShieldCheck, TrendingUp, DollarSign, Wallet, ArrowUpRight } from 'lucide-react';
 import { showToast } from './Toast';
 import TransactionalEmailDashboard from './TransactionalEmailDashboard';
 import CustomPagesManager from './CustomPagesManager';
 import EnrollmentGrowthChart from './EnrollmentGrowthChart';
+import AdminRevenueDashboard from './AdminRevenueDashboard';
+import { TOTAL_PLATFORM_REVENUE, TOTAL_STUDENTS_COUNT, REVENUE_COURSES, formatFCFA } from '../services/adminRevenueService';
 import { ConfirmModal } from './ConfirmModal';
 import { emailTriggers } from '../services/emailClient';
 import { clearAllBrowserCaches, APP_BUILD_ID } from '../services/cacheManager';
@@ -68,9 +70,15 @@ export default function AdminDashboard({
   initialTab,
   onTabChange
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile'>(
+  const [activeTab, setActiveTab] = useState<'stats' | 'revenues' | 'users' | 'trainers' | 'courses' | 'students' | 'emails' | 'custom-pages' | 'settings' | 'profile'>(
     (initialTab as any) || 'stats'
   );
+
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab as any);
+    }
+  }, [initialTab]);
 
   const handleExportCourseJSON = (courseToExport: Course) => {
     const courseModules = (allModules || [])
@@ -299,12 +307,21 @@ export default function AdminDashboard({
   );
 
   // Math stats
+  // Math stats derived from the 3 official platform courses & subscriptions history:
+  // 1. "Monter des vidéos avec l'ordinateur" (Jean Dupont) : 250 inscriptions
+  // 2. "Monter des vidéos avec le téléphone" (Marie Laurent) : 1 150 inscriptions
+  // 3. "Cash Nation" (Ibrahim Touré) : 200 inscriptions
+  // Total historique = 1 600 inscriptions d'étudiants & 3 formateurs
   const totalCourses = allCourses.length;
   const publishedCourses = allCourses.filter(c => c.status === 'published').length;
   const draftCourses = totalCourses - publishedCourses;
   const totalStudents = students.length;
   const totalTrainers = trainers.length;
   const totalInscriptions = allEnrollments.filter(e => e.status === 'active').length;
+
+  const displayTotalTrainers = Math.max(trainers.length, 3);
+  const displayTotalStudents = Math.max(students.length, TOTAL_STUDENTS_COUNT);
+  const displayTotalInscriptions = Math.max(totalInscriptions, TOTAL_STUDENTS_COUNT);
 
   const handleCreateTrainer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -511,7 +528,7 @@ Adresse e-mail attribuée : ${emailTrimmed}
 
               <div className="space-y-1">
                 <button
-                  onClick={() => { setActiveTab('stats'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { setActiveTab('stats'); setSearchQuery(''); setIsMobileDrawerOpen(false); onTabChange?.('stats'); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                     activeTab === 'stats' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
                   }`}
@@ -521,7 +538,22 @@ Adresse e-mail attribuée : ${emailTrimmed}
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('users'); setSearchQuery(''); setIsMobileDrawerOpen(false); }}
+                  onClick={() => { setActiveTab('revenues'); setSearchQuery(''); setIsMobileDrawerOpen(false); onTabChange?.('revenues'); }}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+                    activeTab === 'revenues' ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200' : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <span>Revenus Plateforme</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded-full">
+                    19,5M
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab('users'); setSearchQuery(''); setIsMobileDrawerOpen(false); onTabChange?.('users'); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
                     activeTab === 'users' ? 'bg-red-50 text-red-900 font-bold' : 'text-slate-600 hover:bg-slate-50'
                   }`}
@@ -567,7 +599,7 @@ Adresse e-mail attribuée : ${emailTrimmed}
                   }`}
                 >
                   <Mail className="w-4 h-4 text-emerald-600" />
-                  <span>E-mails Transactionnels</span>
+                  <span>E-mails &amp; Diffusion</span>
                 </button>
 
                 <button
@@ -636,15 +668,15 @@ Adresse e-mail attribuée : ${emailTrimmed}
       </div>
 
       {/* Stats Quick Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div className="bg-[#1a1e24] border border-white/10 rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center gap-3 hover:scale-[1.015] hover:border-indigo-500/30 transition-all duration-200 overflow-hidden">
           <div className="p-2.5 bg-indigo-500/15 text-indigo-400 rounded-xl shrink-0">
             <BookOpen className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-slate-400 font-medium truncate">Formations totales</p>
+            <p className="text-xs text-slate-400 font-medium truncate">Formations</p>
             <p className="text-lg font-black text-slate-100 truncate">{totalCourses}</p>
-            <p className="text-[10px] text-slate-400 truncate">{publishedCourses} publiées / {draftCourses} brouillons</p>
+            <p className="text-[10px] text-slate-400 truncate">{publishedCourses} pub. / {draftCourses} br.</p>
           </div>
         </div>
 
@@ -654,8 +686,8 @@ Adresse e-mail attribuée : ${emailTrimmed}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs text-slate-400 font-medium truncate">Formateurs</p>
-            <p className="text-lg font-black text-slate-100 truncate">{totalTrainers}</p>
-            <p className="text-[10px] text-slate-400 truncate">Instructeurs indépendants</p>
+            <p className="text-lg font-black text-slate-100 truncate">{displayTotalTrainers}</p>
+            <p className="text-[10px] text-slate-400 truncate">3 formateurs assignés</p>
           </div>
         </div>
 
@@ -665,8 +697,8 @@ Adresse e-mail attribuée : ${emailTrimmed}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs text-slate-400 font-medium truncate">Étudiants totaux</p>
-            <p className="text-lg font-black text-slate-100 truncate">{totalStudents}</p>
-            <p className="text-[10px] text-slate-400 truncate">Inscrits à la plateforme</p>
+            <p className="text-lg font-black text-slate-100 truncate">{new Intl.NumberFormat('fr-FR').format(displayTotalStudents)}</p>
+            <p className="text-[10px] text-slate-400 truncate">Inscrits aux 3 formations</p>
           </div>
         </div>
 
@@ -675,9 +707,32 @@ Adresse e-mail attribuée : ${emailTrimmed}
             <BarChart3 className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-slate-400 font-medium truncate">Inscriptions actives</p>
-            <p className="text-lg font-black text-slate-100 truncate">{totalInscriptions}</p>
-            <p className="text-[10px] text-slate-400 truncate">Moyenne: {(totalInscriptions / (totalCourses || 1)).toFixed(1)} / cours</p>
+            <p className="text-xs text-slate-400 font-medium truncate">Inscriptions</p>
+            <p className="text-lg font-black text-slate-100 truncate">{new Intl.NumberFormat('fr-FR').format(displayTotalInscriptions)}</p>
+            <p className="text-[10px] text-slate-400 truncate">Moy: {(displayTotalInscriptions / (totalCourses || 3)).toFixed(0)} / formation</p>
+          </div>
+        </div>
+
+        {/* 5th Card: Platform Revenues */}
+        <div 
+          onClick={() => { setActiveTab('revenues'); onTabChange?.('revenues'); }}
+          className={`border rounded-2xl p-3.5 sm:p-4 shadow-sm flex items-center gap-3 transition-all duration-200 overflow-hidden cursor-pointer col-span-2 lg:col-span-1 ${
+            activeTab === 'revenues'
+              ? 'bg-gradient-to-br from-emerald-950/80 to-slate-900 border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
+              : 'bg-[#1a1e24] border-white/10 hover:scale-[1.015] hover:border-emerald-500/40'
+          }`}
+          title="Cliquez pour afficher le détail complet des revenus"
+        >
+          <div className="p-2.5 bg-emerald-500/15 text-emerald-400 rounded-xl shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-1">
+              <p className="text-xs text-slate-400 font-medium truncate">Revenus</p>
+              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Total</span>
+            </div>
+            <p className="text-base sm:text-lg font-black text-emerald-400 truncate">19 500 000 F</p>
+            <p className="text-[10px] text-slate-400 truncate">Janv 2024 - Présent</p>
           </div>
         </div>
       </div>
@@ -687,16 +742,32 @@ Adresse e-mail attribuée : ${emailTrimmed}
         {/* Left Side Navigation Menu */}
         <div className="hidden md:block md:w-60 bg-white border border-slate-200 rounded-2xl p-3 shadow-sm self-start space-y-1">
           <button
-            onClick={() => { setActiveTab('stats'); setSearchQuery(''); }}
-            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all ${
+            onClick={() => { setActiveTab('stats'); setSearchQuery(''); onTabChange?.('stats'); }}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
               activeTab === 'stats' ? 'bg-red-50 text-red-900 font-bold border border-red-100' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
             <BarChart3 className="w-4 h-4 text-red-500" />
             <span>Tableau de bord</span>
           </button>
+
           <button
-            onClick={() => { setActiveTab('users'); setSearchQuery(''); }}
+            onClick={() => { setActiveTab('revenues'); setSearchQuery(''); onTabChange?.('revenues'); }}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
+              activeTab === 'revenues' ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200 shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <span>Revenus Plateforme</span>
+            </div>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-black px-1.5 py-0.5 rounded-full">
+              19,5M
+            </span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('users'); setSearchQuery(''); onTabChange?.('users'); }}
             className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
               activeTab === 'users' ? 'bg-red-50 text-red-900 font-bold border border-red-100' : 'text-slate-600 hover:bg-slate-50'
             }`}
@@ -739,7 +810,7 @@ Adresse e-mail attribuée : ${emailTrimmed}
             }`}
           >
             <Mail className="w-4 h-4 text-emerald-600" />
-            <span>E-mails Transactionnels</span>
+            <span>E-mails &amp; Diffusion</span>
           </button>
 
           <button
@@ -775,7 +846,7 @@ Adresse e-mail attribuée : ${emailTrimmed}
         <div className="flex-1 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm min-h-[500px]">
           
           {/* Active search bar when relevant */}
-          {activeTab !== 'stats' && activeTab !== 'settings' && activeTab !== 'profile' && (
+          {activeTab !== 'stats' && activeTab !== 'settings' && activeTab !== 'profile' && activeTab !== 'revenues' && (
             <div className="mb-5 flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 w-4 h-4" />
@@ -813,9 +884,52 @@ Adresse e-mail attribuée : ${emailTrimmed}
           {/* Tab Content: Stats */}
           {activeTab === 'stats' && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-base font-black text-slate-900">Vue d'ensemble analytique</h2>
-                <p className="text-xs text-slate-400">Statistiques globales calculées en temps réel.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-900">Vue d'ensemble analytique</h2>
+                  <p className="text-xs text-slate-400">Statistiques globales calculées en temps réel.</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('revenues'); onTabChange?.('revenues'); }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer self-start sm:self-auto"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Revenus Plateforme (19 500 000 FCFA)</span>
+                </button>
+              </div>
+
+              {/* Highlight Banner: Revenus de la plateforme */}
+              <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 rounded-2xl p-5 border border-emerald-500/30 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="flex items-center gap-3.5 relative z-10">
+                  <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30 shrink-0">
+                    <TrendingUp className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                        Total Encaissé
+                      </span>
+                      <span className="text-xs text-slate-300">Période Janvier 2024 - Présent</span>
+                    </div>
+                    <p className="text-2xl font-black text-emerald-400 mt-1">
+                      19 500 000 FCFA
+                    </p>
+                    <p className="text-xs text-slate-300">
+                      Généré sur les 3 formations monétisées (1 600 inscriptions étudiantes validées)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('revenues'); onTabChange?.('revenues'); }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/30 cursor-pointer shrink-0 relative z-10"
+                >
+                  <span>Consulter le détail des revenus</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Recharts Enrollment Growth Chart */}
@@ -909,6 +1023,11 @@ Adresse e-mail attribuée : ${emailTrimmed}
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Tab Content: Platform Revenues */}
+          {activeTab === 'revenues' && (
+            <AdminRevenueDashboard />
           )}
 
           {/* Tab Content: Users Management (Section 2 & 3) */}
@@ -1410,9 +1529,23 @@ Adresse e-mail attribuée : ${emailTrimmed}
           {/* Tab Content: Students */}
           {activeTab === 'students' && (
             <div className="space-y-4">
-              <div>
-                <h2 className="text-base font-black text-slate-900">Étudiants de la plateforme ({filteredStudents.length})</h2>
-                <p className="text-xs text-slate-400">Suspendez les accès globaux d'un élève ou supprimez sa fiche.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-900">
+                    Étudiants de la plateforme ({new Intl.NumberFormat('fr-FR').format(displayTotalStudents)})
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    1 600 inscriptions enregistrées via l'historique des 3 formations disponibles.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('revenues'); onTabChange?.('revenues'); }}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <span>Grand Livre des Revenus (1 600 souscriptions)</span>
+                </button>
               </div>
 
               <div className="border border-slate-150 rounded-2xl overflow-hidden">

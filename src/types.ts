@@ -387,6 +387,8 @@ export interface CustomHtmlPage {
   updatedAt: string;
   authorId?: string;
   authorName?: string;
+  authorEmail?: string;
+  lastVisitedAt?: string;
   viewsCount?: number;
 }
 

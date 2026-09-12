@@ -41,7 +41,7 @@ import {
   saveModule, saveModuleList, deleteModule, saveChapter, saveChapterList, 
   deleteChapter, saveEnrollment, deleteEnrollment, saveStudentProgress, 
   saveSimulatedEmail, clearSimulatedEmails, savePreRegistered, deletePreRegistered,
-  saveCustomPage, deleteCustomPage, saveFooterSettings
+  saveCustomPage, deleteCustomPage, saveFooterSettings, incrementCustomPageViewCount
 } from './firebaseService';
 
 // Safe localStorage JSON parser helper to prevent white screen crashes from corrupt cache
@@ -61,10 +61,69 @@ function safeJsonStorage<T>(key: string, fallback: T): T {
   }
 }
 
+function getInitialCourses(): Course[] {
+  try {
+    const saved = localStorage.getItem('sio_courses');
+    if (saved) {
+      const parsed: Course[] = JSON.parse(saved);
+      const isUpdated = parsed.some(c => c.title === "Monter des vidéos avec l'ordinateur" || c.title === 'Cash Nation');
+      if (isUpdated && parsed.length === 3) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  localStorage.setItem('sio_courses', JSON.stringify(INITIAL_COURSES));
+  return INITIAL_COURSES;
+}
+
+function getInitialCustomPages(): CustomHtmlPage[] {
+  try {
+    const saved = localStorage.getItem('sio_custom_pages');
+    if (saved) {
+      const parsed: CustomHtmlPage[] = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure all trainer custom landing pages from mockData are merged and present
+        const map = new Map<string, CustomHtmlPage>();
+        INITIAL_CUSTOM_PAGES.forEach(p => map.set(p.id, p));
+        parsed.forEach((p: CustomHtmlPage) => {
+          const existing = map.get(p.id);
+          map.set(p.id, existing ? { ...existing, ...p } : p);
+        });
+        const merged = Array.from(map.values());
+        localStorage.setItem('sio_custom_pages', JSON.stringify(merged));
+        return merged;
+      }
+    }
+  } catch (e) {}
+  localStorage.setItem('sio_custom_pages', JSON.stringify(INITIAL_CUSTOM_PAGES));
+  return INITIAL_CUSTOM_PAGES;
+}
+
+function getInitialUsers(): User[] {
+  try {
+    const saved = localStorage.getItem('sio_users');
+    if (saved) {
+      const parsed: User[] = JSON.parse(saved);
+      const hasIbrahim = parsed.some(u => u.id === 'u-6' || u.name === 'Ibrahim Touré');
+      if (hasIbrahim) {
+        return parsed;
+      }
+      const ibrahim = INITIAL_USERS.find(u => u.id === 'u-6');
+      if (ibrahim) {
+        const updated = [...parsed, ibrahim];
+        localStorage.setItem('sio_users', JSON.stringify(updated));
+        return updated;
+      }
+    }
+  } catch (e) {}
+  localStorage.setItem('sio_users', JSON.stringify(INITIAL_USERS));
+  return INITIAL_USERS;
+}
+
 export default function App() {
   // --- Persistent State Handlers (localStorage/Firestore cached fallback) ---
-  const [allUsers, setAllUsers] = useState<User[]>(() => safeJsonStorage('sio_users', INITIAL_USERS));
-  const [allCourses, setAllCourses] = useState<Course[]>(() => safeJsonStorage('sio_courses', INITIAL_COURSES));
+  const [allUsers, setAllUsers] = useState<User[]>(getInitialUsers);
+  const [allCourses, setAllCourses] = useState<Course[]>(getInitialCourses);
   const [allModules, setAllModules] = useState<Module[]>(() => safeJsonStorage('sio_modules', INITIAL_MODULES));
   const [allChapters, setAllChapters] = useState<Chapter[]>(() => safeJsonStorage('sio_chapters', INITIAL_CHAPTERS));
   const [allEnrollments, setAllEnrollments] = useState<Enrollment[]>(() => safeJsonStorage('sio_enrollments', INITIAL_ENROLLMENTS));
@@ -171,13 +230,13 @@ export default function App() {
   };
 
   // --- Custom HTML Pages State & Firestore Sync ---
-  const [allCustomPages, setAllCustomPages] = useState<CustomHtmlPage[]>(() => safeJsonStorage('sio_custom_pages', INITIAL_CUSTOM_PAGES));
+  const [allCustomPages, setAllCustomPages] = useState<CustomHtmlPage[]>(getInitialCustomPages);
 
   const [previewingCustomPage, setPreviewingCustomPage] = useState<CustomHtmlPage | null>(null);
   
   // Synchronous initial route detection (zero delay / no home page flash)
   const [activeCustomPageRoute, setActiveCustomPageRoute] = useState<CustomHtmlPage | null>(() => {
-    const pages: CustomHtmlPage[] = safeJsonStorage('sio_custom_pages', INITIAL_CUSTOM_PAGES);
+    const pages: CustomHtmlPage[] = getInitialCustomPages();
     let slug = '';
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     const SYSTEM_RESERVED_SLUGS = ['marketplace', 'admin', 'student', 'trainer', 'auth', 'verify-email', 'verify', 'verifier-email', 'reset-password', 'mot-de-passe-oublie', 'connexion', 'login', 'inscription', 'register', 'dashboard', 'api', 'unsubscribe', 'desabonnement', 'desinscription'];
@@ -254,6 +313,31 @@ export default function App() {
     }
     if (pageToDelete) {
       showToast(`Page "${pageToDelete.title}" supprimée.`, 'info');
+    }
+  };
+
+  const handleIncrementCustomPageView = async (pageId: string) => {
+    let targetPage: CustomHtmlPage | undefined;
+    setAllCustomPages(prev => {
+      const updated = prev.map(p => {
+        if (p.id === pageId || p.slug === pageId) {
+          targetPage = {
+            ...p,
+            viewsCount: (p.viewsCount || 0) + 1,
+            lastVisitedAt: new Date().toISOString()
+          };
+          return targetPage;
+        }
+        return p;
+      });
+      localStorage.setItem('sio_custom_pages', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      await incrementCustomPageViewCount(pageId, targetPage);
+    } catch (err) {
+      console.warn('View count sync notice:', err);
     }
   };
 
@@ -620,6 +704,32 @@ export default function App() {
       setPreRegistered(list);
     }, (err) => {
       console.warn('Preregistered collection subscription restricted:', err.message);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'custom_pages'), (snap) => {
+      const firestorePages: CustomHtmlPage[] = [];
+      snap.forEach(docSnap => {
+        firestorePages.push(docSnap.data() as CustomHtmlPage);
+      });
+      if (firestorePages.length > 0) {
+        setAllCustomPages(prev => {
+          const map = new Map<string, CustomHtmlPage>();
+          INITIAL_CUSTOM_PAGES.forEach(p => map.set(p.id, p));
+          prev.forEach(p => map.set(p.id, p));
+          firestorePages.forEach(p => {
+            const existing = map.get(p.id);
+            map.set(p.id, existing ? { ...existing, ...p } : p);
+          });
+          const merged = Array.from(map.values());
+          localStorage.setItem('sio_custom_pages', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }, (err) => {
+      console.warn('Custom pages subscription notice:', err.message);
     });
     return () => unsub();
   }, []);
@@ -1182,11 +1292,12 @@ Bon apprentissage.`,
     
     if (targetSlug && !['', 'marketplace', 'catalogue', 'admin', 'student', 'trainer', 'auth', 'connexion', 'inscription', 'register', 'dashboard', 'reset-password', 'verify-email', 'api', 'formateurs', 'trainers', 'faq', 'centre-aide', 'help', 'contact', 'unsubscribe', 'desabonnement', 'desinscription'].includes(targetSlug.toLowerCase())) {
       const matchedPage = allCustomPages.find(p => p.slug?.toLowerCase() === targetSlug.toLowerCase() || p.id?.toLowerCase() === targetSlug.toLowerCase());
-      if (matchedPage && (matchedPage.status === 'published' || currentUser?.role === 'admin')) {
+      if (matchedPage && (matchedPage.status === 'published' || currentUser?.role === 'admin' || currentUser?.role === 'trainer')) {
         return (
           <CustomPageViewer
             page={matchedPage}
             onClosePreview={() => navigateTo('/')}
+            onIncrementView={handleIncrementCustomPageView}
           />
         );
       }
@@ -1515,7 +1626,6 @@ Bon apprentissage.`,
       else if (pathname.includes('/webhooks')) subTab = 'webhooks';
       else if (pathname.includes('/assistants')) subTab = 'assistants';
       else if (pathname.includes('/custom-pages') || pathname.includes('/pages')) subTab = 'custom-pages';
-      else if (pathname.includes('/emails')) subTab = 'emails';
       else if (pathname.includes('/parametres') || pathname.includes('/profil') || pathname.includes('/profile')) subTab = 'profile';
 
       return (
@@ -1627,7 +1737,8 @@ Bon apprentissage.`,
       }
 
       let subTab = 'stats';
-      if (pathname.includes('/utilisateurs') || pathname.includes('/users')) subTab = 'users';
+      if (pathname.includes('/revenus') || pathname.includes('/revenues')) subTab = 'revenues';
+      else if (pathname.includes('/utilisateurs') || pathname.includes('/users')) subTab = 'users';
       else if (pathname.includes('/trainers') || pathname.includes('/formateurs')) subTab = 'trainers';
       else if (pathname.includes('/formations') || pathname.includes('/courses')) subTab = 'courses';
       else if (pathname.includes('/students') || pathname.includes('/etudiants')) subTab = 'students';

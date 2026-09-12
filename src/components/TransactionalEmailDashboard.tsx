@@ -450,6 +450,21 @@ export default function TransactionalEmailDashboard({
   const failedEmails = logs.filter(l => l.status === 'failed').length;
   const successRate = totalEmails > 0 ? Math.round((sentEmails / totalEmails) * 100) : 100;
 
+  // Strict role enforcement: Only administrator is authorized
+  if (currentUser?.role !== 'admin') {
+    return (
+      <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 shadow-sm max-w-lg mx-auto mt-6">
+        <div className="inline-flex p-3 bg-red-50 text-red-600 rounded-full mb-3">
+          <ShieldCheck className="w-6 h-6 text-red-500" />
+        </div>
+        <h3 className="text-base font-bold text-slate-900">Accès strictement réservé à l'Administrateur</h3>
+        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+          Seul l'administrateur de la plateforme est autorisé à consulter et gérer la page E-mails &amp; Diffusion. Ni les formateurs ni les étudiants ne peuvent accéder à cet espace.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in text-slate-100">
       

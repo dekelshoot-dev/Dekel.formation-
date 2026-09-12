@@ -10,7 +10,6 @@ import {
 import { showToast } from './Toast';
 import UserProfile from './UserProfile';
 import CustomPagesManager from './CustomPagesManager';
-import EmailBroadcastManager from './EmailBroadcastManager';
 import ModuleProgressChart from './ModuleProgressChart';
 import { db } from '../firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
@@ -96,13 +95,17 @@ export default function TrainerDashboard({
   onTabChange
 }: TrainerDashboardProps) {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants' | 'custom-pages' | 'emails'>(
-    (initialTab as any) || 'dashboard'
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'courses' | 'students' | 'course-editor' | 'webhooks' | 'assistants' | 'custom-pages'>(
+    initialTab && initialTab !== 'emails' ? (initialTab as any) : 'dashboard'
   );
 
   useEffect(() => {
     if (initialTab && initialTab !== activeTab) {
-      setActiveTab(initialTab as any);
+      if ((initialTab as any) === 'emails') {
+        setActiveTab('dashboard');
+      } else {
+        setActiveTab(initialTab as any);
+      }
     }
   }, [initialTab]);
 
@@ -2098,15 +2101,6 @@ Le support Dekel.Formation`,
                   <span>Pages HTML ({customPages.length})</span>
                 </button>
 
-                <button
-                  onClick={() => { setActiveTab('emails'); setSelectedCourseId(null); setIsMobileDrawerOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all cursor-pointer ${
-                    activeTab === 'emails' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <Mail className="w-4 h-4 text-purple-500" />
-                  <span>E-mails &amp; Diffusion</span>
-                </button>
 
                 {(currentUser.role === 'trainer' || currentUser.role === 'admin') && (
                   <button
@@ -2223,15 +2217,6 @@ Le support Dekel.Formation`,
         >
           <FileCode className="w-4 h-4 text-amber-500" />
           <span>Pages HTML ({customPages.length})</span>
-        </button>
-        <button
-          onClick={() => { setActiveTab('emails'); setSelectedCourseId(null); }}
-          className={`pb-3 px-1 border-b-2 transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'emails' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <Mail className="w-4 h-4 text-purple-500" />
-          <span>E-mails &amp; Diffusion</span>
         </button>
         {(currentUser.role === 'trainer' || currentUser.role === 'admin') && (
           <button
@@ -5534,16 +5519,6 @@ Le support Dekel.Formation`,
         </div>
       )}
 
-      {/* Tab: Emails & Broadcast */}
-      {activeTab === 'emails' && (
-        <div className="space-y-6 animate-fade-in">
-          <EmailBroadcastManager
-            allUsers={allUsers}
-            currentUser={currentUser}
-            onSendEmail={onSendEmail}
-          />
-        </div>
-      )}
 
       {/* Visualiser Profil Modal */}
       {viewingUserProfile && (
